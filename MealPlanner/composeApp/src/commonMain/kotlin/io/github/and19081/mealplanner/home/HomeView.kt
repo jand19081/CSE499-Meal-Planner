@@ -1,4 +1,4 @@
-package io.github.and19081.mealplanner
+package io.github.and19081.mealplanner.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -17,12 +17,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.and19081.mealplanner.Greeting
 import mealplanner.composeapp.generated.resources.Res
 import mealplanner.composeapp.generated.resources.compose_multiplatform
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun MainView() {
+fun HomeView() {
     var showContent by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
