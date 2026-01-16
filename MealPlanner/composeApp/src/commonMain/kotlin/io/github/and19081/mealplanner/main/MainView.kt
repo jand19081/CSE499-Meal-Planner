@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.and19081.mealplanner.home.HomeView
+import io.github.and19081.mealplanner.ingredients.IngredientsView
 import io.github.and19081.mealplanner.settings.SettingsView
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +75,9 @@ fun MainView(
             ) {
                 composable<HomeRoute> {
                     HomeView()
+                }
+                composable<IngredientsRoute> {
+                    IngredientsView()
                 }
                 composable<SettingsRoute> {
                     SettingsView()
