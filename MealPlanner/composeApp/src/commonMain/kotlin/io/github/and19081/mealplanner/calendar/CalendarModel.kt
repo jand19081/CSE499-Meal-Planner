@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner.calendar
 
 import io.github.and19081.mealplanner.MealType
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class CalendarEvent(

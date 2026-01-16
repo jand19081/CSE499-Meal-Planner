@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner.shoppinglist
 
 import androidx.lifecycle.ViewModel
@@ -9,6 +7,7 @@ import io.github.and19081.mealplanner.MealComponent
 import io.github.and19081.mealplanner.MealPlanEntry
 import io.github.and19081.mealplanner.MealPlannerRepository
 import io.github.and19081.mealplanner.Recipe
+import io.github.and19081.mealplanner.RecipeIngredient
 import io.github.and19081.mealplanner.RecipeRepository
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.ingredients.Ingredient
@@ -17,11 +16,9 @@ import io.github.and19081.mealplanner.settings.SettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.math.ceil
 
-@OptIn(ExperimentalUuidApi::class)
 class ShoppingListViewModel : ViewModel() {
 
     data class RepoData(
@@ -30,7 +27,10 @@ class ShoppingListViewModel : ViewModel() {
         val mealComponents: List<MealComponent>,
         val recipes: List<Recipe>,
         val overrides: Map<Uuid, ShoppingListOverride>,
-        val taxRate: Double
+        val taxRate: Double,
+        val allIngredients: List<Ingredient>,
+        val allStores: List<Store>,
+        val allRecipeIngredients: List<RecipeIngredient>
     )
 
     private val repoDataFlow = combine(
@@ -39,7 +39,10 @@ class ShoppingListViewModel : ViewModel() {
         MealPlannerRepository.mealComponents,
         RecipeRepository.recipes,
         ShoppingListRepository.overrides,
-        SettingsRepository.salesTaxRate
+        SettingsRepository.salesTaxRate,
+        MealPlannerRepository.ingredients,
+        MealPlannerRepository.stores,
+        MealPlannerRepository.recipeIngredients
     ) { args: Array<Any> ->
         RepoData(
             entries = args[0] as List<MealPlanEntry>,
@@ -47,13 +50,16 @@ class ShoppingListViewModel : ViewModel() {
             mealComponents = args[2] as List<MealComponent>,
             recipes = args[3] as List<Recipe>,
             overrides = args[4] as Map<Uuid, ShoppingListOverride>,
-            taxRate = args[5] as Double
+            taxRate = args[5] as Double,
+            allIngredients = args[6] as List<Ingredient>,
+            allStores = args[7] as List<Store>,
+            allRecipeIngredients = args[8] as List<RecipeIngredient>
         )
     }
 
     // Map the combined data to UI State
     val uiState = repoDataFlow.combine(kotlinx.coroutines.flow.flowOf(Unit)) { data, _ ->
-        val (entries, meals, mealComponents, recipes, overrides, taxRate) = data
+        val (entries, meals, mealComponents, recipes, overrides, taxRate, allIngredients, allStores, allRecipeIngredients) = data
 
         // Aggregate Needs
         val requirements = mutableMapOf<Pair<Uuid, String>, Double>() // (IngId, UnitName) -> Qty
@@ -68,7 +74,7 @@ class ShoppingListViewModel : ViewModel() {
                 components.forEach { comp ->
                     if (comp.ingredientId != null) {
                         // Direct Ingredient
-                        val ing = MealPlannerRepository.ingredients.find { it.id == comp.ingredientId }
+                        val ing = allIngredients.find { it.id == comp.ingredientId }
                         if (ing != null) {
                             val key = ing.id to (comp.quantity?.unit?.name ?: "EACH")
                             val baseQty = comp.quantity?.amount ?: 1.0
@@ -81,7 +87,7 @@ class ShoppingListViewModel : ViewModel() {
                             // Scale: (Target / Base)
                             val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
                             
-                            val recipeIngs = MealPlannerRepository.recipeIngredients.filter { it.recipeId == recipe.id }
+                            val recipeIngs = allRecipeIngredients.filter { it.recipeId == recipe.id }
                             recipeIngs.forEach { ri ->
                                 val key = ri.ingredientId to ri.quantity.unit.name
                                 requirements[key] = (requirements[key] ?: 0.0) + (ri.quantity.amount * scale)
@@ -96,7 +102,7 @@ class ShoppingListViewModel : ViewModel() {
         val shoppingLists = mutableMapOf<Uuid, ShoppingListSection>() // StoreId -> Section
         val ownedItems = mutableListOf<ShoppingListItemUi>()
 
-        MealPlannerRepository.stores.forEach { store ->
+        allStores.forEach { store ->
             shoppingLists[store.id] = ShoppingListSection(
                 storeId = store.id,
                 storeName = store.name,
@@ -109,7 +115,7 @@ class ShoppingListViewModel : ViewModel() {
 
         requirements.forEach { (key, qty) ->
             val (ingId, unitName) = key
-            val ing = MealPlannerRepository.ingredients.find { it.id == ingId } ?: return@forEach
+            val ing = allIngredients.find { it.id == ingId } ?: return@forEach
             val override = overrides[ingId]
 
             if (override?.isOwned == true) {
@@ -150,7 +156,13 @@ class ShoppingListViewModel : ViewModel() {
                     }
 
                     val currentList = shoppingLists[targetStoreId] 
-                        ?: ShoppingListSection(targetStoreId, MealPlannerRepository.stores.find { it.id == targetStoreId }?.name ?: "Unknown", emptyList(), 0, 0, 0)
+                        ?: ShoppingListSection(targetStoreId,
+                            allStores.find { it.id == targetStoreId }?.name ?: "Unknown",
+                            emptyList(),
+                            0,
+                            0,
+                            0
+                        )
                     
                     val newItem = ShoppingListItemUi(
                         ingredientId = ingId,
@@ -170,7 +182,7 @@ class ShoppingListViewModel : ViewModel() {
             }
         }
 
-        // 3. Calculate Totals (Tax)
+        // Calculate Totals (Tax)
         val finalLists = shoppingLists.values.map { section ->
             val tax = (section.subtotalCents * taxRate).toLong()
             section.copy(
@@ -182,9 +194,15 @@ class ShoppingListViewModel : ViewModel() {
         ShoppingListUiState(
             sections = finalLists.sortedBy { it.storeName },
             ownedItems = ownedItems,
-            allStores = MealPlannerRepository.stores.toList()
+            allStores = allStores
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ShoppingListUiState(emptyList(), emptyList(), emptyList()))
+    }.stateIn(viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ShoppingListUiState(emptyList(),
+            emptyList(),
+            emptyList()
+        )
+    )
 
     fun markOwned(ingredientId: Uuid) {
         ShoppingListRepository.markAsOwned(ingredientId)

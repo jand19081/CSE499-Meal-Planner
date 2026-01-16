@@ -1,17 +1,15 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner
 
-import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.Measure
+import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.ingredients.PurchaseOption
 import io.github.and19081.mealplanner.ingredients.Store
-import kotlin.time.Clock
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
-import kotlinx.datetime.DatePeriod
-import kotlin.uuid.ExperimentalUuidApi
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 object MockData {
@@ -22,11 +20,7 @@ object MockData {
         val winco = Store(id = Uuid.random(), name = "WinCo")
         val costco = Store(id = Uuid.random(), name = "Costco")
         
-        MealPlannerRepository.stores.clear()
-        MealPlannerRepository.stores.addAll(listOf(walmart, winco, costco))
-
-        // Ingredients & Purchase Options
-        val ingredients = mutableListOf<Ingredient>()
+        MealPlannerRepository.setStores(listOf(walmart, winco, costco))
 
         // Helper to make options
         fun makeOption(store: Store, cents: Long, amount: Double, unit: MeasureUnit): PurchaseOption {
@@ -40,6 +34,7 @@ object MockData {
 
         // --- Ground Beef ---
         val groundBeef = Ingredient(
+            id = Uuid.random(),
             name = "Ground Beef",
             category = "Meat",
             purchaseOptions = listOf(
@@ -48,10 +43,10 @@ object MockData {
                 makeOption(costco, 2499, 5.0, MeasureUnit.LB)
             )
         )
-        ingredients.add(groundBeef)
 
         // --- Pasta Noodles ---
         val pasta = Ingredient(
+            id = Uuid.random(),
             name = "Lasagna Noodles",
             category = "Pantry",
             purchaseOptions = listOf(
@@ -59,10 +54,10 @@ object MockData {
                 makeOption(winco, 148, 16.0, MeasureUnit.OZ)
             )
         )
-        ingredients.add(pasta)
 
         // --- Marinara Sauce ---
         val marinara = Ingredient(
+            id = Uuid.random(),
             name = "Marinara Sauce",
             category = "Pantry",
             purchaseOptions = listOf(
@@ -71,10 +66,10 @@ object MockData {
                 makeOption(costco, 899, 3.0 * 24.0, MeasureUnit.OZ) // 3 pack
             )
         )
-        ingredients.add(marinara)
 
         // --- Cheese (Mozzarella) ---
         val cheese = Ingredient(
+            id = Uuid.random(),
             name = "Mozzarella Cheese",
             category = "Dairy",
             purchaseOptions = listOf(
@@ -83,10 +78,10 @@ object MockData {
                 makeOption(costco, 1299, 2.0, MeasureUnit.LB) // 32 oz
             )
         )
-        ingredients.add(cheese)
 
         // --- Tortillas ---
         val tortillas = Ingredient(
+            id = Uuid.random(),
             name = "Corn Tortillas",
             category = "Pantry",
             purchaseOptions = listOf(
@@ -94,10 +89,10 @@ object MockData {
                 makeOption(winco, 250, 30.0, MeasureUnit.EACH)
             )
         )
-        ingredients.add(tortillas)
 
         // --- Eggs ---
         val eggs = Ingredient(
+            id = Uuid.random(),
             name = "Eggs",
             category = "Dairy",
             purchaseOptions = listOf(
@@ -106,10 +101,10 @@ object MockData {
                 makeOption(costco, 999, 60.0, MeasureUnit.EACH)
             )
         )
-        ingredients.add(eggs)
 
         // --- Onions ---
         val onion = Ingredient(
+            id = Uuid.random(),
             name = "Onion",
             category = "Produce",
             purchaseOptions = listOf(
@@ -117,14 +112,13 @@ object MockData {
                 makeOption(winco, 58, 1.0, MeasureUnit.EACH)
             )
         )
-        ingredients.add(onion)
 
-        MealPlannerRepository.ingredients.clear()
-        MealPlannerRepository.ingredients.addAll(ingredients)
-
+        val ingredients = listOf(groundBeef, pasta, marinara, cheese, tortillas, eggs, onion)
+        MealPlannerRepository.setIngredients(ingredients)
+        
         // Recipes
         val rLasagna = Recipe(
-            id = Uuid.random(),
+            id = Uuid.parse("60e8d022-7772-4638-8924-111111111111"),
             name = "Lasagna",
             baseServings = 6.0,
             instructions = listOf(
@@ -158,25 +152,21 @@ object MockData {
 
         RecipeRepository.recipes.value = listOf(rLasagna, rTacos, rOmelette)
 
-        // Recipe Ingredients
-        MealPlannerRepository.recipeIngredients.clear()
-        
-        // Lasagna Ingredients
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rLasagna.id, ingredientId = groundBeef.id, quantity = Measure(1.0, MeasureUnit.LB)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rLasagna.id, ingredientId = pasta.id, quantity = Measure(12.0, MeasureUnit.OZ)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rLasagna.id, ingredientId = marinara.id, quantity = Measure(24.0, MeasureUnit.OZ)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rLasagna.id, ingredientId = cheese.id, quantity = Measure(2.0, MeasureUnit.CUP)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rLasagna.id, ingredientId = onion.id, quantity = Measure(1.0, MeasureUnit.EACH)))
-
-        // Tacos Ingredients
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rTacos.id, ingredientId = groundBeef.id, quantity = Measure(1.0, MeasureUnit.LB)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rTacos.id, ingredientId = tortillas.id, quantity = Measure(12.0, MeasureUnit.EACH)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rTacos.id, ingredientId = cheese.id, quantity = Measure(1.0, MeasureUnit.CUP)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rTacos.id, ingredientId = onion.id, quantity = Measure(0.5, MeasureUnit.EACH)))
-
-        // Omelette Ingredients
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rOmelette.id, ingredientId = eggs.id, quantity = Measure(3.0, MeasureUnit.EACH)))
-        MealPlannerRepository.recipeIngredients.add(RecipeIngredient(recipeId = rOmelette.id, ingredientId = cheese.id, quantity = Measure(0.5, MeasureUnit.CUP)))
+        MealPlannerRepository.setRecipeIngredients(listOf(
+            RecipeIngredient(recipeId = rLasagna.id, ingredientId = groundBeef.id, quantity = Measure(1.0, MeasureUnit.LB)),
+            RecipeIngredient(recipeId = rLasagna.id, ingredientId = pasta.id, quantity = Measure(12.0, MeasureUnit.OZ)),
+            RecipeIngredient(recipeId = rLasagna.id, ingredientId = marinara.id, quantity = Measure(24.0, MeasureUnit.OZ)),
+            RecipeIngredient(recipeId = rLasagna.id, ingredientId = cheese.id, quantity = Measure(2.0, MeasureUnit.CUP)),
+            RecipeIngredient(recipeId = rLasagna.id, ingredientId = onion.id, quantity = Measure(1.0, MeasureUnit.EACH)),
+            
+            RecipeIngredient(recipeId = rTacos.id, ingredientId = groundBeef.id, quantity = Measure(1.0, MeasureUnit.LB)),
+            RecipeIngredient(recipeId = rTacos.id, ingredientId = tortillas.id, quantity = Measure(12.0, MeasureUnit.EACH)),
+            RecipeIngredient(recipeId = rTacos.id, ingredientId = cheese.id, quantity = Measure(1.0, MeasureUnit.CUP)),
+            RecipeIngredient(recipeId = rTacos.id, ingredientId = onion.id, quantity = Measure(0.5, MeasureUnit.EACH)),
+            
+            RecipeIngredient(recipeId = rOmelette.id, ingredientId = eggs.id, quantity = Measure(3.0, MeasureUnit.EACH)),
+            RecipeIngredient(recipeId = rOmelette.id, ingredientId = cheese.id, quantity = Measure(0.5, MeasureUnit.CUP))
+        ))
 
         // Meals
         val mLasagna = Meal(id = Uuid.random(), name = "Lasagna Dinner", description = "Classic family dinner")

@@ -11,6 +11,10 @@ plugins {
 }
 
 kotlin {
+    sourceSets.all {
+        languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+    }
+
     androidLibrary {
         namespace = "io.github.and19081.mealplanner"
         compileSdk = libs.versions.android.compileSdk.get().toInt()

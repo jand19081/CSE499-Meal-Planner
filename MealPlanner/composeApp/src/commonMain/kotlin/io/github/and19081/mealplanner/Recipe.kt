@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner
 
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class Recipe(

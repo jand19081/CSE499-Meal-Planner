@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner.shoppinglist
 
 import io.github.and19081.mealplanner.Measure
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class ShoppingItem(

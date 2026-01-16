@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner.calendar
 
 import androidx.lifecycle.ViewModel
@@ -21,7 +19,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 // The UI State

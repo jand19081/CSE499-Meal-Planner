@@ -10,22 +10,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlin.uuid.ExperimentalUuidApi
+import kotlinx.coroutines.flow.update
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class RecipesViewModel : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortByAlpha = MutableStateFlow(true)
-    private val _repoTrigger = MutableStateFlow(0) // To force refresh of ingredients
 
     val uiState = combine(
         RecipeRepository.recipes,
         _searchQuery,
         _sortByAlpha,
-        _repoTrigger
-    ) { recipes, query, isAlpha, _ ->
+        MealPlannerRepository.ingredients,
+        MealPlannerRepository.recipeIngredients
+    ) { recipes, query, isAlpha, ingredients, recipeIngredients ->
 
         // 1. Filter
         val filtered = if (query.isBlank()) recipes else {
@@ -47,25 +46,35 @@ class RecipesViewModel : ViewModel() {
             groupedRecipes = grouped,
             searchQuery = query,
             doesExactMatchExist = exactMatch,
-            allIngredients = MealPlannerRepository.ingredients.toList()
+            allIngredients = ingredients,
+            allRecipeIngredients = recipeIngredients
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecipesUiState(emptyMap(), "", false, emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecipesUiState(emptyMap(), "", false, emptyList(), emptyList()))
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }
 
-    fun saveRecipe(recipe: Recipe) {
-        val current = RecipeRepository.recipes.value.toMutableList()
-        current.removeAll { it.id == recipe.id }
-        current.add(recipe)
-        RecipeRepository.recipes.value = current
+    fun saveRecipe(recipe: Recipe, ingredients: List<io.github.and19081.mealplanner.RecipeIngredient>) {
+        // Save Recipe
+        RecipeRepository.recipes.update { current ->
+            val list = current.toMutableList()
+            list.removeAll { it.id == recipe.id }
+            list.add(recipe)
+            list
+        }
+        
+        // Save Ingredients
+        MealPlannerRepository.removeRecipeIngredients(recipe.id)
+        ingredients.forEach { 
+            MealPlannerRepository.addRecipeIngredient(it)
+        }
     }
 
     fun deleteRecipe(id: Uuid) {
-        val current = RecipeRepository.recipes.value.toMutableList()
-        current.removeAll { it.id == id }
-        RecipeRepository.recipes.value = current
+        RecipeRepository.recipes.update { current ->
+            current.filter { it.id != id }
+        }
     }
 }
 
@@ -73,5 +82,6 @@ data class RecipesUiState(
     val groupedRecipes: Map<String, List<Recipe>>,
     val searchQuery: String,
     val doesExactMatchExist: Boolean,
-    val allIngredients: List<Ingredient>
+    val allIngredients: List<Ingredient>,
+    val allRecipeIngredients: List<io.github.and19081.mealplanner.RecipeIngredient>
 )

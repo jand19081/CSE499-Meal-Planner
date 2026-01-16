@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package io.github.and19081.mealplanner.recipes
 
@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.ingredients.Ingredient
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Composable
@@ -104,6 +103,7 @@ fun RecipesView() {
                 items(recipes) { recipe ->
                     RecipeRow(
                         recipe = recipe,
+                        allRecipeIngredients = uiState.allRecipeIngredients,
                         onEditClick = {
                             selectedRecipe = recipe
                             showEditDialog = true
@@ -120,12 +120,11 @@ fun RecipesView() {
             recipe = selectedRecipe,
             initialName = creationName,
             allIngredients = uiState.allIngredients,
+            // Pass current recipe ingredients from state so dialog has initial data
+            initialRecipeIngredients = uiState.allRecipeIngredients.filter { it.recipeId == (selectedRecipe?.id ?: Uuid.NIL) },
             onDismiss = { showEditDialog = false },
             onSave = { recipe, ingredients ->
-                viewModel.saveRecipe(recipe)
-                // Update ingredients in repo manually for now (should be in VM but this works for MVP)
-                MealPlannerRepository.recipeIngredients.removeAll { it.recipeId == recipe.id }
-                MealPlannerRepository.recipeIngredients.addAll(ingredients)
+                viewModel.saveRecipe(recipe, ingredients)
                 showEditDialog = false
             }
         )
@@ -135,10 +134,11 @@ fun RecipesView() {
 @Composable
 fun RecipeRow(
     recipe: Recipe,
+    allRecipeIngredients: List<RecipeIngredient>,
     onEditClick: () -> Unit
 ) {
     // Count ingredients
-    val ingredientCount = MealPlannerRepository.recipeIngredients.count { it.recipeId == recipe.id }
+    val ingredientCount = allRecipeIngredients.count { it.recipeId == recipe.id }
     val subtitle = "Serves ${recipe.baseServings} • $ingredientCount ingredients"
 
     ExpandableListItem(
@@ -168,6 +168,7 @@ fun RecipeEditDialog(
     recipe: Recipe?,
     initialName: String,
     allIngredients: List<Ingredient>,
+    initialRecipeIngredients: List<RecipeIngredient>,
     onDismiss: () -> Unit,
     onSave: (Recipe, List<RecipeIngredient>) -> Unit
 ) {
@@ -177,17 +178,10 @@ fun RecipeEditDialog(
     var instructionsText by remember { mutableStateOf(recipe?.instructions?.joinToString("\n") ?: "") }
 
     // Ingredients State
-    // We need a temp ID for new recipes to link ingredients
+    // temp ID for new recipes to link ingredients
     val recipeId = remember { recipe?.id ?: Uuid.random() }
-    var currentIngredients by remember {
-        mutableStateOf(
-            if (recipe != null) {
-                MealPlannerRepository.recipeIngredients.filter { it.recipeId == recipe.id }
-            } else {
-                emptyList()
-            }
-        )
-    }
+    
+    var currentIngredients by remember { mutableStateOf(initialRecipeIngredients) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("General", "Ingredients")
@@ -197,7 +191,7 @@ fun RecipeEditDialog(
         title = { Text(if (recipe == null) "New Recipe" else "Edit Recipe") },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)) {
-                TabRow(selectedTabIndex = selectedTabIndex) {
+                SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTabIndex == index,
@@ -304,7 +298,7 @@ fun RecipeIngredientsEditor(
                             Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                         }
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }

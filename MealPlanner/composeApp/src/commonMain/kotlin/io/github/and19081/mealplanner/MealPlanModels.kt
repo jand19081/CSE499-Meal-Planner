@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner
 
 import kotlinx.datetime.LocalDate
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 enum class MealType {
@@ -30,11 +27,7 @@ data class MealComponent(
 
     val recipeId: Uuid? = null,
     val ingredientId: Uuid? = null,
-    
-    // For Ingredients: Amount per person? Or fixed amount?
-    // Let's assume for now this is "Amount per Serving" if we scale, 
-    // or just "Amount" if we don't scale ingredients nicely yet.
-    // For Recipes: usually null (implies 1x base recipe serving).
+
     val quantity: Measure? = null
 )
 

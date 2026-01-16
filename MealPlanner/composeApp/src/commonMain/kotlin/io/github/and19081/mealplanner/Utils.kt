@@ -1,17 +1,21 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package io.github.and19081.mealplanner
 
 import io.github.and19081.mealplanner.ingredients.Ingredient
-import kotlin.uuid.ExperimentalUuidApi
 
 // Logic
-fun calculateEstimatedCost(entry: MealPlanEntry, allRecipes: List<Recipe>, allIngredients: List<Ingredient>): Long {
+fun calculateEstimatedCost(
+    entry: MealPlanEntry,
+    allMeals: List<Meal>,
+    allMealComponents: List<MealComponent>,
+    allRecipes: List<Recipe>,
+    allIngredients: List<Ingredient>,
+    allRecipeIngredients: List<RecipeIngredient>
+): Long {
     // Find Meal
-    val meal = MealPlannerRepository.meals.value.find { it.id == entry.mealId } ?: return 0L
+    val meal = allMeals.find { it.id == entry.mealId } ?: return 0L
     
     // Find Components
-    val components = MealPlannerRepository.mealComponents.value.filter { it.mealId == meal.id }
+    val components = allMealComponents.filter { it.mealId == meal.id }
 
     var totalCents = 0L
 
@@ -23,7 +27,7 @@ fun calculateEstimatedCost(entry: MealPlanEntry, allRecipes: List<Recipe>, allIn
                 val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
 
                 // Look up ingredients from the central repo
-                val recipeIngredients = MealPlannerRepository.recipeIngredients.filter { it.recipeId == recipe.id }
+                val recipeIngredients = allRecipeIngredients.filter { it.recipeId == recipe.id }
 
                 for (ri in recipeIngredients) {
                     val ingredient = allIngredients.find { it.id == ri.ingredientId }
@@ -44,7 +48,6 @@ fun calculateEstimatedCost(entry: MealPlanEntry, allRecipes: List<Recipe>, allIn
             val ingredient = allIngredients.find { it.id == comp.ingredientId }
             if (ingredient != null) {
                 val qty = comp.quantity?.amount ?: 1.0
-                // Scaling? Assume ingredients in a meal also scale by person
                 val requiredAmount = qty * entry.targetServings
                 
                 val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }

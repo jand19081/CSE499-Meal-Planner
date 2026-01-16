@@ -149,7 +149,7 @@ fun IngredientRow(
     // Calculate Best Price
     val bestOption = ingredient.purchaseOptions.minByOrNull { it.unitPrice }
     val bestPriceString = if (bestOption != null) {
-        val store = MealPlannerRepository.stores.find { it.id == bestOption.storeId }?.name ?: "Unknown"
+        val store = MealPlannerRepository.stores.value.find { it.id == bestOption.storeId }?.name ?: "Unknown"
         val price = bestOption.priceCents / 100.0
         // Price per 1 Unit
         val perUnit = price / bestOption.quantity.amount
@@ -174,7 +174,7 @@ fun IngredientRow(
         } else {
             Text("Purchase Options:", style = MaterialTheme.typography.labelMedium)
             ingredient.purchaseOptions.forEach { opt ->
-                val storeName = MealPlannerRepository.stores.find { it.id == opt.storeId }?.name ?: "Unknown Store"
+                val storeName = MealPlannerRepository.stores.value.find { it.id == opt.storeId }?.name ?: "Unknown Store"
                 Text("• $storeName: $${opt.priceCents / 100.0} for ${opt.quantity}", style = MaterialTheme.typography.bodySmall)
             }
         }

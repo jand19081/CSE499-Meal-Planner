@@ -13,10 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class MealsViewModel : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -26,9 +23,16 @@ class MealsViewModel : ViewModel() {
         MealPlannerRepository.meals,
         MealPlannerRepository.mealComponents,
         RecipeRepository.recipes,
+        MealPlannerRepository.ingredients,
         _searchQuery,
         _sortByAlpha
-    ) { meals, components, recipes, query, isAlpha ->
+    ) { args: Array<Any?> ->
+        val meals = args[0] as List<Meal>
+        val components = args[1] as List<MealComponent>
+        val recipes = args[2] as List<Recipe>
+        val ingredients = args[3] as List<Ingredient>
+        val query = args[4] as String
+        val isAlpha = args[5] as Boolean
 
         // 1. Filter
         val filtered = if (query.isBlank()) meals else {
@@ -46,10 +50,13 @@ class MealsViewModel : ViewModel() {
             searchQuery = query,
             allComponents = components,
             allRecipes = recipes,
-            allIngredients = MealPlannerRepository.ingredients.toList()
+            allIngredients = ingredients
         )
 
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MealsUiState(emptyMap(), "", emptyList(), emptyList(), emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
+        MealsUiState(emptyMap(), "", emptyList(),
+            emptyList(), emptyList())
+    )
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -57,27 +64,31 @@ class MealsViewModel : ViewModel() {
 
     fun saveMeal(meal: Meal, components: List<MealComponent>) {
         // Update Meal
-        val currentMeals = MealPlannerRepository.meals.value.toMutableList()
-        currentMeals.removeAll { it.id == meal.id }
-        currentMeals.add(meal)
-        MealPlannerRepository.meals.value = currentMeals
+        MealPlannerRepository.meals.update { current ->
+            val list = current.toMutableList()
+            list.removeAll { it.id == meal.id }
+            list.add(meal)
+            list
+        }
 
         // Update Components
-        val currentComps = MealPlannerRepository.mealComponents.value.toMutableList()
-        currentComps.removeAll { it.mealId == meal.id }
-        currentComps.addAll(components)
-        MealPlannerRepository.mealComponents.value = currentComps
+        MealPlannerRepository.mealComponents.update { current ->
+            val list = current.toMutableList()
+            list.removeAll { it.mealId == meal.id }
+            list.addAll(components)
+            list
+        }
     }
 
     fun deleteMeal(meal: Meal) {
-        val currentMeals = MealPlannerRepository.meals.value.toMutableList()
-        currentMeals.removeAll { it.id == meal.id }
-        MealPlannerRepository.meals.value = currentMeals
+        MealPlannerRepository.meals.update { current ->
+            current.filter { it.id != meal.id }
+        }
         
         // Cleanup components
-        val currentComps = MealPlannerRepository.mealComponents.value.toMutableList()
-        currentComps.removeAll { it.mealId == meal.id }
-        MealPlannerRepository.mealComponents.value = currentComps
+        MealPlannerRepository.mealComponents.update { current ->
+            current.filter { it.mealId != meal.id }
+        }
     }
 }
 
