@@ -4,11 +4,10 @@ package io.github.and19081.mealplanner.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.and19081.mealplanner.Meal
 import io.github.and19081.mealplanner.MealPlanEntry
+import io.github.and19081.mealplanner.MealPlannerRepository
 import io.github.and19081.mealplanner.MealType
-import io.github.and19081.mealplanner.Recipe
-import io.github.and19081.mealplanner.RecipeRepository
-import io.github.and19081.mealplanner.ScheduledItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +28,7 @@ import kotlin.uuid.Uuid
 data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
-    val availableRecipes: List<Recipe> = emptyList()
+    val availableMeals: List<Meal> = emptyList()
 ) {
     data class DateUiModel(
         val date: LocalDate,
@@ -61,44 +60,29 @@ class CalendarViewModel : ViewModel() {
     private val _currentMonth = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
 
-    private val recipesFlow = RecipeRepository.recipes
-
     val uiState: StateFlow<CalendarUiState> = combine(
         _currentMonth,
         _selectedDate,
         MealPlanRepository.entries,
-        MealPlanRepository.scheduledItems,
-        recipesFlow
-    ) { currentMonth, selectedDate, entries, items, recipes ->
+        MealPlannerRepository.meals
+    ) { currentMonth, selectedDate, entries, meals ->
 
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
         val dateList = CalendarDataSource.getDates(currentMonth, selectedDate)
 
         val entriesByDate = entries.groupBy { it.date }
-        val itemsByEntryId = items.groupBy { it.mealPlanEntryId }
-        val recipesById = recipes.associateBy { it.id }
+        val mealsById = meals.associateBy { it.id }
 
         val dateUiModels = dateList.map { date ->
             val daysEntries = entriesByDate[date] ?: emptyList()
 
             val resolvedEvents = daysEntries.map { entry ->
-                val entryItems = itemsByEntryId[entry.id] ?: emptyList()
-
-                val title = if (entryItems.isNotEmpty()) {
-                    val firstItem = entryItems.first()
-                    if (firstItem.recipeId != null) {
-                        recipesById[firstItem.recipeId]?.name ?: "Unknown Recipe"
-                    } else {
-                        "Custom Item"
-                    }
-                } else {
-                    "Empty Meal"
-                }
+                val mealName = mealsById[entry.mealId]?.name ?: "Unknown Meal"
 
                 CalendarEvent(
                     entryId = entry.id,
                     mealType = entry.mealType,
-                    title = title,
+                    title = mealName,
                     servings = entry.targetServings
                 )
             }
@@ -115,7 +99,7 @@ class CalendarViewModel : ViewModel() {
         CalendarUiState(
             currentMonth = currentMonth,
             dates = dateUiModels,
-            availableRecipes = recipes
+            availableMeals = meals
         )
     }.stateIn(
         scope = viewModelScope,
@@ -135,19 +119,14 @@ class CalendarViewModel : ViewModel() {
         _selectedDate.value = date
     }
 
-    fun addPlan(date: LocalDate, recipe: Recipe, mealType: MealType, servings: Double) {
+    fun addPlan(date: LocalDate, meal: Meal, mealType: MealType, servings: Double) {
         val newEntry = MealPlanEntry(
             date = date,
             mealType = mealType,
-            targetServings = servings
+            targetServings = servings,
+            mealId = meal.id
         )
 
-        val newItem = ScheduledItem(
-            mealPlanEntryId = newEntry.id,
-            recipeId = recipe.id
-        )
-
-        MealPlanRepository.addPlan(newEntry, listOf(newItem))
+        MealPlanRepository.addPlan(newEntry)
     }
 }
-

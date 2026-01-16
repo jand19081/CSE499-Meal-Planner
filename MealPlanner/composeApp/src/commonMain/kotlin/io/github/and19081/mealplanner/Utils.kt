@@ -2,23 +2,25 @@
 
 package io.github.and19081.mealplanner
 
-import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import kotlin.uuid.ExperimentalUuidApi
 
 // Logic
 fun calculateEstimatedCost(entry: MealPlanEntry, allRecipes: List<Recipe>, allIngredients: List<Ingredient>): Long {
-    // Find all items scheduled for this meal
-    val items = MealPlanRepository.scheduledItems.value.filter { it.mealPlanEntryId == entry.id }
+    // Find Meal
+    val meal = MealPlannerRepository.meals.value.find { it.id == entry.mealId } ?: return 0L
+    
+    // Find Components
+    val components = MealPlannerRepository.mealComponents.value.filter { it.mealId == meal.id }
 
     var totalCents = 0L
 
-    for (item in items) {
-        if (item.recipeId != null) {
-            val recipe = allRecipes.find { it.id == item.recipeId }
+    for (comp in components) {
+        if (comp.recipeId != null) {
+            val recipe = allRecipes.find { it.id == comp.recipeId }
             if (recipe != null) {
                 // Scaling Factor: "We are feeding 8, recipe serves 4" -> Factor 2.0
-                val scale = entry.targetServings / recipe.baseServings
+                val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
 
                 // Look up ingredients from the central repo
                 val recipeIngredients = MealPlannerRepository.recipeIngredients.filter { it.recipeId == recipe.id }
@@ -36,6 +38,20 @@ fun calculateEstimatedCost(entry: MealPlanEntry, allRecipes: List<Recipe>, allIn
                             totalCents += (pricePerUnit * requiredAmount).toLong()
                         }
                     }
+                }
+            }
+        } else if (comp.ingredientId != null) {
+            val ingredient = allIngredients.find { it.id == comp.ingredientId }
+            if (ingredient != null) {
+                val qty = comp.quantity?.amount ?: 1.0
+                // Scaling? Assume ingredients in a meal also scale by person
+                val requiredAmount = qty * entry.targetServings
+                
+                val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
+
+                if (bestOption != null) {
+                    val pricePerUnit = bestOption.priceCents / bestOption.quantity.amount
+                    totalCents += (pricePerUnit * requiredAmount).toLong()
                 }
             }
         }
