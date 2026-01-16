@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
 
-// Define the Routes (The addresses)
+// Define Routes
 @Serializable
 object HomeRoute
 
@@ -18,7 +18,7 @@ object SettingsRoute
 @Serializable
 object IngredientsRoute
 
-// Define the Rail Items
+// Define Rail Items
 enum class AppDestinations(
     val label: String,
     val icon: ImageVector,
