@@ -1,0 +1,138 @@
+@startuml
+
+hide circle
+skinparam linetype ortho
+
+' --- Enums ---
+
+package "Enums" {
+    enum MealType {
+        BREAKFAST
+        LUNCH
+        DINNER
+        SNACK
+        DESSERT
+        CUSTOM
+    }
+}
+
+' --- Inventory & Stores ---
+
+entity "Ingredient" as ingredient {
+    *id : UUID <<PK>>
+    --
+    name : text
+    category : text
+}
+
+entity "Store" as store {
+    *id : UUID <<PK>>
+    --
+    name : text
+}
+
+entity "PurchaseOption" as purchase_option {
+    *id : UUID <<PK>>
+    --
+    *ingredient_id : UUID <<FK>>
+    *store_id : UUID <<FK>>
+    price_cents : long
+    quantity_amount : double
+    quantity_unit : text
+    label : text
+}
+
+entity "UnitBridge" as unit_bridge {
+    *id : UUID <<PK>>
+    --
+    *ingredient_id : UUID <<FK>>
+    from_amount : double
+    from_unit : text
+    to_amount : double
+    to_unit : text
+    calculated_ratio : double
+}
+
+' --- Recipes ---
+
+entity "Recipe" as recipe {
+    *id : UUID <<PK>>
+    --
+    name : text
+    description : text
+    base_servings : double
+    instructions : text
+}
+
+entity "RecipeIngredient" as recipe_ingredient {
+    *id : UUID <<PK>>
+    --
+    *recipe_id : UUID <<FK>>
+    *ingredient_id : UUID <<FK>>
+    quantity_amount : double
+    quantity_unit : text
+}
+
+' --- Meal Definitions (New Layer) ---
+
+entity "Meal" as meal {
+    *id : UUID <<PK>>
+    --
+    name : text
+    description : text
+}
+
+entity "MealComponent" as meal_component {
+    *id : UUID <<PK>>
+    --
+    *meal_id : UUID <<FK>>
+    recipe_id : UUID <<FK, Nullable>>
+    ingredient_id : UUID <<FK, Nullable>>
+    quantity_amount : double
+    quantity_unit : text
+}
+
+' --- Planning (Calendar) ---
+
+entity "MealPlanEntry" as meal_plan_entry {
+    *id : UUID <<PK>>
+    --
+    *meal_id : UUID <<FK>>
+    date : date
+    meal_type : MealType
+    target_servings : double
+}
+
+' --- Shopping List ---
+
+entity "ShoppingListOverride" as shopping_override {
+    *ingredient_id : UUID <<PK, FK>>
+    --
+    force_store_id : UUID <<FK, Nullable>>
+    is_owned : boolean
+}
+
+' --- Relationships ---
+
+' Store & Inventory relationships
+store ||..o{ purchase_option : "sells"
+ingredient ||..o{ purchase_option : "has available SKUs"
+ingredient ||..o{ unit_bridge : "has user conversions"
+
+' Recipe relationships
+recipe ||..o{ recipe_ingredient : "composed of"
+ingredient ||..o{ recipe_ingredient : "used in"
+
+' Meal relationships (New)
+meal ||..o{ meal_component : "contains"
+recipe ||..o{ meal_component : "included in"
+ingredient ||..o{ meal_component : "included in"
+
+' Planning relationships
+meal ||..o{ meal_plan_entry : "scheduled as"
+
+' Shopping relationships
+ingredient ||..o| shopping_override : "has user preferences"
+store ||..o{ shopping_override : "is preferred source"
+
+@enduml
