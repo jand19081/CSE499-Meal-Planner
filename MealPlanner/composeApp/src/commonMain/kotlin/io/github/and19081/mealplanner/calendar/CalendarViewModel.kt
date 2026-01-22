@@ -25,6 +25,7 @@ import kotlin.uuid.Uuid
 data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
+    val weekDates: List<DateUiModel>,
     val availableMeals: List<Meal> = emptyList()
 ) {
     data class DateUiModel(
@@ -53,12 +54,13 @@ object CalendarDataSource {
 }
 
 // The ViewModel
-class CalendarViewModel : ViewModel() {
-    private val _currentMonth = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
+class CalendarViewModel(
+    currentMonthFlow: StateFlow<LocalDate>
+) : ViewModel() {
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
 
     val uiState: StateFlow<CalendarUiState> = combine(
-        _currentMonth,
+        currentMonthFlow,
         _selectedDate,
         MealPlanRepository.entries,
         MealPlannerRepository.meals
@@ -93,24 +95,32 @@ class CalendarViewModel : ViewModel() {
             )
         }
 
+        val weekDates = if (selectedDate != null) {
+            val dayOfWeek = selectedDate.dayOfWeek.ordinal
+            dateUiModels.filter {
+                it.date >= selectedDate.minus(DatePeriod(days = dayOfWeek)) &&
+                        it.date <= selectedDate.plus(DatePeriod(days = 6 - dayOfWeek))
+            }
+        } else {
+            val todayDayOfWeek = today.dayOfWeek.ordinal
+            dateUiModels.filter {
+                it.date >= today.minus(DatePeriod(days = todayDayOfWeek)) &&
+                        it.date <= today.plus(DatePeriod(days = 6 - todayDayOfWeek))
+            }
+        }
+
+
         CalendarUiState(
             currentMonth = currentMonth,
             dates = dateUiModels,
+            weekDates = weekDates,
             availableMeals = meals
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = CalendarUiState(Clock.System.todayIn(TimeZone.currentSystemDefault()), emptyList())
+        initialValue = CalendarUiState(Clock.System.todayIn(TimeZone.currentSystemDefault()), emptyList(), emptyList())
     )
-
-    fun toNextMonth() {
-        _currentMonth.update { it.plus(DatePeriod(months = 1)) }
-    }
-
-    fun toPreviousMonth() {
-        _currentMonth.update { it.minus(DatePeriod(months = 1)) }
-    }
 
     fun selectDate(date: LocalDate) {
         _selectedDate.value = date

@@ -1,0 +1,891 @@
+diff --git a/.gitignore b/.gitignore
+old mode 100644
+new mode 100755
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarView.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarView.kt
+index 216871a..6401530 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarView.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarView.kt
+@@ -1,11 +1,16 @@
+-@file:OptIn(ExperimentalMaterial3Api::class)
++@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+ 
+ package io.github.and19081.mealplanner.calendar
+ 
++import androidx.compose.foundation.ExperimentalFoundationApi
++import androidx.compose.foundation.BorderStroke
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.lazy.grid.GridCells
++import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
++import androidx.compose.foundation.lazy.grid.items
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -27,23 +32,37 @@ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.viewmodel.compose.viewModel
+ import io.github.and19081.mealplanner.Meal
+ import io.github.and19081.mealplanner.MealType
++import kotlinx.coroutines.flow.StateFlow
+ import kotlin.time.Clock
+ import kotlinx.datetime.DayOfWeek
+ import kotlinx.datetime.LocalDate
+-import kotlinx.datetime.TimeZone
+ import kotlinx.datetime.todayIn
++import androidx.compose.material3.DatePicker
++import androidx.compose.material3.DatePickerDialog
++import androidx.compose.material3.DatePickerState
++import androidx.compose.material3.DisplayMode
++import androidx.compose.material3.rememberDatePickerState
++import kotlinx.datetime.Instant
++import kotlinx.datetime.toLocalDate
++import kotlinx.datetime.toLocalDateTime
++import kotlinx.datetime.atStartOfDayIn
++import androidx.compose.material3.Button
++import kotlinx.datetime.TimeZone as KTimeZone
+ 
+ @Composable
+-fun CalendarView() {
+-    val viewModel = viewModel { CalendarViewModel() }
++fun CalendarView(
++    currentMonthFlow: StateFlow<LocalDate>,
++    calendarViewMode: CalendarViewMode,
++) {
++    val viewModel = viewModel { CalendarViewModel(currentMonthFlow) }
+     val uiState by viewModel.uiState.collectAsState()
+ 
+     var showAddDialog by remember { mutableStateOf(false) }
+     var showDayOverviewDialog by remember { mutableStateOf(false) }
+     var selectedDateForDialog by remember { mutableStateOf<LocalDate?>(null) }
+-    
+-    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+-    
++
++    val today = Clock.System.todayIn(KTimeZone.currentSystemDefault())
++
+     Scaffold(
+         floatingActionButton = {
+             FloatingActionButton(
+@@ -61,25 +80,40 @@ fun CalendarView() {
+             }
+         }
+     ) { innerPadding ->
+-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
+-            CalendarHeader(
+-                currentMonth = uiState.currentMonth.month.name.lowercase().replaceFirstChar { it.uppercase() } + " " + uiState.currentMonth.year,
+-                onPreviousClick = { viewModel.toPreviousMonth() },
+-                onNextClick = { viewModel.toNextMonth() }
+-            )
+-
+-            Spacer(modifier = Modifier.height(16.dp))
+-            DaysOfWeekHeader()
+-            Spacer(modifier = Modifier.height(8.dp))
+-
+-            CalendarGrid(
+-                dates = uiState.dates,
+-                onDateClick = { dateModel ->
+-                    viewModel.selectDate(dateModel.date)
+-                    selectedDateForDialog = dateModel.date
+-                    showDayOverviewDialog = true
++        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(4.dp)) {
++            when (calendarViewMode) {
++                CalendarViewMode.MONTH -> {
++                    DaysOfWeekHeader()
++                    Spacer(modifier = Modifier.height(8.dp))
++                    CalendarGrid(
++                        dates = uiState.dates,
++                        onDateClick = { dateModel ->
++                            viewModel.selectDate(dateModel.date)
++                            selectedDateForDialog = dateModel.date
++                            showDayOverviewDialog = true
++                        }
++                    )
+                 }
+-            )
++                CalendarViewMode.WEEK -> {
++                    WeekView(
++                        dates = uiState.weekDates,
++                        onDateClick = { dateModel ->
++                            viewModel.selectDate(dateModel.date)
++                            selectedDateForDialog = dateModel.date
++                            showDayOverviewDialog = true
++                        }
++                    )
++                }
++                CalendarViewMode.DAY -> {
++                    DayView(
++                        events = uiState.dates.find { it.date == uiState.currentMonth }?.events ?: emptyList(),
++                        onAddClick = {
++                            showDayOverviewDialog = false
++                            showAddDialog = true
++                        }
++                    )
++                }
++            }
+         }
+     }
+ 
+@@ -88,8 +122,8 @@ fun CalendarView() {
+             date = selectedDateForDialog!!,
+             availableMeals = uiState.availableMeals,
+             onDismiss = { showAddDialog = false },
+-            onConfirm = { meal, mealType, servings ->
+-                viewModel.addPlan(selectedDateForDialog!!, meal, mealType, servings)
++            onConfirm = { date, meal, mealType, servings ->
++                viewModel.addPlan(date, meal, mealType, servings)
+                 showAddDialog = false
+             }
+         )
+@@ -112,43 +146,122 @@ fun CalendarView() {
+ }
+ 
+ @Composable
+-fun CalendarHeader(
+-    currentMonth: String,
+-    onPreviousClick: () -> Unit,
+-    onNextClick: () -> Unit
+-) {
+-    Row(
+-        modifier = Modifier.fillMaxWidth(),
+-        horizontalArrangement = Arrangement.SpaceBetween,
+-        verticalAlignment = Alignment.CenterVertically
+-    ) {
+-        IconButton(onClick = onPreviousClick) {
+-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
++fun DayView(events: List<CalendarEvent>, onAddClick: () -> Unit) {
++    if (events.isEmpty()) {
++        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
++            Text("No meals planned for this day.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+         }
+-        Text(
+-            text = currentMonth,
+-            style = MaterialTheme.typography.titleLarge,
+-            fontWeight = FontWeight.Bold
+-        )
+-        IconButton(onClick = onNextClick) {
+-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
++    } else {
++        LazyColumn(modifier = Modifier.fillMaxSize()) {
++            items(events) { event ->
++                Card(
++                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
++                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
++                ) {
++                    Column(modifier = Modifier.padding(12.dp)) {
++                        Text(
++                            text = event.mealType.name,
++                            style = MaterialTheme.typography.labelSmall,
++                            color = MaterialTheme.colorScheme.primary
++                        )
++                        Text(
++                            text = event.title,
++                            style = MaterialTheme.typography.bodyLarge,
++                            fontWeight = FontWeight.Bold
++                        )
++                        Text(
++                            text = "Serves: ${event.servings}",
++                            style = MaterialTheme.typography.bodySmall
++                        )
++                    }
++                }
++            }
++        }
++    }
++}
++
++@OptIn(ExperimentalFoundationApi::class)
++@Composable
++fun WeekView(
++    dates: List<CalendarUiState.DateUiModel>,
++    onDateClick: (CalendarUiState.DateUiModel) -> Unit
++) {
++    LazyColumn(modifier = Modifier.fillMaxSize()) {
++        dates.forEach { dateModel ->
++            stickyHeader {
++                Surface(
++                    modifier = Modifier.fillMaxWidth(),
++                    color = MaterialTheme.colorScheme.surfaceVariant,
++                    shadowElevation = 2.dp
++                ) {
++                    Text(
++                        text = "${dateModel.date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }} ${dateModel.date.day}",
++                        modifier = Modifier.padding(16.dp),
++                        style = MaterialTheme.typography.titleMedium,
++                        fontWeight = FontWeight.Bold,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant
++                    )
++                }
++            }
++            if (dateModel.events.isEmpty()) {
++                item {
++                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
++                        Text("No meals planned for this day.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
++                    }
++                }
++            } else {
++                items(dateModel.events) { event ->
++                    Card(
++                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
++                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
++                    ) {
++                        Column(modifier = Modifier.padding(12.dp)) {
++                            Text(
++                                text = event.mealType.name,
++                                style = MaterialTheme.typography.labelSmall,
++                                color = MaterialTheme.colorScheme.primary
++                            )
++                            Text(
++                                text = event.title,
++                                style = MaterialTheme.typography.bodyLarge,
++                                fontWeight = FontWeight.Bold
++                            )
++                            Text(
++                                text = "Serves: ${event.servings}",
++                                style = MaterialTheme.typography.bodySmall
++                            )
++                        }
++                    }
++                }
++            }
+         }
+     }
+ }
+ 
++
++
++
+ @Composable
+ fun DaysOfWeekHeader() {
+     Row(modifier = Modifier.fillMaxWidth()) {
+         val days = DayOfWeek.entries.sortedBy { it.ordinal }
+         days.forEach { day ->
+-            Text(
+-                text = day.name.take(3),
++            Card(
+                 modifier = Modifier.weight(1f),
+-                textAlign = TextAlign.Center,
+-                style = MaterialTheme.typography.bodyMedium,
+-                fontWeight = FontWeight.SemiBold,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant
+-            )
++                shape = RoundedCornerShape(0.dp),
++                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline)
++            ) {
++                Text(
++                    text = day.name.take(3),
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(vertical = 8.dp),
++                    textAlign = TextAlign.Center,
++                    style = MaterialTheme.typography.bodyMedium,
++                    fontWeight = FontWeight.SemiBold,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant
++                )
++            }
+         }
+     }
+ }
+@@ -158,24 +271,16 @@ fun CalendarGrid(
+     dates: List<CalendarUiState.DateUiModel>,
+     onDateClick: (CalendarUiState.DateUiModel) -> Unit
+ ) {
+-    Column {
+-        var index = 0
+-        repeat(6) {
+-            Row(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+-                repeat(7) {
+-                    if (index < dates.size) {
+-                        val dateModel = dates[index]
+-                        CalendarCell(
+-                            dateModel = dateModel,
+-                            modifier = Modifier.weight(1f).fillMaxHeight(),
+-                            onClick = { onDateClick(dateModel) }
+-                        )
+-                        index++
+-                    } else {
+-                        Spacer(modifier = Modifier.weight(1f))
+-                    }
+-                }
+-            }
++    LazyVerticalGrid(
++        columns = GridCells.Fixed(7),
++        modifier = Modifier.fillMaxWidth()
++    ) {
++        items(dates) { dateModel ->
++            CalendarCell(
++                dateModel = dateModel,
++                modifier = Modifier.aspectRatio(1f),
++                onClick = { onDateClick(dateModel) }
++            )
+         }
+     }
+ }
+@@ -193,7 +298,8 @@ fun CalendarCell(
+         colors = CardDefaults.cardColors(
+             containerColor = if (dateModel.isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+         ),
+-        shape = RoundedCornerShape(4.dp)
++        shape = RoundedCornerShape(4.dp),
++        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline)
+     ) {
+         Column(modifier = Modifier.padding(4.dp)) {
+             Text(
+@@ -294,7 +400,7 @@ fun AddPlanDialog(
+     date: LocalDate,
+     availableMeals: List<Meal>,
+     onDismiss: () -> Unit,
+-    onConfirm: (Meal, MealType, Double) -> Unit
++    onConfirm: (LocalDate, Meal, MealType, Double) -> Unit
+ ) {
+     var selectedMeal by remember { mutableStateOf<Meal?>(null) }
+     var selectedType by remember { mutableStateOf(MealType.DINNER) }
+@@ -303,11 +409,23 @@ fun AddPlanDialog(
+     var expandedMeal by remember { mutableStateOf(false) }
+     var expandedType by remember { mutableStateOf(false) }
+ 
++    val initialDateMillis = date.atStartOfDayIn(KTimeZone.currentSystemDefault()).toEpochMilliseconds()
++    val datePickerState = rememberDatePickerState(
++        initialSelectedDateMillis = initialDateMillis,
++        initialDisplayedMonthMillis = initialDateMillis,
++        initialDisplayMode = DisplayMode.Picker,
++        yearRange = (date.year - 10)..(date.year + 10)
++    )
++    var showDatePicker by remember { mutableStateOf(false) }
++
+     AlertDialog(
+         onDismissRequest = onDismiss,
+-        title = { Text("Plan Meal for $date") },
++        title = { Text("Plan Meal for ${datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date}") },
+         text = {
+             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                Button(onClick = { showDatePicker = true }) {
++                    Text("Select Date: ${datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date}")
++                }
+                 // Meal Selector
+                 Box {
+                     OutlinedButton(onClick = { expandedMeal = true }, modifier = Modifier.fillMaxWidth()) {
+@@ -358,8 +476,9 @@ fun AddPlanDialog(
+             Button(
+                 onClick = {
+                     val servings = servingsText.toDoubleOrNull()
++                    val selectedDate = datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date
+                     if (selectedMeal != null && servings != null) {
+-                        onConfirm(selectedMeal!!, selectedType, servings)
++                        onConfirm(selectedDate, selectedMeal!!, selectedType, servings)
+                     }
+                 },
+                 enabled = selectedMeal != null && servingsText.toDoubleOrNull() != null
+@@ -371,4 +490,22 @@ fun AddPlanDialog(
+             TextButton(onClick = onDismiss) { Text("Cancel") }
+         }
+     )
+-}
+\ No newline at end of file
++
++    if (showDatePicker) {
++        DatePickerDialog(
++            onDismissRequest = { showDatePicker = false },
++            confirmButton = {
++                TextButton(onClick = { showDatePicker = false }) {
++                    Text("Ok")
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { showDatePicker = false }) {
++                    Text("Cancel")
++                }
++            }
++        ) {
++            DatePicker(state = datePickerState)
++        }
++    }
++}
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarViewModel.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarViewModel.kt
+index 3d430a0..3433c50 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarViewModel.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/calendar/CalendarViewModel.kt
+@@ -25,6 +25,7 @@ import kotlin.uuid.Uuid
+ data class CalendarUiState(
+     val currentMonth: LocalDate,
+     val dates: List<DateUiModel>,
++    val weekDates: List<DateUiModel>,
+     val availableMeals: List<Meal> = emptyList()
+ ) {
+     data class DateUiModel(
+@@ -53,12 +54,13 @@ object CalendarDataSource {
+ }
+ 
+ // The ViewModel
+-class CalendarViewModel : ViewModel() {
+-    private val _currentMonth = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
++class CalendarViewModel(
++    currentMonthFlow: StateFlow<LocalDate>
++) : ViewModel() {
+     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+ 
+     val uiState: StateFlow<CalendarUiState> = combine(
+-        _currentMonth,
++        currentMonthFlow,
+         _selectedDate,
+         MealPlanRepository.entries,
+         MealPlannerRepository.meals
+@@ -93,25 +95,33 @@ class CalendarViewModel : ViewModel() {
+             )
+         }
+ 
++        val weekDates = if (selectedDate != null) {
++            val dayOfWeek = selectedDate.dayOfWeek.ordinal
++            dateUiModels.filter {
++                it.date >= selectedDate.minus(DatePeriod(days = dayOfWeek)) &&
++                        it.date <= selectedDate.plus(DatePeriod(days = 6 - dayOfWeek))
++            }
++        } else {
++            val todayDayOfWeek = today.dayOfWeek.ordinal
++            dateUiModels.filter {
++                it.date >= today.minus(DatePeriod(days = todayDayOfWeek)) &&
++                        it.date <= today.plus(DatePeriod(days = 6 - todayDayOfWeek))
++            }
++        }
++
++
+         CalendarUiState(
+             currentMonth = currentMonth,
+             dates = dateUiModels,
++            weekDates = weekDates,
+             availableMeals = meals
+         )
+     }.stateIn(
+         scope = viewModelScope,
+         started = SharingStarted.WhileSubscribed(5000),
+-        initialValue = CalendarUiState(Clock.System.todayIn(TimeZone.currentSystemDefault()), emptyList())
++        initialValue = CalendarUiState(Clock.System.todayIn(TimeZone.currentSystemDefault()), emptyList(), emptyList())
+     )
+ 
+-    fun toNextMonth() {
+-        _currentMonth.update { it.plus(DatePeriod(months = 1)) }
+-    }
+-
+-    fun toPreviousMonth() {
+-        _currentMonth.update { it.minus(DatePeriod(months = 1)) }
+-    }
+-
+     fun selectDate(date: LocalDate) {
+         _selectedDate.value = date
+     }
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainView.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainView.kt
+index afe77d9..60273fd 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainView.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainView.kt
+@@ -3,8 +3,16 @@ package io.github.and19081.mealplanner.main
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.filled.ArrowBack
++import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
++import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
++import androidx.compose.material.icons.filled.CalendarMonth
++import androidx.compose.material.icons.filled.CalendarViewDay
++import androidx.compose.material.icons.filled.CalendarViewWeek
+ import androidx.compose.material.icons.filled.Menu
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.Icon
+@@ -13,9 +21,12 @@ import androidx.compose.material3.NavigationRail
+ import androidx.compose.material3.NavigationRailItem
+ import androidx.compose.material3.Scaffold
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
+ import androidx.compose.material3.TopAppBar
++import io.github.and19081.mealplanner.calendar.CalendarViewMode
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.collectAsState
+ import androidx.compose.runtime.getValue
+ import androidx.compose.ui.Modifier
+ import androidx.lifecycle.viewmodel.compose.viewModel
+@@ -32,6 +43,8 @@ import io.github.and19081.mealplanner.meals.MealsView
+ import io.github.and19081.mealplanner.recipes.RecipesView
+ import io.github.and19081.mealplanner.settings.SettingsView
+ import io.github.and19081.mealplanner.shoppinglist.ShoppingListView
++import kotlinx.datetime.DatePeriod
++import kotlinx.datetime.plus
+ 
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+@@ -45,6 +58,7 @@ fun MainView(
+     val canNavigateBack = navController.previousBackStackEntry != null
+     val selectedItemIndex = viewModel.selectedRailIndex.intValue
+     val isNavRailVisible = viewModel.isNavRailVisible.value
++    val currentMonth by viewModel.currentMonth.collectAsState()
+ 
+     // Sync ViewModel state with Navigation State
+     LaunchedEffect(currentDestination) {
+@@ -76,7 +90,45 @@ fun MainView(
+                 },
+                 title = {
+                     val label = AppDestinations.entries.getOrNull(selectedItemIndex)?.label ?: ""
+-                    Text(label)
++                    if (currentDestination?.hasRoute(CalendarRoute::class) == true) {
++                        when (viewModel.calendarViewMode.value) {
++                            CalendarViewMode.MONTH -> {
++                                Text(currentMonth.month.name.lowercase().replaceFirstChar { it.uppercase() } + " " + currentMonth.year)
++                            }
++                            CalendarViewMode.WEEK -> {
++                                val week = viewModel.currentMonth.value
++                                Text(
++                                    "${week.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${week.day} - " +
++                                            "${week.plus(kotlinx.datetime.DatePeriod(days = 6)).day}, ${week.year}"
++                                )
++                            }
++                            CalendarViewMode.DAY -> {
++                                Text(
++                                    "${currentMonth.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${currentMonth.day}, ${currentMonth.year}"
++                                )
++                            }
++                        }
++                    } else {
++                        Text(label)
++                    }
++                },
++                actions = {
++                    if (currentDestination?.hasRoute(CalendarRoute::class) == true) {
++                        IconButton(onClick = { viewModel.onDateArrowClick(false) }) {
++                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous")
++                        }
++                        IconButton(onClick = { viewModel.toggleCalendarViewMode() }) {
++                            val icon = when (viewModel.calendarViewMode.value) {
++                                CalendarViewMode.DAY -> Icons.Filled.CalendarViewDay
++                                CalendarViewMode.WEEK -> Icons.Filled.CalendarViewWeek
++                                CalendarViewMode.MONTH -> Icons.Filled.CalendarMonth
++                            }
++                            Icon(icon, contentDescription = "Toggle Calendar View")
++                        }
++                        IconButton(onClick = { viewModel.onDateArrowClick(true) }) {
++                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next")
++                        }
++                    }
+                 }
+             )
+         }
+@@ -89,30 +141,38 @@ fun MainView(
+         ) {
+ 
+             if (isNavRailVisible) {
+-                NavigationRail {
+-                    AppDestinations.entries.forEachIndexed { index, destination ->
+-                        NavigationRailItem(
+-                            label = { Text(destination.label) },
+-                            icon = { Icon(destination.icon, contentDescription = destination.label) },
+-                            selected = selectedItemIndex == index,
+-                            onClick = {
+-                                navController.navigate(destination.route) {
+-                                    launchSingleTop = true
+-                                    restoreState = true
++                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
++                    NavigationRail {
++                        AppDestinations.entries.forEachIndexed { index, destination ->
++                            NavigationRailItem(
++                                label = { Text(destination.label) },
++                                icon = { Icon(destination.icon, contentDescription = destination.label) },
++                                selected = selectedItemIndex == index,
++                                onClick = {
++                                    navController.navigate(destination.route) {
++                                        launchSingleTop = true
++                                        restoreState = true
++                                    }
+                                 }
+-                            }
+-                        )
++                            )
++                        }
+                     }
+                 }
+             }
+ 
++
+             NavHost(
+                 navController = navController,
+                 startDestination = HomeRoute,
+                 modifier = Modifier.weight(1f)
+             ) {
+                 composable<HomeRoute> { HomeView() }
+-                composable<CalendarRoute> { CalendarView() }
++                composable<CalendarRoute> {
++                    CalendarView(
++                        currentMonthFlow = viewModel.currentMonth,
++                        calendarViewMode = viewModel.calendarViewMode.value
++                    )
++                }
+                 composable<IngredientsRoute> { IngredientsView() }
+                 composable<MealsRoute> { MealsView() }
+                 composable<RecipesRoute> { RecipesView() }
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainViewModel.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainViewModel.kt
+index b42552b..e5a619b 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainViewModel.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/main/MainViewModel.kt
+@@ -1,8 +1,19 @@
+ package io.github.and19081.mealplanner.main
+ 
++import androidx.compose.runtime.State
+ import androidx.compose.runtime.mutableIntStateOf
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.lifecycle.ViewModel
++import io.github.and19081.mealplanner.calendar.CalendarViewMode
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.update
++import kotlin.time.Clock
++import kotlinx.datetime.DatePeriod
++import kotlinx.datetime.LocalDate
++import kotlinx.datetime.TimeZone
++import kotlinx.datetime.minus
++import kotlinx.datetime.plus
++import kotlinx.datetime.todayIn
+ 
+ class MainViewModel : ViewModel() {
+ 
+@@ -12,6 +23,12 @@ class MainViewModel : ViewModel() {
+     var isNavRailVisible = mutableStateOf(true)
+         private set
+ 
++    private val _currentMonth = MutableStateFlow(Clock.System.todayIn(TimeZone.currentSystemDefault()))
++    val currentMonth: MutableStateFlow<LocalDate> = _currentMonth
++
++    private val _calendarViewMode = mutableStateOf(CalendarViewMode.MONTH)
++    val calendarViewMode: State<CalendarViewMode> = _calendarViewMode
++
+     fun onRailItemClicked(index: Int) {
+         selectedRailIndex.intValue = index
+     }
+@@ -19,4 +36,44 @@ class MainViewModel : ViewModel() {
+     fun toggleRailVisibility() {
+         isNavRailVisible.value = !isNavRailVisible.value
+     }
++
++    fun toggleCalendarViewMode() {
++        _calendarViewMode.value = when (_calendarViewMode.value) {
++            CalendarViewMode.DAY -> CalendarViewMode.WEEK
++            CalendarViewMode.WEEK -> CalendarViewMode.MONTH
++            CalendarViewMode.MONTH -> CalendarViewMode.DAY
++        }
++    }
++
++    fun onDateArrowClick(isNext: Boolean) {
++        when (calendarViewMode.value) {
++            CalendarViewMode.DAY -> if (isNext) toNextDay() else toPreviousDay()
++            CalendarViewMode.WEEK -> if (isNext) toNextWeek() else toPreviousWeek()
++            CalendarViewMode.MONTH -> if (isNext) toNextMonth() else toPreviousMonth()
++        }
++    }
++
++    private fun toNextDay() {
++        _currentMonth.update { it.plus(DatePeriod(days = 1)) }
++    }
++
++    private fun toPreviousDay() {
++        _currentMonth.update { it.minus(DatePeriod(days = 1)) }
++    }
++
++    private fun toNextWeek() {
++        _currentMonth.update { it.plus(DatePeriod(days = 7)) }
++    }
++
++    private fun toPreviousWeek() {
++        _currentMonth.update { it.minus(DatePeriod(days = 7)) }
++    }
++
++    private fun toNextMonth() {
++        _currentMonth.update { it.plus(DatePeriod(months = 1)) }
++    }
++
++    private fun toPreviousMonth() {
++        _currentMonth.update { it.minus(DatePeriod(months = 1)) }
++    }
+ }
+\ No newline at end of file
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/settings/SettingsView.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/settings/SettingsView.kt
+index 829c68e..fc64f81 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/settings/SettingsView.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/settings/SettingsView.kt
+@@ -20,32 +20,27 @@ import androidx.compose.ui.unit.dp
+ fun SettingsView() {
+     val taxRate by SettingsRepository.salesTaxRate.collectAsState()
+ 
+-    Scaffold { innerPadding ->
+-        Column(
+-            modifier = Modifier
+-                .fillMaxSize()
+-                .padding(innerPadding)
+-                .padding(16.dp)
+-        ) {
+-            Text("Settings", style = MaterialTheme.typography.headlineMedium)
+-
+-            OutlinedTextField(
+-                value = (taxRate * 100).toString(),
+-                onValueChange = {
+-                    val doubleVal = it.toDoubleOrNull()
+-                    if (doubleVal != null) {
+-                        SettingsRepository.salesTaxRate.value = doubleVal / 100.0
+-                    }
+-                },
+-                label = { Text("Sales Tax Rate (%)") },
+-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+-                modifier = Modifier.fillMaxWidth()
+-            )
+-            Text(
+-                "Enter tax as percentage (e.g., 8.0 for 8%)",
+-                style = MaterialTheme.typography.bodySmall,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant
+-            )
+-        }
++    Column(
++        modifier = Modifier
++            .fillMaxSize()
++            .padding(16.dp)
++    ) {
++        OutlinedTextField(
++            value = (taxRate * 100).toString(),
++            onValueChange = {
++                val doubleVal = it.toDoubleOrNull()
++                if (doubleVal != null) {
++                    SettingsRepository.salesTaxRate.value = doubleVal / 100.0
++                }
++            },
++            label = { Text("Sales Tax Rate (%)") },
++            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
++            modifier = Modifier.fillMaxWidth()
++        )
++        Text(
++            "Enter tax as percentage (e.g., 8.0 for 8%)",
++            style = MaterialTheme.typography.bodySmall,
++            color = MaterialTheme.colorScheme.onSurfaceVariant
++        )
+     }
+ }
+diff --git a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/shoppinglist/ShoppingListView.kt b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/shoppinglist/ShoppingListView.kt
+index 9eb933a..82b312a 100644
+--- a/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/shoppinglist/ShoppingListView.kt
++++ b/MealPlanner/composeApp/src/commonMain/kotlin/io/github/and19081/mealplanner/shoppinglist/ShoppingListView.kt
+@@ -27,71 +27,65 @@ fun ShoppingListView() {
+     val viewModel = viewModel { ShoppingListViewModel() }
+     val uiState by viewModel.uiState.collectAsState()
+ 
+-    Scaffold(
+-        topBar = {
+-            TopAppBar(title = { Text("Shopping List") })
+-        }
+-    ) { innerPadding ->
+-        LazyColumn(
+-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+-            contentPadding = PaddingValues(bottom = 80.dp)
+-        ) {
+-            // 1. Stores
+-            uiState.sections.forEach { section ->
+-                item {
+-                    ShoppingListHeader(section)
+-                }
+-                
+-                if (section.items.isEmpty()) {
+-                    item {
+-                         Text(
+-                             "Nothing needed from ${section.storeName}.", 
+-                             modifier = Modifier.padding(16.dp),
+-                             style = MaterialTheme.typography.bodySmall,
+-                             color = MaterialTheme.colorScheme.onSurfaceVariant
+-                         )
+-                    }
+-                } else {
+-                    items(section.items) { item ->
+-                        ShoppingListItemRow(
+-                            item = item,
+-                            allStores = uiState.allStores,
+-                            onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) },
+-                            onMarkOwned = { viewModel.markOwned(item.ingredientId) }
+-                        )
+-                        HorizontalDivider()
+-                    }
+-                }
++    LazyColumn(
++        modifier = Modifier.fillMaxSize(),
++        contentPadding = PaddingValues(bottom = 80.dp)
++    ) {
++        // 1. Stores
++        uiState.sections.forEach { section ->
++            item {
++                ShoppingListHeader(section)
+             }
+ 
+-            // 2. Owned Items
+-            if (uiState.ownedItems.isNotEmpty()) {
+-                stickyHeader {
+-                    Surface(
+-                        modifier = Modifier.fillMaxWidth(),
+-                        color = MaterialTheme.colorScheme.secondaryContainer,
+-                        shadowElevation = 2.dp
+-                    ) {
+-                        Text(
+-                            text = "Already Owned",
+-                            modifier = Modifier.padding(16.dp),
+-                            style = MaterialTheme.typography.titleMedium,
+-                            fontWeight = FontWeight.Bold,
+-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+-                        )
+-                    }
++            if (section.items.isEmpty()) {
++                item {
++                    Text(
++                        "Nothing needed from ${section.storeName}.",
++                        modifier = Modifier.padding(16.dp),
++                        style = MaterialTheme.typography.bodySmall,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant
++                    )
+                 }
+-                items(uiState.ownedItems) { item ->
++            } else {
++                items(section.items) { item ->
+                     ShoppingListItemRow(
+                         item = item,
+                         allStores = uiState.allStores,
+-                        onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) }, // Move back to list
+-                        onMarkOwned = { /* Already owned */ }
++                        onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) },
++                        onMarkOwned = { viewModel.markOwned(item.ingredientId) }
+                     )
+                     HorizontalDivider()
+                 }
+             }
+         }
++
++        // 2. Owned Items
++        if (uiState.ownedItems.isNotEmpty()) {
++            stickyHeader {
++                Surface(
++                    modifier = Modifier.fillMaxWidth(),
++                    color = MaterialTheme.colorScheme.secondaryContainer,
++                    shadowElevation = 2.dp
++                ) {
++                    Text(
++                        text = "Already Owned",
++                        modifier = Modifier.padding(16.dp),
++                        style = MaterialTheme.typography.titleMedium,
++                        fontWeight = FontWeight.Bold,
++                        color = MaterialTheme.colorScheme.onSecondaryContainer
++                    )
++                }
++            }
++            items(uiState.ownedItems) { item ->
++                ShoppingListItemRow(
++                    item = item,
++                    allStores = uiState.allStores,
++                    onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) }, // Move back to list
++                    onMarkOwned = { /* Already owned */ }
++                )
++                HorizontalDivider()
++            }
++        }
+     }
+ }
+ 

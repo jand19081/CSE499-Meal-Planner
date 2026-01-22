@@ -27,69 +27,63 @@ fun ShoppingListView() {
     val viewModel = viewModel { ShoppingListViewModel() }
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Shopping List") })
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            // 1. Stores
-            uiState.sections.forEach { section ->
-                item {
-                    ShoppingListHeader(section)
-                }
-                
-                if (section.items.isEmpty()) {
-                    item {
-                         Text(
-                             "Nothing needed from ${section.storeName}.", 
-                             modifier = Modifier.padding(16.dp),
-                             style = MaterialTheme.typography.bodySmall,
-                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                         )
-                    }
-                } else {
-                    items(section.items) { item ->
-                        ShoppingListItemRow(
-                            item = item,
-                            allStores = uiState.allStores,
-                            onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) },
-                            onMarkOwned = { viewModel.markOwned(item.ingredientId) }
-                        )
-                        HorizontalDivider()
-                    }
-                }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        // 1. Stores
+        uiState.sections.forEach { section ->
+            item {
+                ShoppingListHeader(section)
             }
 
-            // 2. Owned Items
-            if (uiState.ownedItems.isNotEmpty()) {
-                stickyHeader {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shadowElevation = 2.dp
-                    ) {
-                        Text(
-                            text = "Already Owned",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
+            if (section.items.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing needed from ${section.storeName}.",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                items(uiState.ownedItems) { item ->
+            } else {
+                items(section.items) { item ->
                     ShoppingListItemRow(
                         item = item,
                         allStores = uiState.allStores,
-                        onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) }, // Move back to list
-                        onMarkOwned = { /* Already owned */ }
+                        onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) },
+                        onMarkOwned = { viewModel.markOwned(item.ingredientId) }
                     )
                     HorizontalDivider()
                 }
+            }
+        }
+
+        // 2. Owned Items
+        if (uiState.ownedItems.isNotEmpty()) {
+            stickyHeader {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shadowElevation = 2.dp
+                ) {
+                    Text(
+                        text = "Already Owned",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            items(uiState.ownedItems) { item ->
+                ShoppingListItemRow(
+                    item = item,
+                    allStores = uiState.allStores,
+                    onMoveToStore = { storeId -> viewModel.moveToStore(item.ingredientId, storeId) }, // Move back to list
+                    onMarkOwned = { /* Already owned */ }
+                )
+                HorizontalDivider()
             }
         }
     }

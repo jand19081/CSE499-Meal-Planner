@@ -20,32 +20,27 @@ import androidx.compose.ui.unit.dp
 fun SettingsView() {
     val taxRate by SettingsRepository.salesTaxRate.collectAsState()
 
-    Scaffold { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            Text("Settings", style = MaterialTheme.typography.headlineMedium)
-
-            OutlinedTextField(
-                value = (taxRate * 100).toString(),
-                onValueChange = {
-                    val doubleVal = it.toDoubleOrNull()
-                    if (doubleVal != null) {
-                        SettingsRepository.salesTaxRate.value = doubleVal / 100.0
-                    }
-                },
-                label = { Text("Sales Tax Rate (%)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                "Enter tax as percentage (e.g., 8.0 for 8%)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        OutlinedTextField(
+            value = (taxRate * 100).toString(),
+            onValueChange = {
+                val doubleVal = it.toDoubleOrNull()
+                if (doubleVal != null) {
+                    SettingsRepository.salesTaxRate.value = doubleVal / 100.0
+                }
+            },
+            label = { Text("Sales Tax Rate (%)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            "Enter tax as percentage (e.g., 8.0 for 8%)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
