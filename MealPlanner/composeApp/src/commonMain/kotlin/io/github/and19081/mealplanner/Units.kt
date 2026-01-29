@@ -14,10 +14,15 @@ enum class MeasureUnit(val type: MeasureType, val baseFactor: Double) {
     LITER(MeasureType.VOLUME, 1000.0),
     TSP(MeasureType.VOLUME, 4.92892),
     TBSP(MeasureType.VOLUME, 14.7868),
+    FL_OZ(MeasureType.VOLUME, 29.5735),
     CUP(MeasureType.VOLUME, 236.588), // US Cup
+    PINT(MeasureType.VOLUME, 473.176),
+    QUART(MeasureType.VOLUME, 946.353),
+    GALLON(MeasureType.VOLUME, 3785.41),
 
     // Count Base: Each
-    EACH(MeasureType.COUNT, 1.0)
+    EACH(MeasureType.COUNT, 1.0),
+    DOZEN(MeasureType.COUNT, 12.0)
 }
 
 data class Measure(

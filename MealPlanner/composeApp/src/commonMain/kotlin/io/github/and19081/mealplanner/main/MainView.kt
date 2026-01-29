@@ -21,7 +21,6 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import io.github.and19081.mealplanner.calendar.CalendarViewMode
 import androidx.compose.runtime.Composable
@@ -37,14 +36,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.and19081.mealplanner.calendar.CalendarView
-import io.github.and19081.mealplanner.home.HomeView
+import io.github.and19081.mealplanner.dashboard.DashboardView
 import io.github.and19081.mealplanner.ingredients.IngredientsView
+import io.github.and19081.mealplanner.inventory.PantryView
+import io.github.and19081.mealplanner.analytics.AnalyticsView
 import io.github.and19081.mealplanner.meals.MealsView
 import io.github.and19081.mealplanner.recipes.RecipesView
 import io.github.and19081.mealplanner.settings.SettingsView
 import io.github.and19081.mealplanner.shoppinglist.ShoppingListView
-import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.plus
+
+import io.github.and19081.mealplanner.settings.SettingsRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +61,7 @@ fun MainView(
     val selectedItemIndex = viewModel.selectedRailIndex.intValue
     val isNavRailVisible = viewModel.isNavRailVisible.value
     val currentMonth by viewModel.currentMonth.collectAsState()
+    val cornerStyle by SettingsRepository.cornerStyle.collectAsState()
 
     // Sync ViewModel state with Navigation State
     LaunchedEffect(currentDestination) {
@@ -148,6 +151,7 @@ fun MainView(
                                 label = { Text(destination.label) },
                                 icon = { Icon(destination.icon, contentDescription = destination.label) },
                                 selected = selectedItemIndex == index,
+                                // shape = if (cornerStyle == CornerStyle.ROUNDED) CircleShape else RectangleShape,
                                 onClick = {
                                     navController.navigate(destination.route) {
                                         launchSingleTop = true
@@ -163,10 +167,10 @@ fun MainView(
 
             NavHost(
                 navController = navController,
-                startDestination = HomeRoute,
+                startDestination = DashboardRoute,
                 modifier = Modifier.weight(1f)
             ) {
-                composable<HomeRoute> { HomeView() }
+                composable<DashboardRoute> { DashboardView() }
                 composable<CalendarRoute> {
                     CalendarView(
                         currentMonthFlow = viewModel.currentMonth,
@@ -177,6 +181,8 @@ fun MainView(
                 composable<MealsRoute> { MealsView() }
                 composable<RecipesRoute> { RecipesView() }
                 composable<ShoppingListRoute> { ShoppingListView() }
+                composable<PantryRoute> { PantryView() }
+                composable<AnalyticsRoute> { AnalyticsView() }
                 composable<SettingsRoute> { SettingsView() }
             }
         }

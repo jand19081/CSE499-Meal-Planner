@@ -12,13 +12,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,15 +36,23 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.todayIn
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.rememberDatePickerState
+import io.github.and19081.mealplanner.DialogActionButtons
+import io.github.and19081.mealplanner.EmptyListMessage
+import io.github.and19081.mealplanner.ListSectionHeader
 import kotlin.time.Instant
-import kotlinx.datetime.toLocalDate
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.atStartOfDayIn
-import androidx.compose.material3.Button
 import kotlinx.datetime.TimeZone as KTimeZone
+import kotlin.uuid.Uuid
+import io.github.and19081.mealplanner.MpButton
+import io.github.and19081.mealplanner.MpTextButton
+import io.github.and19081.mealplanner.MpOutlinedButton
+import io.github.and19081.mealplanner.MpOutlinedTextField
+import io.github.and19081.mealplanner.MpCard
+import io.github.and19081.mealplanner.MpFloatingActionButton
+import io.github.and19081.mealplanner.MpSurface
 
 @Composable
 fun CalendarView(
@@ -65,7 +70,7 @@ fun CalendarView(
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
+            MpFloatingActionButton(
                 onClick = {
                     if (selectedDateForDialog == null) {
                         viewModel.selectDate(today)
@@ -73,8 +78,6 @@ fun CalendarView(
                     }
                     showAddDialog = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Plan Meal")
             }
@@ -101,7 +104,8 @@ fun CalendarView(
                             viewModel.selectDate(dateModel.date)
                             selectedDateForDialog = dateModel.date
                             showDayOverviewDialog = true
-                        }
+                        },
+                        onConsume = { viewModel.consumeMeal(it) }
                     )
                 }
                 CalendarViewMode.DAY -> {
@@ -110,7 +114,8 @@ fun CalendarView(
                         onAddClick = {
                             showDayOverviewDialog = false
                             showAddDialog = true
-                        }
+                        },
+                        onConsume = { viewModel.consumeMeal(it) }
                     )
                 }
             }
@@ -140,41 +145,20 @@ fun CalendarView(
             onAddClick = {
                 showDayOverviewDialog = false
                 showAddDialog = true
-            }
+            },
+            onConsume = { viewModel.consumeMeal(it) }
         )
     }
 }
 
 @Composable
-fun DayView(events: List<CalendarEvent>, onAddClick: () -> Unit) {
+fun DayView(events: List<CalendarEvent>, onAddClick: () -> Unit, onConsume: (Uuid) -> Unit) {
     if (events.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No meals planned for this day.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-        }
+        EmptyListMessage(message = "No meals planned for this day.")
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(events) { event ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = event.mealType.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = event.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Serves: ${event.servings}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
+                MealEventCard(event, onConsume)
             }
         }
     }
@@ -184,54 +168,92 @@ fun DayView(events: List<CalendarEvent>, onAddClick: () -> Unit) {
 @Composable
 fun WeekView(
     dates: List<CalendarUiState.DateUiModel>,
-    onDateClick: (CalendarUiState.DateUiModel) -> Unit
+    onDateClick: (CalendarUiState.DateUiModel) -> Unit,
+    onConsume: (Uuid) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         dates.forEach { dateModel ->
             stickyHeader {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shadowElevation = 2.dp
-                ) {
-                    Text(
-                        text = "${dateModel.date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }} ${dateModel.date.day}",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                ListSectionHeader(
+                    text = "${dateModel.date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }} ${dateModel.date.day}"
+                )
             }
             if (dateModel.events.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        Text("No meals planned for this day.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                    }
+                    EmptyListMessage(
+                        message = "No meals planned for this day.",
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
             } else {
                 items(dateModel.events) { event ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = event.mealType.name,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = event.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Serves: ${event.servings}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                    MealEventCard(event, onConsume)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MealEventCard(event: CalendarEvent, onConsume: (Uuid) -> Unit) {
+    MpCard(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (event.isConsumed) 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) 
+            else 
+                MaterialTheme.colorScheme.surfaceContainerHighest
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Color indicator bar
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(6.dp)
+                    .background(
+                        if (event.isConsumed) Color.Gray 
+                        else when(event.mealType) {
+                            MealType.BREAKFAST -> MaterialTheme.colorScheme.tertiary
+                            MealType.LUNCH -> MaterialTheme.colorScheme.secondary
+                            MealType.DINNER -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.outline
                         }
+                    )
+            )
+
+            Row(
+                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = event.mealType.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (event.isConsumed) Color.Gray else MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = event.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (event.isConsumed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Serves: ${event.servings}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!event.isConsumed) {
+                    IconButton(onClick = { onConsume(event.entryId) }) {
+                        Icon(Icons.Default.CheckCircle, "Consume", tint = MaterialTheme.colorScheme.primary)
                     }
+                } else {
+                     Icon(Icons.Default.CheckCircle, "Consumed", tint = Color.Gray)
                 }
             }
         }
@@ -239,27 +261,22 @@ fun WeekView(
 }
 
 
-
-
 @Composable
 fun DaysOfWeekHeader() {
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
         val days = DayOfWeek.entries.sortedBy { it.ordinal }
         days.forEach { day ->
-            Card(
+            Box(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(0.dp),
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline)
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = day.name.take(3),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = 8.dp),
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -273,7 +290,9 @@ fun CalendarGrid(
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(7),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         items(dates) { dateModel ->
             CalendarCell(
@@ -291,41 +310,60 @@ fun CalendarCell(
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = modifier
-            .padding(2.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (dateModel.isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(4.dp),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline)
+    val containerColor = when {
+        dateModel.isSelected -> MaterialTheme.colorScheme.primaryContainer
+        dateModel.isToday -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.surface
+    }
+    
+    val borderColor = if (dateModel.isToday) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
+
+    MpCard(
+        modifier = modifier.clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = MaterialTheme.shapes.extraSmall,
+        border = BorderStroke(1.dp, if (dateModel.isSelected) MaterialTheme.colorScheme.primary else borderColor)
     ) {
-        Column(modifier = Modifier.padding(4.dp)) {
+        Column(
+            modifier = Modifier.padding(4.dp).fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
                 text = dateModel.date.day.toString(),
                 style = MaterialTheme.typography.bodySmall,
-                fontWeight = if (dateModel.isToday) FontWeight.Bold else FontWeight.Normal,
-                color = if (dateModel.isCurrentMonth) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                fontWeight = if (dateModel.isToday) FontWeight.ExtraBold else FontWeight.Medium,
+                color = when {
+                    !dateModel.isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    dateModel.isToday -> MaterialTheme.colorScheme.secondary
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
             )
 
-            dateModel.events.forEach { event ->
-                Box(
-                    modifier = Modifier
-                        .padding(vertical = 1.dp)
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .background(
-                            color = when(event.mealType) {
-                                MealType.BREAKFAST -> Color(0xFFFFA000)
-                                MealType.LUNCH -> Color(0xFF1976D2)
-                                MealType.DINNER -> Color(0xFF388E3C)
-                                MealType.DESSERT -> Color(0xFF8E24AA)
-                                else -> Color.Gray
-                            },
-                            shape = CircleShape
-                        )
-                )
+            Spacer(modifier = Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier.padding(bottom = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                dateModel.events.take(3).forEach { event ->
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                color = if (event.isConsumed) MaterialTheme.colorScheme.outline 
+                                else when(event.mealType) {
+                                    MealType.BREAKFAST -> MaterialTheme.colorScheme.tertiary
+                                    MealType.LUNCH -> MaterialTheme.colorScheme.secondary
+                                    MealType.DINNER -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.outline
+                                },
+                                shape = MaterialTheme.shapes.extraSmall
+                            )
+                    )
+                }
+                if (dateModel.events.size > 3) {
+                    Text("+", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
@@ -336,7 +374,8 @@ fun DayOverviewDialog(
     date: LocalDate,
     events: List<CalendarEvent>,
     onDismiss: () -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onConsume: (Uuid) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -354,39 +393,22 @@ fun DayOverviewDialog(
         },
         text = {
             if (events.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                    Text("No meals planned for this day.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                }
+                EmptyListMessage(
+                    message = "No meals planned for this day.",
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(events) { event ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = event.mealType.name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = event.title,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Serves: ${event.servings}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
+                        MealEventCard(event, onConsume)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onAddClick) {
+            MpTextButton(
+                onClick = onAddClick
+            ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Add Meal")
@@ -405,11 +427,13 @@ fun AddPlanDialog(
     var selectedMeal by remember { mutableStateOf<Meal?>(null) }
     var selectedType by remember { mutableStateOf(MealType.DINNER) }
     var servingsText by remember { mutableStateOf("4") }
+    // Store current display date in state so it updates when Picker confirms
+    var currentDisplayDate by remember { mutableStateOf(date) }
 
     var expandedMeal by remember { mutableStateOf(false) }
     var expandedType by remember { mutableStateOf(false) }
 
-    val initialDateMillis = date.atStartOfDayIn(KTimeZone.currentSystemDefault()).toEpochMilliseconds()
+    val initialDateMillis = currentDisplayDate.atStartOfDayIn(KTimeZone.currentSystemDefault()).toEpochMilliseconds()
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialDateMillis,
         initialDisplayedMonthMillis = initialDateMillis,
@@ -420,15 +444,20 @@ fun AddPlanDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Plan Meal for ${datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date}") },
+        title = { Text("Plan Meal for $currentDisplayDate") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showDatePicker = true }) {
-                    Text("Select Date: ${datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date}")
+                MpButton(
+                    onClick = { showDatePicker = true }
+                ) {
+                    Text("Select Date: $currentDisplayDate")
                 }
                 // Meal Selector
                 Box {
-                    OutlinedButton(onClick = { expandedMeal = true }, modifier = Modifier.fillMaxWidth()) {
+                    MpOutlinedButton(
+                        onClick = { expandedMeal = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(selectedMeal?.name ?: "Select Meal")
                     }
                     DropdownMenu(expanded = expandedMeal, onDismissRequest = { expandedMeal = false }) {
@@ -446,7 +475,10 @@ fun AddPlanDialog(
 
                 // Meal Type Selector
                 Box {
-                    OutlinedButton(onClick = { expandedType = true }, modifier = Modifier.fillMaxWidth()) {
+                    MpOutlinedButton(
+                        onClick = { expandedType = true }, 
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(selectedType.name)
                     }
                     DropdownMenu(expanded = expandedType, onDismissRequest = { expandedType = false }) {
@@ -463,7 +495,7 @@ fun AddPlanDialog(
                 }
 
                 // Servings Input
-                OutlinedTextField(
+                MpOutlinedTextField(
                     value = servingsText,
                     onValueChange = { servingsText = it },
                     label = { Text("Servings") },
@@ -473,34 +505,42 @@ fun AddPlanDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
+            DialogActionButtons(
+                onCancel = onDismiss,
+                onSave = {
                     val servings = servingsText.toDoubleOrNull()
-                    val selectedDate = datePickerState.selectedDateMillis?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(KTimeZone.currentSystemDefault()).date } ?: date
+                    // Use state date
                     if (selectedMeal != null && servings != null) {
-                        onConfirm(selectedDate, selectedMeal!!, selectedType, servings)
+                        onConfirm(currentDisplayDate, selectedMeal!!, selectedType, servings)
                     }
                 },
-                enabled = selectedMeal != null && servingsText.toDoubleOrNull() != null
-            ) {
-                Text("Add")
-            }
+                saveEnabled = selectedMeal != null && servingsText.toDoubleOrNull() != null,
+                saveLabel = "Add"
+            )
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        dismissButton = {}
     )
 
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                MpTextButton(
+                    onClick = { 
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            currentDisplayDate = Instant.fromEpochMilliseconds(millis).toLocalDateTime(KTimeZone.currentSystemDefault()).date
+                        }
+                        showDatePicker = false 
+                    }
+                ) {
                     Text("Ok")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                MpTextButton(
+                    onClick = { showDatePicker = false }
+                ) {
                     Text("Cancel")
                 }
             }

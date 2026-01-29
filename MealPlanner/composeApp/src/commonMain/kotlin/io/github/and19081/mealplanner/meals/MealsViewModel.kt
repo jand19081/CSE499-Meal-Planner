@@ -2,12 +2,10 @@ package io.github.and19081.mealplanner.meals
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.and19081.mealplanner.Meal
-import io.github.and19081.mealplanner.MealComponent
-import io.github.and19081.mealplanner.MealPlannerRepository
-import io.github.and19081.mealplanner.Recipe
-import io.github.and19081.mealplanner.RecipeRepository
+import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.recipes.RecipeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -20,12 +18,13 @@ class MealsViewModel : ViewModel() {
     private val _sortByAlpha = MutableStateFlow(true)
 
     val uiState = combine(
-        MealPlannerRepository.meals,
-        MealPlannerRepository.mealComponents,
+        MealRepository.meals,
+        MealRepository.mealComponents,
         RecipeRepository.recipes,
-        MealPlannerRepository.ingredients,
+        IngredientRepository.ingredients,
         _searchQuery,
-        _sortByAlpha
+        _sortByAlpha,
+        RecipeRepository.recipeIngredients
     ) { args: Array<Any?> ->
         val meals = args[0] as List<Meal>
         val components = args[1] as List<MealComponent>
@@ -33,6 +32,7 @@ class MealsViewModel : ViewModel() {
         val ingredients = args[3] as List<Ingredient>
         val query = args[4] as String
         val isAlpha = args[5] as Boolean
+        val recipeIngredients = args[6] as List<RecipeIngredient>
 
         // 1. Filter
         val filtered = if (query.isBlank()) meals else {
@@ -50,12 +50,13 @@ class MealsViewModel : ViewModel() {
             searchQuery = query,
             allComponents = components,
             allRecipes = recipes,
-            allIngredients = ingredients
+            allIngredients = ingredients,
+            allRecipeIngredients = recipeIngredients
         )
 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
         MealsUiState(emptyMap(), "", emptyList(),
-            emptyList(), emptyList())
+            emptyList(), emptyList(), emptyList())
     )
 
     fun onSearchQueryChange(query: String) {
@@ -64,31 +65,17 @@ class MealsViewModel : ViewModel() {
 
     fun saveMeal(meal: Meal, components: List<MealComponent>) {
         // Update Meal
-        MealPlannerRepository.meals.update { current ->
-            val list = current.toMutableList()
-            list.removeAll { it.id == meal.id }
-            list.add(meal)
-            list
-        }
+        MealRepository.upsertMeal(meal)
 
         // Update Components
-        MealPlannerRepository.mealComponents.update { current ->
-            val list = current.toMutableList()
-            list.removeAll { it.mealId == meal.id }
-            list.addAll(components)
-            list
+        MealRepository.removeComponentsForMeal(meal.id)
+        components.forEach { 
+            MealRepository.addMealComponent(it)
         }
     }
 
     fun deleteMeal(meal: Meal) {
-        MealPlannerRepository.meals.update { current ->
-            current.filter { it.id != meal.id }
-        }
-        
-        // Cleanup components
-        MealPlannerRepository.mealComponents.update { current ->
-            current.filter { it.mealId != meal.id }
-        }
+        MealRepository.removeMeal(meal.id)
     }
 }
 
@@ -97,5 +84,6 @@ data class MealsUiState(
     val searchQuery: String,
     val allComponents: List<MealComponent>,
     val allRecipes: List<Recipe>,
-    val allIngredients: List<Ingredient>
+    val allIngredients: List<Ingredient>,
+    val allRecipeIngredients: List<RecipeIngredient>
 )

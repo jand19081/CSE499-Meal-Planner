@@ -20,6 +20,10 @@ object MealPlanRepository {
         _entries.update { list -> list.filter { it.id != entryId } }
     }
 
+    fun markConsumed(entryId: Uuid) {
+         _entries.update { list -> list.map { if (it.id == entryId) it.copy(isConsumed = true) else it } }
+    }
+
     fun clearAll() {
         _entries.value = emptyList()
     }

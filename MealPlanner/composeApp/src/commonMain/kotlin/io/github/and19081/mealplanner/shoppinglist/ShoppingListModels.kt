@@ -1,16 +1,25 @@
 package io.github.and19081.mealplanner.shoppinglist
 
-import io.github.and19081.mealplanner.Measure
+import kotlinx.datetime.LocalDate
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-data class ShoppingItem(
+@OptIn(ExperimentalUuidApi::class)
+data class ReceiptItem(
+    val name: String,
+    val quantity: Double,
+    val unit: String,
+    val priceCents: Long,
+    val ingredientId: Uuid?
+)
+
+@OptIn(ExperimentalUuidApi::class)
+data class ShoppingTrip(
     val id: Uuid = Uuid.random(),
-
-    val ingredientId: Uuid,
-    val requiredQuantity: Measure, // "Need 200g"
-
-    // If null, the user hasn't decided WHICH store/pack to buy yet.
-    val selectedOptionId: Uuid? = null,
-
-    val isPurchased: Boolean = false
+    val date: LocalDate,
+    val storeName: String,
+    val subtotalCents: Long,
+    val taxCents: Long,
+    val totalPaidCents: Long,
+    val items: List<ReceiptItem>
 )

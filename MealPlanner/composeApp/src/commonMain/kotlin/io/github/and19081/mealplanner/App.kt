@@ -1,9 +1,10 @@
 package io.github.and19081.mealplanner
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.and19081.mealplanner.main.MainView
+import io.github.and19081.mealplanner.settings.MealPlannerTheme
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
@@ -15,7 +16,7 @@ fun App() {
         MockData.initialize()
     }
 
-    MaterialTheme {
+    MealPlannerTheme {
         MainView()
     }
 }

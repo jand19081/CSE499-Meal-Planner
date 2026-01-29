@@ -20,12 +20,3 @@ data class RecipeIngredient(
     val quantity: Measure // e.g. 2.0 CUPS
 )
 
-object RecipeRepository {
-    val recipes = MutableStateFlow(
-        listOf(
-            Recipe(id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000"), name = "Lasagna", baseServings = 4.0, instructions = emptyList()),
-            Recipe(id = Uuid.parse("550e8400-e29b-41d4-a716-446655440001"), name = "Tacos", baseServings = 2.0, instructions = emptyList()),
-            Recipe(id = Uuid.parse("550e8400-e29b-41d4-a716-446655440002"), name = "Omelette", baseServings = 1.0, instructions = emptyList())
-        )
-    )
-}

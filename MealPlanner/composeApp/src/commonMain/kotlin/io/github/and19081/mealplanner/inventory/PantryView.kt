@@ -1,0 +1,182 @@
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalUuidApi::class)
+
+package io.github.and19081.mealplanner.inventory
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.and19081.mealplanner.DialogActionButtons
+import io.github.and19081.mealplanner.EmptyListMessage
+import io.github.and19081.mealplanner.MeasureUnit
+import io.github.and19081.mealplanner.ListControlToolbar
+import io.github.and19081.mealplanner.MeasureInputRow
+import io.github.and19081.mealplanner.SearchableDropdown
+import io.github.and19081.mealplanner.ingredients.Ingredient
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+@Composable
+fun PantryView() {
+    val viewModel = viewModel { PantryViewModel() }
+    val uiState by viewModel.uiState.collectAsState()
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var selectedItem by remember { mutableStateOf<PantryItemUi?>(null) }
+    
+    // For adding new
+    var isAddingNew by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            // Re-use list toolbar or make custom? Reuse for consistency.
+            // But we don't have sort toggle logic in VM yet.
+            ListControlToolbar(
+                searchQuery = "", // TODO: Bind to uiState.searchQuery when available
+                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                searchPlaceholder = "Search Pantry...",
+                isSortByPrimary = true,
+                onToggleSort = { },
+                onAddClick = {
+                    selectedItem = null
+                    isAddingNew = true
+                    showEditDialog = true
+                }
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            if (uiState.items.isEmpty()) {
+                 item {
+                    EmptyListMessage(
+                        message = "Pantry is empty.",
+                        modifier = Modifier.padding(32.dp)
+                    )
+                }
+            } else {
+                items(uiState.items) { item ->
+                    PantryItemRow(
+                        item = item,
+                        onEditClick = {
+                            selectedItem = item
+                            isAddingNew = false
+                            showEditDialog = true
+                        }
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+
+    if (showEditDialog) {
+        PantryEditDialog(
+            item = selectedItem,
+            allIngredients = uiState.allIngredients,
+            onDismiss = { showEditDialog = false },
+            onSave = { ingId, qty, unit ->
+                viewModel.updateQuantity(ingId, qty, unit)
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun PantryItemRow(
+    item: PantryItemUi,
+    onEditClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEditClick)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Text(item.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            "${String.format("%.2f", item.quantity.amount)} ${item.quantity.unit.name}",
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+fun PantryEditDialog(
+    item: PantryItemUi?,
+    allIngredients: List<Ingredient>,
+    onDismiss: () -> Unit,
+    onSave: (Uuid, Double, MeasureUnit) -> Unit
+) {
+    var selectedIngName by remember { mutableStateOf(item?.name ?: "") }
+    var quantityStr by remember { mutableStateOf(item?.quantity?.amount?.toString() ?: "") }
+    var unit by remember { mutableStateOf(item?.quantity?.unit ?: MeasureUnit.EACH) }
+    var unitExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (item == null) "Add to Pantry" else "Update Quantity") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (item == null) {
+                    SearchableDropdown(
+                        label = "Ingredient",
+                        options = allIngredients.map { it.name },
+                        selectedOption = selectedIngName,
+                        onOptionSelected = { selectedIngName = it },
+                        onAddOption = {}, // Don't allow creating new ingredients here, simple flow
+                        onDeleteOption = {},
+                        deleteWarningMessage = ""
+                    )
+                } else {
+                    Text(item.name, style = MaterialTheme.typography.titleMedium)
+                }
+
+                MeasureInputRow(
+                    quantity = quantityStr,
+                    onQuantityChange = { quantityStr = it },
+                    unit = unit,
+                    onUnitChange = { unit = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            DialogActionButtons(
+                onCancel = onDismiss,
+                onSave = {
+                    val qty = quantityStr.toDoubleOrNull()
+                    val ingId = if (item != null) item.id else allIngredients.find { it.name == selectedIngName }?.id
+                    
+                    if (ingId != null && qty != null) {
+                        onSave(ingId, qty, unit)
+                    }
+                },
+                saveEnabled = (item != null || selectedIngName.isNotBlank()) && quantityStr.toDoubleOrNull() != null
+            )
+        },
+        dismissButton = {}
+    )
+}

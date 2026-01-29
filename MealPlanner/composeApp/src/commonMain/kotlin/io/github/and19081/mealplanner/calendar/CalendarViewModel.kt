@@ -2,10 +2,12 @@ package io.github.and19081.mealplanner.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.and19081.mealplanner.Meal
-import io.github.and19081.mealplanner.MealPlanEntry
-import io.github.and19081.mealplanner.MealPlannerRepository
-import io.github.and19081.mealplanner.MealType
+import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.domain.UnitConverter
+import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.meals.MealRepository
+import io.github.and19081.mealplanner.recipes.RecipeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
 import kotlin.uuid.Uuid
+import kotlin.math.max
 
 // The UI State
 data class CalendarUiState(
@@ -63,7 +66,7 @@ class CalendarViewModel(
         currentMonthFlow,
         _selectedDate,
         MealPlanRepository.entries,
-        MealPlannerRepository.meals
+        MealRepository.meals
     ) { currentMonth, selectedDate, entries, meals ->
 
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
@@ -82,7 +85,8 @@ class CalendarViewModel(
                     entryId = entry.id,
                     mealType = entry.mealType,
                     title = mealName,
-                    servings = entry.targetServings
+                    servings = entry.targetServings,
+                    isConsumed = entry.isConsumed
                 )
             }
 
@@ -135,5 +139,55 @@ class CalendarViewModel(
         )
 
         MealPlanRepository.addPlan(newEntry)
+    }
+
+    fun consumeMeal(entryId: Uuid) {
+        val entry = MealPlanRepository.entries.value.find { it.id == entryId } ?: return
+        if (entry.isConsumed) return
+
+        // Mark as consumed
+        MealPlanRepository.markConsumed(entryId)
+
+        // Decrement Pantry Logic
+        val meal = MealRepository.meals.value.find { it.id == entry.mealId } ?: return
+        val components = MealRepository.mealComponents.value.filter { it.mealId == meal.id }
+        val allRecipes = RecipeRepository.recipes.value
+        val allRecipeIngredients = RecipeRepository.recipeIngredients.value
+        val allIngredients = IngredientRepository.ingredients.value
+        
+        // Helper to decrement
+        fun decrement(ingId: Uuid, qtyUsed: Double, unit: MeasureUnit) {
+            val (baseUsed, _) = UnitConverter.toStandard(qtyUsed, unit)
+            
+            // Get Current Pantry
+            val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == ingId }
+            val currentQty = if (currentPantryItem != null) {
+                 UnitConverter.toStandard(currentPantryItem.quantityOnHand.amount, currentPantryItem.quantityOnHand.unit).first
+            } else 0.0
+            
+            val newQty = max(0.0, currentQty - baseUsed)
+            
+            // Update Pantry (Store back in base unit GRAMS/ML/EACH)
+            // Ideally we keep user's preferred unit, but for simplicity we convert to standard base
+            val (_, stdUnit) = UnitConverter.toStandard(0.0, unit) // get standard unit type
+            PantryRepository.updateQuantity(ingId, Measure(newQty, stdUnit))
+        }
+
+        components.forEach { comp ->
+            if (comp.ingredientId != null) {
+                if (comp.quantity != null) {
+                    decrement(comp.ingredientId, comp.quantity.amount * entry.targetServings, comp.quantity.unit)
+                }
+            } else if (comp.recipeId != null) {
+                val recipe = allRecipes.find { it.id == comp.recipeId }
+                if (recipe != null) {
+                    val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
+                    val ris = allRecipeIngredients.filter { it.recipeId == recipe.id }
+                    ris.forEach { ri ->
+                        decrement(ri.ingredientId, ri.quantity.amount * scale, ri.quantity.unit)
+                    }
+                }
+            }
+        }
     }
 }

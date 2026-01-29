@@ -1,82 +1,69 @@
 package io.github.and19081.mealplanner
 
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.PurchaseOption
-import io.github.and19081.mealplanner.ingredients.Store
+import io.github.and19081.mealplanner.shoppinglist.ShoppingTrip
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlin.uuid.Uuid
 
-object MealPlannerRepository {
-    private val _stores = MutableStateFlow<List<Store>>(emptyList())
-    val stores: StateFlow<List<Store>> = _stores.asStateFlow()
+object PantryRepository {
+    private val _pantryItems = MutableStateFlow<List<PantryItem>>(emptyList())
+    val pantryItems = _pantryItems.asStateFlow()
 
-    private val _ingredients = MutableStateFlow<List<Ingredient>>(emptyList())
-    val ingredients: StateFlow<List<Ingredient>> = _ingredients.asStateFlow()
-
-    private val _allPurchaseOptions = MutableStateFlow<List<PurchaseOption>>(emptyList())
-    val allPurchaseOptions: StateFlow<List<PurchaseOption>> = _allPurchaseOptions.asStateFlow()
-
-    // Join Tables
-    private val _recipeIngredients = MutableStateFlow<List<RecipeIngredient>>(emptyList())
-    val recipeIngredients: StateFlow<List<RecipeIngredient>> = _recipeIngredients.asStateFlow()
-    
-    // New Meal Definitions
-    val meals = MutableStateFlow<List<Meal>>(emptyList())
-    val mealComponents = MutableStateFlow<List<MealComponent>>(emptyList())
-
-    // Mutations
-    fun addStore(store: Store) {
-        _stores.update { it + store }
+    fun updateQuantity(ingredientId: Uuid, quantity: Measure) {
+         _pantryItems.update { current ->
+             val list = current.toMutableList()
+             list.removeAll { it.ingredientId == ingredientId }
+             if (quantity.amount > 0) {
+                 list.add(PantryItem(ingredientId, quantity))
+             }
+             list
+         }
     }
+}
 
-    fun deleteStore(storeId: Uuid) {
-        _stores.update { list -> list.filter { it.id != storeId } }
-        _allPurchaseOptions.update { list -> list.filter { it.storeId != storeId } }
-        // Cascade to ingredients
-        _ingredients.update { list ->
-            list.map { ing ->
-                ing.copy(purchaseOptions = ing.purchaseOptions.filter { it.storeId != storeId })
-            }
+object CustomItemRepository {
+    private val _items = MutableStateFlow<List<CustomShoppingItem>>(emptyList())
+    val items = _items.asStateFlow()
+
+    fun addItem(item: CustomShoppingItem) {
+        _items.update { it + item }
+    }
+    
+    fun removeItem(id: Uuid) {
+         _items.update { list -> list.filter { it.id != id } }
+    }
+    
+    fun toggleItem(id: Uuid) {
+        _items.update { list -> list.map { if(it.id == id) it.copy(isChecked = !it.isChecked) else it } }
+    }
+}
+
+object ShoppingSessionRepository {
+    // Set of IDs (Ingredient ID or Custom Item ID) that are currently in the cart
+    private val _inCartItems = MutableStateFlow<Set<Uuid>>(emptySet())
+    val inCartItems = _inCartItems.asStateFlow()
+
+    fun toggleCartStatus(id: Uuid) {
+        _inCartItems.update { current ->
+            if (current.contains(id)) current - id else current + id
         }
     }
 
-    fun addIngredient(ingredient: Ingredient) {
-        _ingredients.update { it + ingredient }
+    fun removeItemsFromCart(ids: Collection<Uuid>) {
+        _inCartItems.update { current -> current - ids.toSet() }
     }
 
-    fun updateIngredient(ingredient: Ingredient) {
-        _ingredients.update { list -> list.map { if (it.id == ingredient.id) ingredient else it } }
+    fun clearCart() {
+        _inCartItems.value = emptySet()
     }
+}
 
-    fun removeIngredient(id: Uuid) {
-        _ingredients.update { list -> list.filter { it.id != id } }
-    }
-    
-    fun addPurchaseOption(option: PurchaseOption) {
-        _allPurchaseOptions.update { it + option }
-    }
+object ShoppingHistoryRepository {
+    private val _trips = MutableStateFlow<List<ShoppingTrip>>(emptyList())
+    val trips = _trips.asStateFlow()
 
-    fun addRecipeIngredient(ri: RecipeIngredient) {
-        _recipeIngredients.update { it + ri }
-    }
-
-    fun removeRecipeIngredients(recipeId: Uuid) {
-        _recipeIngredients.update { list -> list.filter { it.recipeId != recipeId } }
-    }
-
-    // Bulk Setters (for Mock Data)
-    fun setStores(newStores: List<Store>) {
-        _stores.value = newStores
-    }
-
-    fun setIngredients(newIngredients: List<Ingredient>) {
-        _ingredients.value = newIngredients
-    }
-
-    fun setRecipeIngredients(newRi: List<RecipeIngredient>) {
-        _recipeIngredients.value = newRi
+    fun addTrip(trip: ShoppingTrip) {
+        _trips.update { it + trip }
     }
 }

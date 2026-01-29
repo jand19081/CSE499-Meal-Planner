@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,59 +56,30 @@ fun IngredientsView() {
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Create New Option (if searching and not found)
+            // Create New Option
             if (uiState.searchQuery.isNotBlank() && !uiState.doesExactMatchExist) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedIngredient = null
-                                creationName = uiState.searchQuery
-                                showEditDialog = true
-                            }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Create '${uiState.searchQuery}'",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Add this new ingredient to the database",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    CreateNewItemRow(
+                        searchQuery = uiState.searchQuery,
+                        onClick = {
+                            selectedIngredient = null
+                            creationName = uiState.searchQuery
+                            showEditDialog = true
                         }
-                    }
+                    )
                     HorizontalDivider()
                 }
             }
 
             uiState.groupedIngredients.forEach { (header, ingredients) ->
                 stickyHeader {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shadowElevation = 2.dp
-                    ) {
-                        Text(
-                            text = header,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    ListSectionHeader(text = header)
                 }
 
                 items(ingredients) { ingredient ->
                     IngredientRow(
                         ingredient = ingredient,
+                        allStores = uiState.allStores,
                         onEditClick = {
                             selectedIngredient = ingredient
                             creationName = ""
@@ -131,6 +103,7 @@ fun IngredientsView() {
                 viewModel.saveIngredient(updatedIngredient)
                 showEditDialog = false
             },
+            onDelete = if (selectedIngredient != null) { { viewModel.deleteIngredient(selectedIngredient!!.id) } } else null,
             onAddStore = { viewModel.addStore(it) },
             onDeleteStore = { storeName ->
                 val store = uiState.allStores.find { it.name == storeName }
@@ -144,14 +117,14 @@ fun IngredientsView() {
 @Composable
 fun IngredientRow(
     ingredient: Ingredient,
+    allStores: List<Store>,
     onEditClick: () -> Unit
 ) {
     // Calculate Best Price
     val bestOption = ingredient.purchaseOptions.minByOrNull { it.unitPrice }
     val bestPriceString = if (bestOption != null) {
-        val store = MealPlannerRepository.stores.value.find { it.id == bestOption.storeId }?.name ?: "Unknown"
+        val store = allStores.find { it.id == bestOption.storeId }?.name ?: "Unknown"
         val price = bestOption.priceCents / 100.0
-        // Price per 1 Unit
         val perUnit = price / bestOption.quantity.amount
         val rounded = String.format("%.2f", perUnit)
         "Best: $store - $$rounded/${bestOption.quantity.unit.name}"
@@ -174,7 +147,7 @@ fun IngredientRow(
         } else {
             Text("Purchase Options:", style = MaterialTheme.typography.labelMedium)
             ingredient.purchaseOptions.forEach { opt ->
-                val storeName = MealPlannerRepository.stores.value.find { it.id == opt.storeId }?.name ?: "Unknown Store"
+                val storeName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown Store"
                 Text("• $storeName: $${opt.priceCents / 100.0} for ${opt.quantity}", style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -189,11 +162,13 @@ fun IngredientEditDialog(
     allCategories: List<String>,
     onDismiss: () -> Unit,
     onSave: (Ingredient) -> Unit,
+    onDelete: (() -> Unit)? = null,
     onAddStore: (String) -> Unit,
     onDeleteStore: (String) -> Unit,
     onDeleteCategory: (String) -> Unit
 ) {
-    // Local State for the Ingredient being edited
+    val ingredientId = remember { ingredient?.id ?: Uuid.random() }
+    
     var name by remember { mutableStateOf(ingredient?.name ?: initialName) }
     var category by remember { mutableStateOf(ingredient?.category ?: "") }
     var purchaseOptions by remember { mutableStateOf(ingredient?.purchaseOptions ?: emptyList()) }
@@ -202,87 +177,75 @@ fun IngredientEditDialog(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("General", "Purchase Options", "Conversions")
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (ingredient == null) "Add Ingredient" else "Edit Ingredient") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)) {
-                SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index },
-                            text = { Text(title) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                when (selectedTabIndex) {
-                    0 -> { // General Tab
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = name,
-                                onValueChange = { name = it },
-                                label = { Text("Name") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            SearchableDropdown(
-                                label = "Category",
-                                options = allCategories,
-                                selectedOption = category,
-                                onOptionSelected = { category = it },
-                                onAddOption = { category = it }, // Just set it
-                                onDeleteOption = { onDeleteCategory(it) },
-                                deleteWarningMessage = "Deleting this category will remove ALL ingredients in it."
-                            )
-                        }
-                    }
-                    1 -> { // Purchase Options Tab
-                        PurchaseOptionsEditor(
-                            options = purchaseOptions,
-                            allStores = allStores,
-                            onUpdateOptions = { purchaseOptions = it },
-                            onAddStore = onAddStore,
-                            onDeleteStore = onDeleteStore
-                        )
-                    }
-                    2 -> { // Conversions Tab
-                        // Minimal implementation for now
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Conversion Logic Coming Soon", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                        }
-                    }
-                }
-            }
+    MpEditDialogScaffold(
+        title = if (ingredient == null) "Add Ingredient" else "Edit Ingredient",
+        onDismiss = onDismiss,
+        onSave = {
+            val finalIngredient = Ingredient(
+                id = ingredientId,
+                name = name,
+                category = category,
+                purchaseOptions = purchaseOptions,
+                conversionBridges = bridges
+            )
+            onSave(finalIngredient)
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalIngredient = Ingredient(
-                        id = ingredient?.id ?: Uuid.random(),
-                        name = name,
-                        category = category,
-                        purchaseOptions = purchaseOptions,
-                        conversionBridges = bridges
+        saveEnabled = name.isNotBlank() && category.isNotBlank(),
+        onDelete = if (onDelete != null) {
+            {
+                onDelete()
+                onDismiss()
+            }
+        } else null,
+        tabs = tabs,
+        selectedTabIndex = selectedTabIndex,
+        onTabSelected = { selectedTabIndex = it }
+    ) {
+        when (selectedTabIndex) {
+            0 -> { // General Tab
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MpOutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    onSave(finalIngredient)
-                },
-                enabled = name.isNotBlank() && category.isNotBlank()
-            ) {
-                Text("Save")
+
+                    SearchableDropdown(
+                        label = "Category",
+                        options = allCategories,
+                        selectedOption = category,
+                        onOptionSelected = { category = it },
+                        onAddOption = { category = it },
+                        onDeleteOption = { onDeleteCategory(it) },
+                        deleteWarningMessage = "Deleting this category will remove ALL ingredients in it."
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            1 -> { // Purchase Options Tab
+                PurchaseOptionsEditor(
+                    ingredientId = ingredientId,
+                    options = purchaseOptions,
+                    allStores = allStores,
+                    onUpdateOptions = { purchaseOptions = it },
+                    onAddStore = onAddStore,
+                    onDeleteStore = onDeleteStore
+                )
+            }
+            2 -> { // Conversions Tab
+                ConversionBridgesEditor(
+                    ingredientId = ingredientId,
+                    currentBridges = bridges,
+                    onUpdate = { bridges = it }
+                )
+            }
         }
-    )
+    }
 }
 
 @Composable
 fun PurchaseOptionsEditor(
+    ingredientId: Uuid,
     options: List<PurchaseOption>,
     allStores: List<Store>,
     onUpdateOptions: (List<PurchaseOption>) -> Unit,
@@ -290,28 +253,49 @@ fun PurchaseOptionsEditor(
     onDeleteStore: (String) -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
+    var editingOption by remember { mutableStateOf<PurchaseOption?>(null) }
 
-    // New Option State
-    var newStoreName by remember { mutableStateOf("") }
-    var newPriceStr by remember { mutableStateOf("") }
-    var newQtyStr by remember { mutableStateOf("") }
-    var newUnit by remember { mutableStateOf(MeasureUnit.EACH) }
+    var storeName by remember { mutableStateOf("") }
+    var priceStr by remember { mutableStateOf("") }
+    var qtyStr by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf(MeasureUnit.EACH) }
     var unitExpanded by remember { mutableStateOf(false) }
+    
+    fun startEditing(opt: PurchaseOption?) {
+        if (opt != null) {
+            val store = allStores.find { it.id == opt.storeId }
+            storeName = store?.name ?: ""
+            priceStr = (opt.priceCents / 100.0).toString()
+            qtyStr = opt.quantity.amount.toString()
+            unit = opt.quantity.unit
+            editingOption = opt
+            isAdding = true
+        } else {
+            storeName = ""
+            priceStr = ""
+            qtyStr = ""
+            unit = MeasureUnit.EACH
+            editingOption = null
+            isAdding = true
+        }
+    }
 
     Column {
-        // List Existing Options
-        if (options.isEmpty()) {
+        if (options.isEmpty() && !isAdding) {
             Text("No options added yet.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
-        } else {
+        } else if (!isAdding) {
             LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 150.dp)) {
                 items(options) { opt ->
-                    val storeName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown"
+                    val sName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown"
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { startEditing(opt) }
+                            .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("$storeName: $${opt.priceCents / 100.0} / ${opt.quantity}", style = MaterialTheme.typography.bodySmall)
+                        Text("$sName: $${opt.priceCents / 100.0} / ${opt.quantity}", style = MaterialTheme.typography.bodySmall)
                         IconButton(onClick = { onUpdateOptions(options - opt) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                         }
@@ -323,86 +307,165 @@ fun PurchaseOptionsEditor(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Add New Option Form
         if (!isAdding) {
-            Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+            MpButton(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add Purchase Option")
             }
         } else {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("New Option", style = MaterialTheme.typography.labelMedium)
+                    Text(if (editingOption == null) "New Option" else "Edit Option", style = MaterialTheme.typography.labelMedium)
 
-                    // Store Selector
                     SearchableDropdown(
                         label = "Store",
                         options = allStores.map { it.name },
-                        selectedOption = newStoreName,
-                        onOptionSelected = { newStoreName = it },
+                        selectedOption = storeName,
+                        onOptionSelected = { storeName = it },
                         onAddOption = onAddStore,
                         onDeleteOption = onDeleteStore,
                         deleteWarningMessage = "This will remove this store and ALL associated prices from ALL ingredients."
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = newPriceStr,
-                            onValueChange = { newPriceStr = it },
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        MpOutlinedTextField(
+                            value = priceStr,
+                            onValueChange = { priceStr = it },
                             label = { Text("Price ($)") },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
-                        OutlinedTextField(
-                            value = newQtyStr,
-                            onValueChange = { newQtyStr = it },
-                            label = { Text("Qty") },
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        
+                        MeasureInputRow(
+                            quantity = qtyStr,
+                            onQuantityChange = { qtyStr = it },
+                            unit = unit,
+                            onUnitChange = { unit = it },
+                            modifier = Modifier.weight(1.5f),
+                            label = "Qty"
                         )
                     }
 
-                    // Unit Selector
-                    Box {
-                        OutlinedButton(onClick = { unitExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(newUnit.name)
-                        }
-                        DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
-                            MeasureUnit.entries.forEach { unit ->
-                                DropdownMenuItem(
-                                    text = { Text(unit.name) },
-                                    onClick = {
-                                        newUnit = unit
-                                        unitExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        Button(
+                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        MpButton(
                             onClick = {
-                                val store = allStores.find { it.name == newStoreName }
-                                val price = newPriceStr.toDoubleOrNull()
-                                val qty = newQtyStr.toDoubleOrNull()
+                                val store = allStores.find { it.name == storeName }
+                                val price = priceStr.toDoubleOrNull()
+                                val qty = qtyStr.toDoubleOrNull()
 
                                 if (store != null && price != null && qty != null) {
                                     val newOpt = PurchaseOption(
-                                        ingredientId = Uuid.random(), // Temp ID, not used strictly here
+                                        id = editingOption?.id ?: Uuid.random(),
+                                        ingredientId = ingredientId,
                                         storeId = store.id,
                                         priceCents = (price * 100).toLong(),
-                                        quantity = Measure(qty, newUnit)
+                                        quantity = Measure(qty, unit)
                                     )
-                                    onUpdateOptions(options + newOpt)
+                                    val newList = if (editingOption != null) {
+                                        options.map { if (it.id == editingOption!!.id) newOpt else it }
+                                    } else {
+                                        options + newOpt
+                                    }
+                                    onUpdateOptions(newList)
                                     isAdding = false
-                                    // Reset fields
-                                    newPriceStr = ""
-                                    newQtyStr = ""
-                                    newStoreName = ""
                                 }
                             },
-                            enabled = newStoreName.isNotBlank() && newPriceStr.isNotBlank() && newQtyStr.isNotBlank()
+                            enabled = storeName.isNotBlank() && priceStr.isNotBlank() && qtyStr.isNotBlank()
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConversionBridgesEditor(
+    ingredientId: Uuid,
+    currentBridges: List<UnitBridge>,
+    onUpdate: (List<UnitBridge>) -> Unit
+) {
+    var isAdding by remember { mutableStateOf(false) }
+    
+    var fromQtyStr by remember { mutableStateOf("1") }
+    var fromUnit by remember { mutableStateOf(MeasureUnit.EACH) }
+    var toQtyStr by remember { mutableStateOf("") }
+    var toUnit by remember { mutableStateOf(MeasureUnit.GRAM) }
+    
+    var fromExpanded by remember { mutableStateOf(false) }
+    var toExpanded by remember { mutableStateOf(false) }
+
+    Column {
+        if (currentBridges.isEmpty() && !isAdding) {
+            Text("No conversions defined.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+        } else if (!isAdding) {
+            LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 150.dp)) {
+                items(currentBridges) { bridge ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${bridge.from} = ${bridge.to}", style = MaterialTheme.typography.bodySmall)
+                        IconButton(onClick = { onUpdate(currentBridges - bridge) }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (!isAdding) {
+            MpButton(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add Conversion")
+            }
+        } else {
+            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("New Conversion (e.g. 1 Cup = 120 Grams)", style = MaterialTheme.typography.labelMedium)
+
+                    MeasureInputRow(
+                        quantity = fromQtyStr,
+                        onQuantityChange = { fromQtyStr = it },
+                        unit = fromUnit,
+                        onUnitChange = { fromUnit = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "Qty"
+                    )
+                    
+                    Text("EQUALS", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                    MeasureInputRow(
+                        quantity = toQtyStr,
+                        onQuantityChange = { toQtyStr = it },
+                        unit = toUnit,
+                        onUnitChange = { toUnit = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "Qty"
+                    )
+
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        MpButton(
+                            onClick = {
+                                val fq = fromQtyStr.toDoubleOrNull()
+                                val tq = toQtyStr.toDoubleOrNull()
+                                if (fq != null && tq != null) {
+                                    val newBridge = UnitBridge(
+                                        ingredientId = ingredientId,
+                                        from = Measure(fq, fromUnit),
+                                        to = Measure(tq, toUnit)
+                                    )
+                                    onUpdate(currentBridges + newBridge)
+                                    isAdding = false
+                                }
+                            },
+                            enabled = fromQtyStr.isNotBlank() && toQtyStr.isNotBlank()
                         ) {
                             Text("Add")
                         }

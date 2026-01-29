@@ -3,8 +3,12 @@ package io.github.and19081.mealplanner
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.Measure
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
+import io.github.and19081.mealplanner.ingredients.IngredientRepository
 import io.github.and19081.mealplanner.ingredients.PurchaseOption
 import io.github.and19081.mealplanner.ingredients.Store
+import io.github.and19081.mealplanner.ingredients.StoreRepository
+import io.github.and19081.mealplanner.meals.MealRepository
+import io.github.and19081.mealplanner.recipes.RecipeRepository
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -20,7 +24,7 @@ object MockData {
         val winco = Store(id = Uuid.random(), name = "WinCo")
         val costco = Store(id = Uuid.random(), name = "Costco")
         
-        MealPlannerRepository.setStores(listOf(walmart, winco, costco))
+        StoreRepository.setStores(listOf(walmart, winco, costco))
 
         // Helper to make options
         fun makeOption(store: Store, cents: Long, amount: Double, unit: MeasureUnit): PurchaseOption {
@@ -114,7 +118,7 @@ object MockData {
         )
 
         val ingredients = listOf(groundBeef, pasta, marinara, cheese, tortillas, eggs, onion)
-        MealPlannerRepository.setIngredients(ingredients)
+        IngredientRepository.setIngredients(ingredients)
         
         // Recipes
         val rLasagna = Recipe(
@@ -150,9 +154,9 @@ object MockData {
             )
         )
 
-        RecipeRepository.recipes.value = listOf(rLasagna, rTacos, rOmelette)
+        RecipeRepository.setRecipes(listOf(rLasagna, rTacos, rOmelette))
 
-        MealPlannerRepository.setRecipeIngredients(listOf(
+        RecipeRepository.setRecipeIngredients(listOf(
             RecipeIngredient(recipeId = rLasagna.id, ingredientId = groundBeef.id, quantity = Measure(1.0, MeasureUnit.LB)),
             RecipeIngredient(recipeId = rLasagna.id, ingredientId = pasta.id, quantity = Measure(12.0, MeasureUnit.OZ)),
             RecipeIngredient(recipeId = rLasagna.id, ingredientId = marinara.id, quantity = Measure(24.0, MeasureUnit.OZ)),
@@ -173,7 +177,7 @@ object MockData {
         val mTacos = Meal(id = Uuid.random(), name = "Taco Night", description = "Fun taco Tuesday")
         val mOmelette = Meal(id = Uuid.random(), name = "Quick Omelette", description = "Fast breakfast")
 
-        MealPlannerRepository.meals.value = listOf(mLasagna, mTacos, mOmelette)
+        MealRepository.setMeals(listOf(mLasagna, mTacos, mOmelette))
 
         // Meal Components (Link Meals to Recipes)
         val comps = mutableListOf<MealComponent>()
@@ -181,7 +185,7 @@ object MockData {
         comps.add(MealComponent(mealId = mTacos.id, recipeId = rTacos.id))
         comps.add(MealComponent(mealId = mOmelette.id, recipeId = rOmelette.id))
         
-        MealPlannerRepository.mealComponents.value = comps
+        MealRepository.setMealComponents(comps)
 
         // Mock Meal Plan
         MealPlanRepository.clearAll()

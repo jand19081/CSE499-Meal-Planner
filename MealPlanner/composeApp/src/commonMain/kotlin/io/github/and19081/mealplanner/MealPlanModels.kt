@@ -42,5 +42,19 @@ data class MealPlanEntry(
     val targetServings: Double,
     
     // The defined meal being eaten
-    val mealId: Uuid
+    val mealId: Uuid,
+    val isConsumed: Boolean = false
+)
+
+data class CustomShoppingItem(
+    val id: Uuid = Uuid.random(),
+    val name: String,
+    val quantity: Double,
+    val unit: MeasureUnit = MeasureUnit.EACH,
+    val isChecked: Boolean = false
+)
+
+data class PantryItem(
+    val ingredientId: Uuid,
+    val quantityOnHand: Measure
 )

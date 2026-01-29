@@ -2,7 +2,7 @@ package io.github.and19081.mealplanner.ingredients
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.and19081.mealplanner.MealPlannerRepository
+import io.github.and19081.mealplanner.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -19,8 +19,8 @@ class IngredientsViewModel : ViewModel() {
     val uiState = combine(
         _searchQuery,
         _sortByCategory,
-        MealPlannerRepository.ingredients,
-        MealPlannerRepository.stores
+        IngredientRepository.ingredients,
+        StoreRepository.stores
     ) { query, isGrouped, allIngredients, allStores ->
 
         // 1. Filter
@@ -68,32 +68,37 @@ class IngredientsViewModel : ViewModel() {
      * Saves an ingredient (New or Existing).
      */
     fun saveIngredient(ingredient: Ingredient) {
-        val exists = MealPlannerRepository.ingredients.value.any { it.id == ingredient.id }
+        val exists = IngredientRepository.ingredients.value.any { it.id == ingredient.id }
         if (exists) {
-            MealPlannerRepository.updateIngredient(ingredient)
+            IngredientRepository.updateIngredient(ingredient)
         } else {
-            MealPlannerRepository.addIngredient(ingredient)
+            IngredientRepository.addIngredient(ingredient)
         }
+    }
+
+    fun deleteIngredient(id: Uuid) {
+        IngredientRepository.removeIngredient(id)
     }
 
     // --- Store Management ---
 
     fun addStore(name: String) {
-        if (MealPlannerRepository.stores.value.none { it.name.equals(name, ignoreCase = true) }) {
-            MealPlannerRepository.addStore(Store(name = name))
+        if (StoreRepository.stores.value.none { it.name.equals(name, ignoreCase = true) }) {
+            StoreRepository.addStore(Store(name = name))
         }
     }
 
     fun deleteStore(storeId: Uuid) {
-        MealPlannerRepository.deleteStore(storeId)
+        StoreRepository.deleteStore(storeId)
+        IngredientRepository.removePurchaseOptionsForStore(storeId)
     }
 
     // --- Category Management ---
 
     fun deleteCategory(categoryName: String) {
-        val toDelete = MealPlannerRepository.ingredients.value.filter { it.category == categoryName }
+        val toDelete = IngredientRepository.ingredients.value.filter { it.category == categoryName }
         toDelete.forEach { 
-            MealPlannerRepository.removeIngredient(it.id)
+            IngredientRepository.removeIngredient(it.id)
         }
     }
 }

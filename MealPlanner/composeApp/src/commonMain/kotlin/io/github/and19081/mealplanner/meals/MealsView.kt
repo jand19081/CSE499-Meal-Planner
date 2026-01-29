@@ -59,46 +59,21 @@ fun MealsView() {
             // Create New Option
             if (uiState.searchQuery.isNotBlank() && uiState.groupedMeals.values.flatten().none { it.name.equals(uiState.searchQuery, ignoreCase = true) }) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedMeal = null
-                                creationName = uiState.searchQuery
-                                showEditDialog = true
-                            }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Create '${uiState.searchQuery}'",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    CreateNewItemRow(
+                        searchQuery = uiState.searchQuery,
+                        onClick = {
+                            selectedMeal = null
+                            creationName = uiState.searchQuery
+                            showEditDialog = true
                         }
-                    }
+                    )
                     HorizontalDivider()
                 }
             }
 
             uiState.groupedMeals.forEach { (header, meals) ->
                 stickyHeader {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shadowElevation = 2.dp
-                    ) {
-                        Text(
-                            text = header,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    ListSectionHeader(text = header)
                 }
 
                 items(meals) { meal ->
@@ -107,6 +82,7 @@ fun MealsView() {
                         components = uiState.allComponents.filter { it.mealId == meal.id },
                         allRecipes = uiState.allRecipes,
                         allIngredients = uiState.allIngredients,
+                        allRecipeIngredients = uiState.allRecipeIngredients,
                         onEditClick = {
                             selectedMeal = meal
                             showEditDialog = true
@@ -141,9 +117,9 @@ fun MealRow(
     components: List<MealComponent>,
     allRecipes: List<Recipe>,
     allIngredients: List<Ingredient>,
+    allRecipeIngredients: List<RecipeIngredient>,
     onEditClick: () -> Unit
 ) {
-    // Resolve names
     val names = components.mapNotNull { item ->
         if (item.recipeId != null) {
             allRecipes.find { it.id == item.recipeId }?.name
@@ -151,8 +127,11 @@ fun MealRow(
             allIngredients.find { it.id == item.ingredientId }?.name
         }
     }
+    
+    val costCents = calculateMealCost(meal, components, allRecipes, allIngredients, allRecipeIngredients)
+    val costStr = if (costCents > 0) "$${String.format("%.2f", costCents / 100.0)}" else "No price data"
 
-    val subtitle = if (names.isEmpty()) "Empty Meal" else names.joinToString(", ")
+    val subtitle = if (names.isEmpty()) "Empty Meal" else "${names.joinToString(", ")} • Est. Cost: $costStr"
 
     ExpandableListItem(
         title = meal.name,
@@ -195,85 +174,56 @@ fun MealEditDialog(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("General", "Contents")
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (meal == null) "New Meal" else "Edit Meal") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)) {
-                TabRow(selectedTabIndex = selectedTabIndex) {
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index },
-                            text = { Text(title) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                when (selectedTabIndex) {
-                    0 -> { // General
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = name,
-                                onValueChange = { name = it },
-                                label = { Text("Name") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = description,
-                                onValueChange = { description = it },
-                                label = { Text("Description") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            
-                            if (onDelete != null) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(
-                                    onClick = { 
-                                        onDelete() 
-                                        onDismiss()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Delete Meal")
-                                }
-                            }
-                        }
-                    }
-                    1 -> { // Contents
-                        MealContentsEditor(
-                            mealId = mealId,
-                            currentComponents = components,
-                            allRecipes = allRecipes,
-                            allIngredients = allIngredients,
-                            onUpdate = { components = it }
-                        )
-                    }
-                }
-            }
+    MpEditDialogScaffold(
+        title = if (meal == null) "New Meal" else "Edit Meal",
+        onDismiss = onDismiss,
+        onSave = {
+            val finalMeal = Meal(
+                id = mealId,
+                name = name,
+                description = description.ifBlank { null }
+            )
+            onSave(finalMeal, components)
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalMeal = Meal(
-                        id = mealId,
-                        name = name,
-                        description = description.ifBlank { null }
+        saveEnabled = name.isNotBlank(),
+        onDelete = if (onDelete != null) {
+            {
+                onDelete()
+                onDismiss()
+            }
+        } else null,
+        tabs = tabs,
+        selectedTabIndex = selectedTabIndex,
+        onTabSelected = { selectedTabIndex = it }
+    ) {
+        when (selectedTabIndex) {
+            0 -> { // General
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MpOutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    onSave(finalMeal, components)
-                },
-                enabled = name.isNotBlank()
-            ) {
-                Text("Save")
+                    MpOutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            1 -> { // Contents
+                MealContentsEditor(
+                    mealId = mealId,
+                    currentComponents = components,
+                    allRecipes = allRecipes,
+                    allIngredients = allIngredients,
+                    onUpdate = { components = it }
+                )
+            }
         }
-    )
+    }
 }
 
 @Composable
@@ -286,8 +236,7 @@ fun MealContentsEditor(
 ) {
     var isAdding by remember { mutableStateOf(false) }
     
-    // Adding State
-    var selectedType by remember { mutableStateOf("Recipe") } // Recipe or Ingredient
+    var selectedType by remember { mutableStateOf("Recipe") }
     var selectedItemName by remember { mutableStateOf("") }
     var quantityStr by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf(MeasureUnit.EACH) }
@@ -304,9 +253,7 @@ fun MealContentsEditor(
                     } else {
                         allIngredients.find { it.id == comp.ingredientId }?.name ?: "Unknown Ingredient"
                     }
-                    
                     val qtyStr = if (comp.quantity != null) "${comp.quantity}" else ""
-                    
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -317,7 +264,7 @@ fun MealContentsEditor(
                             Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                         }
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
             }
         }
@@ -325,15 +272,14 @@ fun MealContentsEditor(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (!isAdding) {
-            Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+            MpButton(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add Item")
             }
         } else {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Add Item", style = MaterialTheme.typography.labelMedium)
 
-                    // Type Selector
                     Row {
                         FilterChip(selected = selectedType == "Recipe", onClick = { selectedType = "Recipe"; selectedItemName = "" }, label = { Text("Recipe") })
                         Spacer(modifier = Modifier.width(8.dp))
@@ -345,37 +291,24 @@ fun MealContentsEditor(
                         options = if (selectedType == "Recipe") allRecipes.map { it.name } else allIngredients.map { it.name },
                         selectedOption = selectedItemName,
                         onOptionSelected = { selectedItemName = it },
-                        onAddOption = { /* No-op */ },
-                        onDeleteOption = { /* No-op */ },
+                        onAddOption = { },
+                        onDeleteOption = { },
                         deleteWarningMessage = ""
                     )
 
-                    // Quantity only needed for Ingredients (mostly)
                     if (selectedType == "Ingredient") {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = quantityStr,
-                                onValueChange = { quantityStr = it },
-                                label = { Text("Qty") },
-                                modifier = Modifier.weight(1f),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
-                            Box(modifier = Modifier.weight(1f)) {
-                                OutlinedButton(onClick = { unitExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                                    Text(unit.name)
-                                }
-                                DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
-                                    MeasureUnit.entries.forEach { u ->
-                                        DropdownMenuItem(text = { Text(u.name) }, onClick = { unit = u; unitExpanded = false })
-                                    }
-                                }
-                            }
-                        }
+                        MeasureInputRow(
+                            quantity = quantityStr,
+                            onQuantityChange = { quantityStr = it },
+                            unit = unit,
+                            onUnitChange = { unit = it },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        Button(
+                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        MpButton(
                             onClick = {
                                 if (selectedType == "Recipe") {
                                     val r = allRecipes.find { it.name == selectedItemName }

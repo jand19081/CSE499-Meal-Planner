@@ -7,5 +7,6 @@ data class CalendarEvent(
     val entryId: Uuid,
     val mealType: MealType,
     val title: String,
-    val servings: Double
+    val servings: Double,
+    val isConsumed: Boolean = false
 )
