@@ -18,6 +18,7 @@ class RecipesViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     private val _sortByAlpha = MutableStateFlow(true)
     private val _filterCanMakeNow = MutableStateFlow(false)
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState = combine(
         RecipeRepository.recipes,
@@ -26,8 +27,9 @@ class RecipesViewModel : ViewModel() {
         _filterCanMakeNow,
         IngredientRepository.ingredients,
         RecipeRepository.recipeIngredients,
-        PantryRepository.pantryItems
-    ) { args: Array<Any> ->
+        PantryRepository.pantryItems,
+        _errorMessage
+    ) { args: Array<Any?> ->
         val recipes = args[0] as List<Recipe>
         val query = args[1] as String
         val isAlpha = args[2] as Boolean
@@ -35,10 +37,12 @@ class RecipesViewModel : ViewModel() {
         val ingredients = args[4] as List<Ingredient>
         val recipeIngredients = args[5] as List<RecipeIngredient>
         val pantry = args[6] as List<PantryItem>
+        val error = args[7] as String?
 
         // Pre-calculate Maps for O(1) lookups
         val pantryMap = pantry.associateBy { it.ingredientId }
         val recipeIngredientsMap = recipeIngredients.groupBy { it.recipeId }
+        val ingredientsMap = ingredients.associateBy { it.id }
 
         // 1. Filter by Search Query
         var filtered = if (query.isBlank()) recipes else {
@@ -54,9 +58,16 @@ class RecipesViewModel : ViewModel() {
                     if (pantryItem == null) false
                     else {
                         // Check quantity
-                        val (pantryBase, _) = UnitConverter.toStandard(pantryItem.quantityOnHand.amount, pantryItem.quantityOnHand.unit)
-                        val (riBase, _) = UnitConverter.toStandard(ri.quantity.amount, ri.quantity.unit)
-                        pantryBase >= riBase
+                        val ingredient = ingredientsMap[ri.ingredientId]
+                        val bridges = ingredient?.conversionBridges ?: emptyList()
+                        
+                        val pantryInRiUnit = UnitConverter.convert(
+                            amount = pantryItem.quantityOnHand.amount,
+                            from = pantryItem.quantityOnHand.unit,
+                            to = ri.quantity.unit,
+                            bridges = bridges
+                        )
+                        pantryInRiUnit >= ri.quantity.amount
                     }
                 }
             }
@@ -79,19 +90,38 @@ class RecipesViewModel : ViewModel() {
             doesExactMatchExist = exactMatch,
             allIngredients = ingredients,
             allRecipeIngredients = recipeIngredients,
-            isCanMakeNowFilterActive = canMakeNow
+            isCanMakeNowFilterActive = canMakeNow,
+            errorMessage = error
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecipesUiState(emptyMap(), "", false, emptyList(), emptyList(), false))
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+        _errorMessage.value = null
     }
 
     fun toggleCanMakeNowFilter() {
         _filterCanMakeNow.update { !it }
     }
 
+    fun clearError() {
+        _errorMessage.value = null
+    }
+
     fun saveRecipe(recipe: Recipe, ingredients: List<RecipeIngredient>) {
+        val nameVal = io.github.and19081.mealplanner.domain.Validators.validateRecipeName(recipe.name)
+        if (nameVal.isFailure) {
+            _errorMessage.value = nameVal.exceptionOrNull()?.message
+            return
+        }
+
+        val servingsVal = io.github.and19081.mealplanner.domain.Validators.validateServings(recipe.baseServings)
+        if (servingsVal.isFailure) {
+            _errorMessage.value = servingsVal.exceptionOrNull()?.message
+            return
+        }
+
+        _errorMessage.value = null
         RecipeRepository.upsertRecipe(recipe)
         
         RecipeRepository.removeRecipeIngredients(recipe.id)
@@ -106,10 +136,19 @@ class RecipesViewModel : ViewModel() {
 }
 
 data class RecipesUiState(
+
     val groupedRecipes: Map<String, List<Recipe>>,
+
     val searchQuery: String,
+
     val doesExactMatchExist: Boolean,
+
     val allIngredients: List<Ingredient>,
+
     val allRecipeIngredients: List<RecipeIngredient>,
-    val isCanMakeNowFilterActive: Boolean
+
+    val isCanMakeNowFilterActive: Boolean,
+
+    val errorMessage: String? = null
+
 )

@@ -19,12 +19,18 @@ object PriceCalculator {
             if (ingredient != null) {
                  val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
                  if (bestOption != null && bestOption.quantity.amount > 0) {
-                     val (reqBase, _) = UnitConverter.toStandard(ri.quantity.amount, ri.quantity.unit)
-                     val (optBase, _) = UnitConverter.toStandard(bestOption.quantity.amount, bestOption.quantity.unit)
+                     val convertedReqQty = UnitConverter.convert(
+                         amount = ri.quantity.amount,
+                         from = ri.quantity.unit,
+                         to = bestOption.quantity.unit,
+                         bridges = ingredient.conversionBridges
+                     )
                      
-                     if (optBase > 0) {
-                         val pricePerBase = bestOption.priceCents / optBase
-                         totalCents += (pricePerBase * reqBase).toLong()
+                     if (convertedReqQty > 0) {
+                         val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
+                         totalCents += (pricePerUnit * convertedReqQty).toLong()
+                     } else if (convertedReqQty <= 0 && ri.quantity.amount > 0) {
+                         println("Warning: Cannot convert units for ${ingredient.name}")
                      }
                  }
             }
@@ -52,13 +58,19 @@ object PriceCalculator {
                 val ingredient = ingredientsMap[comp.ingredientId]
                 if (ingredient != null && comp.quantity != null) {
                      val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
-                     if (bestOption != null) {
-                         val (reqBase, _) = UnitConverter.toStandard(comp.quantity.amount, comp.quantity.unit)
-                         val (optBase, _) = UnitConverter.toStandard(bestOption.quantity.amount, bestOption.quantity.unit)
+                     if (bestOption != null && bestOption.quantity.amount > 0) {
+                         val convertedReqQty = UnitConverter.convert(
+                             amount = comp.quantity.amount,
+                             from = comp.quantity.unit,
+                             to = bestOption.quantity.unit,
+                             bridges = ingredient.conversionBridges
+                         )
                          
-                         if (optBase > 0) {
-                            val pricePerBase = bestOption.priceCents / optBase
-                            totalCents += (pricePerBase * reqBase).toLong()
+                         if (convertedReqQty > 0) {
+                            val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
+                            totalCents += (pricePerUnit * convertedReqQty).toLong()
+                         } else if (convertedReqQty <= 0 && comp.quantity.amount > 0) {
+                             println("Warning: Cannot convert units for ${ingredient.name}")
                          }
                      }
                 }
@@ -96,12 +108,18 @@ object PriceCalculator {
                         if (ingredient != null) {
                             val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
 
-                            if (bestOption != null) {
-                                val (reqBase, _) = UnitConverter.toStandard(ri.quantity.amount * scale, ri.quantity.unit)
-                                val (optBase, _) = UnitConverter.toStandard(bestOption.quantity.amount, bestOption.quantity.unit)
-                                 if (optBase > 0) {
-                                    val pricePerBase = bestOption.priceCents / optBase
-                                    totalCents += (pricePerBase * reqBase).toLong()
+                            if (bestOption != null && bestOption.quantity.amount > 0) {
+                                val convertedReqQty = UnitConverter.convert(
+                                    amount = ri.quantity.amount * scale,
+                                    from = ri.quantity.unit,
+                                    to = bestOption.quantity.unit,
+                                    bridges = ingredient.conversionBridges
+                                )
+                                 if (convertedReqQty > 0) {
+                                    val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
+                                    totalCents += (pricePerUnit * convertedReqQty).toLong()
+                                 } else if (convertedReqQty <= 0 && ri.quantity.amount > 0) {
+                                     println("Warning: Cannot convert units for ${ingredient.name}")
                                  }
                             }
                         }
@@ -115,12 +133,18 @@ object PriceCalculator {
                     
                     val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
 
-                    if (bestOption != null) {
-                         val (reqBase, _) = UnitConverter.toStandard(requiredAmount, comp.quantity?.unit ?: MeasureUnit.EACH)
-                         val (optBase, _) = UnitConverter.toStandard(bestOption.quantity.amount, bestOption.quantity.unit)
-                         if (optBase > 0) {
-                            val pricePerBase = bestOption.priceCents / optBase
-                            totalCents += (pricePerBase * reqBase).toLong()
+                    if (bestOption != null && bestOption.quantity.amount > 0) {
+                         val convertedReqQty = UnitConverter.convert(
+                             amount = requiredAmount,
+                             from = comp.quantity?.unit ?: MeasureUnit.EACH,
+                             to = bestOption.quantity.unit,
+                             bridges = ingredient.conversionBridges
+                         )
+                         if (convertedReqQty > 0) {
+                            val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
+                            totalCents += (pricePerUnit * convertedReqQty).toLong()
+                         } else if (convertedReqQty <= 0 && requiredAmount > 0) {
+                             println("Warning: Cannot convert units for ${ingredient.name}")
                          }
                     }
                 }

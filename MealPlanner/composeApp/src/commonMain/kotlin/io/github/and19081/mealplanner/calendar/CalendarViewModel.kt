@@ -29,7 +29,8 @@ data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
     val weekDates: List<DateUiModel>,
-    val availableMeals: List<Meal> = emptyList()
+    val availableMeals: List<Meal> = emptyList(),
+    val errorMessage: String? = null
 ) {
     data class DateUiModel(
         val date: LocalDate,
@@ -61,13 +62,15 @@ class CalendarViewModel(
     currentMonthFlow: StateFlow<LocalDate>
 ) : ViewModel() {
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<CalendarUiState> = combine(
         currentMonthFlow,
         _selectedDate,
         MealPlanRepository.entries,
-        MealRepository.meals
-    ) { currentMonth, selectedDate, entries, meals ->
+        MealRepository.meals,
+        _errorMessage
+    ) { currentMonth, selectedDate, entries, meals, error ->
 
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
         val dateList = CalendarDataSource.getDates(currentMonth, selectedDate)
@@ -118,7 +121,8 @@ class CalendarViewModel(
             currentMonth = currentMonth,
             dates = dateUiModels,
             weekDates = weekDates,
-            availableMeals = meals
+            availableMeals = meals,
+            errorMessage = error
         )
     }.stateIn(
         scope = viewModelScope,
@@ -128,9 +132,21 @@ class CalendarViewModel(
 
     fun selectDate(date: LocalDate) {
         _selectedDate.value = date
+        _errorMessage.value = null
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun addPlan(date: LocalDate, meal: Meal, mealType: MealType, servings: Double) {
+        val valResult = io.github.and19081.mealplanner.domain.Validators.validateServings(servings)
+        if (valResult.isFailure) {
+            _errorMessage.value = valResult.exceptionOrNull()?.message
+            return
+        }
+
+        _errorMessage.value = null
         val newEntry = MealPlanEntry(
             date = date,
             mealType = mealType,
@@ -157,20 +173,24 @@ class CalendarViewModel(
         
         // Helper to decrement
         fun decrement(ingId: Uuid, qtyUsed: Double, unit: MeasureUnit) {
-            val (baseUsed, _) = UnitConverter.toStandard(qtyUsed, unit)
-            
             // Get Current Pantry
             val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == ingId }
-            val currentQty = if (currentPantryItem != null) {
-                 UnitConverter.toStandard(currentPantryItem.quantityOnHand.amount, currentPantryItem.quantityOnHand.unit).first
-            } else 0.0
+            if (currentPantryItem == null) return
+
+            val ingredient = allIngredients.find { it.id == ingId }
+            val bridges = ingredient?.conversionBridges ?: emptyList()
+
+            // Convert used qty to pantry unit
+            val usedInPantryUnit = UnitConverter.convert(
+                amount = qtyUsed,
+                from = unit,
+                to = currentPantryItem.quantityOnHand.unit,
+                bridges = bridges
+            )
             
-            val newQty = max(0.0, currentQty - baseUsed)
+            val newQty = max(0.0, currentPantryItem.quantityOnHand.amount - usedInPantryUnit)
             
-            // Update Pantry (Store back in base unit GRAMS/ML/EACH)
-            // Ideally we keep user's preferred unit, but for simplicity we convert to standard base
-            val (_, stdUnit) = UnitConverter.toStandard(0.0, unit) // get standard unit type
-            PantryRepository.updateQuantity(ingId, Measure(newQty, stdUnit))
+            PantryRepository.updateQuantity(ingId, Measure(newQty, currentPantryItem.quantityOnHand.unit))
         }
 
         components.forEach { comp ->

@@ -21,5 +21,11 @@ data class ShoppingTrip(
     val subtotalCents: Long,
     val taxCents: Long,
     val totalPaidCents: Long,
-    val items: List<ReceiptItem>
+    val items: List<ReceiptItem>,
+    val actualReceiptTotalCents: Long? = null
+)
+
+data class PriceUpdate(
+    val ingredientId: Uuid,
+    val newPriceCents: Long
 )

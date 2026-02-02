@@ -12,7 +12,9 @@ import io.github.and19081.mealplanner.ingredients.StoreRepository
 import io.github.and19081.mealplanner.meals.MealRepository
 import io.github.and19081.mealplanner.recipes.RecipeRepository
 import io.github.and19081.mealplanner.settings.SettingsRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -308,6 +310,71 @@ class ShoppingListViewModel : ViewModel() {
 
     fun toggleCart(id: Uuid) {
         ShoppingSessionRepository.toggleCartStatus(id)
+    }
+
+    private val _showReceiptDialog = MutableStateFlow(false)
+    val showReceiptDialog = _showReceiptDialog.asStateFlow()
+
+    private val _showDiscrepancyDialog = MutableStateFlow(false)
+    val showDiscrepancyDialog = _showDiscrepancyDialog.asStateFlow()
+
+    private val _pendingActualTotal = MutableStateFlow<Long?>(null)
+    val pendingActualTotal = _pendingActualTotal.asStateFlow()
+    
+    private var _pendingStoreId: Uuid? = null
+
+    fun openReceiptDialog(storeId: Uuid? = null) {
+        _pendingStoreId = storeId
+        _showReceiptDialog.value = true
+    }
+
+    fun dismissReceiptDialog() {
+        _showReceiptDialog.value = false
+        _pendingStoreId = null
+    }
+
+    fun submitReceiptTotal(actualTotalCents: Long) {
+        _showReceiptDialog.value = false
+        
+        val currentState = uiState.value
+        val cartItems = if (_pendingStoreId == null) {
+            currentState.sections.flatMap { it.items }.filter { it.isInCart }
+        } else {
+            currentState.sections.find { it.storeId == _pendingStoreId }?.items?.filter { it.isInCart } ?: emptyList()
+        }
+        
+        val projectedTotal = cartItems.sumOf { it.priceCents }
+        // Add tax to projected if applicable
+        val tax = (projectedTotal * currentState.taxRate).toLong()
+        val projectedWithTax = projectedTotal + tax
+
+        val difference = kotlin.math.abs(actualTotalCents - projectedWithTax)
+        val percentDiff = if (projectedWithTax > 0) (difference.toDouble() / projectedWithTax.toDouble()) * 100 else 0.0
+        
+        if (percentDiff > 5.0) {
+            _pendingActualTotal.value = actualTotalCents
+            _showDiscrepancyDialog.value = true
+        } else {
+            finalizeTrip(actualTotalCents, _pendingStoreId)
+        }
+    }
+
+    fun updatePricesAndFinalize(updates: List<PriceUpdate>) {
+        updates.forEach { update ->
+            updatePrice(update.ingredientId, update.newPriceCents)
+        }
+        
+        _showDiscrepancyDialog.value = false
+        _pendingActualTotal.value?.let { finalizeTrip(it, _pendingStoreId) }
+        _pendingActualTotal.value = null
+        _pendingStoreId = null
+    }
+
+    fun skipPriceUpdate() {
+        _showDiscrepancyDialog.value = false
+        _pendingActualTotal.value?.let { finalizeTrip(it, _pendingStoreId) }
+        _pendingActualTotal.value = null
+        _pendingStoreId = null
     }
 
     fun finalizeTrip(totalPaidCents: Long, storeId: Uuid? = null) {

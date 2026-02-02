@@ -15,13 +15,15 @@ class IngredientsViewModel : ViewModel() {
     // --- State ---
     private val _searchQuery = MutableStateFlow("")
     private val _sortByCategory = MutableStateFlow(true) // false = A-Z
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState = combine(
         _searchQuery,
         _sortByCategory,
+        _errorMessage,
         IngredientRepository.ingredients,
         StoreRepository.stores
-    ) { query, isGrouped, allIngredients, allStores ->
+    ) { query, isGrouped, error, allIngredients, allStores ->
 
         // 1. Filter
         val filtered = if (query.isBlank()) allIngredients else {
@@ -48,7 +50,8 @@ class IngredientsViewModel : ViewModel() {
             allStores = allStores,
             // Derive unique categories from existing ingredients + defaults
             allCategories = (allIngredients.map { it.category } + "Produce" + "Dairy" + "Pantry").distinct().sorted(),
-            doesExactMatchExist = exactMatch
+            doesExactMatchExist = exactMatch,
+            errorMessage = error
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), IngredientsUiState(emptyMap(), true, "", emptyList(), emptyList()))
 
@@ -56,10 +59,15 @@ class IngredientsViewModel : ViewModel() {
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+        _errorMessage.value = null
     }
 
     fun toggleSortMode() {
         _sortByCategory.update { !it }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     // --- CRUD ---
@@ -68,6 +76,14 @@ class IngredientsViewModel : ViewModel() {
      * Saves an ingredient (New or Existing).
      */
     fun saveIngredient(ingredient: Ingredient) {
+        val validation = io.github.and19081.mealplanner.domain.Validators.validateIngredientName(ingredient.name)
+        
+        if (validation.isFailure) {
+            _errorMessage.value = validation.exceptionOrNull()?.message
+            return
+        }
+
+        _errorMessage.value = null
         val exists = IngredientRepository.ingredients.value.any { it.id == ingredient.id }
         if (exists) {
             IngredientRepository.updateIngredient(ingredient)
@@ -109,5 +125,6 @@ data class IngredientsUiState(
     val searchQuery: String,
     val allStores: List<Store>,
     val allCategories: List<String>,
-    val doesExactMatchExist: Boolean = false
+    val doesExactMatchExist: Boolean = false,
+    val errorMessage: String? = null
 )

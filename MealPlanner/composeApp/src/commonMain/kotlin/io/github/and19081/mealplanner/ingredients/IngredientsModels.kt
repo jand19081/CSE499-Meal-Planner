@@ -19,7 +19,7 @@ data class PurchaseOption(
     val label: String? = null // "Organic", "Family Pack", etc.
 ) {
     val unitPrice: Double
-        get() = if (quantity.amount > 0) priceCents / quantity.amount else 0.0
+        get() = if (quantity.normalizedAmount > 0) priceCents / quantity.normalizedAmount else Double.MAX_VALUE
 }
 
 data class UnitBridge(

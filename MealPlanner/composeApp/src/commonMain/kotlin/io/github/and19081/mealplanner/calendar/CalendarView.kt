@@ -68,7 +68,17 @@ fun CalendarView(
 
     val today = Clock.System.todayIn(KTimeZone.currentSystemDefault())
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             MpFloatingActionButton(
                 onClick = {

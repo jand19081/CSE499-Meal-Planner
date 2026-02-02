@@ -16,6 +16,7 @@ class MealsViewModel : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortByAlpha = MutableStateFlow(true)
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState = combine(
         MealRepository.meals,
@@ -24,7 +25,8 @@ class MealsViewModel : ViewModel() {
         IngredientRepository.ingredients,
         _searchQuery,
         _sortByAlpha,
-        RecipeRepository.recipeIngredients
+        RecipeRepository.recipeIngredients,
+        _errorMessage
     ) { args: Array<Any?> ->
         val meals = args[0] as List<Meal>
         val components = args[1] as List<MealComponent>
@@ -33,6 +35,7 @@ class MealsViewModel : ViewModel() {
         val query = args[4] as String
         val isAlpha = args[5] as Boolean
         val recipeIngredients = args[6] as List<RecipeIngredient>
+        val error = args[7] as String?
 
         // 1. Filter
         val filtered = if (query.isBlank()) meals else {
@@ -51,7 +54,8 @@ class MealsViewModel : ViewModel() {
             allComponents = components,
             allRecipes = recipes,
             allIngredients = ingredients,
-            allRecipeIngredients = recipeIngredients
+            allRecipeIngredients = recipeIngredients,
+            errorMessage = error
         )
 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
@@ -61,9 +65,21 @@ class MealsViewModel : ViewModel() {
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+        _errorMessage.value = null
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun saveMeal(meal: Meal, components: List<MealComponent>) {
+        val nameVal = io.github.and19081.mealplanner.domain.Validators.validateMealName(meal.name)
+        if (nameVal.isFailure) {
+            _errorMessage.value = nameVal.exceptionOrNull()?.message
+            return
+        }
+
+        _errorMessage.value = null
         // Update Meal
         MealRepository.upsertMeal(meal)
 
@@ -80,10 +96,19 @@ class MealsViewModel : ViewModel() {
 }
 
 data class MealsUiState(
+
     val groupedMeals: Map<String, List<Meal>>,
+
     val searchQuery: String,
+
     val allComponents: List<MealComponent>,
+
     val allRecipes: List<Recipe>,
+
     val allIngredients: List<Ingredient>,
-    val allRecipeIngredients: List<RecipeIngredient>
+
+    val allRecipeIngredients: List<RecipeIngredient>,
+
+    val errorMessage: String? = null
+
 )

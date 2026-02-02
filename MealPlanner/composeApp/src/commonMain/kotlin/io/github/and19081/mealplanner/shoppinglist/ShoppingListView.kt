@@ -38,12 +38,13 @@ fun ShoppingListView() {
     val viewModel = viewModel { ShoppingListViewModel() }
     val uiState by viewModel.uiState.collectAsState()
     
+    val showReceiptDialog by viewModel.showReceiptDialog.collectAsState()
+    val showDiscrepancyDialog by viewModel.showDiscrepancyDialog.collectAsState()
+    val pendingActualTotal by viewModel.pendingActualTotal.collectAsState()
+
     var showAddDialog by remember { mutableStateOf(false) }
-    var showCompleteDialog by remember { mutableStateOf(false) }
-    var showPriceUpdateDialog by remember { mutableStateOf(false) }
     var showStoreSelectDialog by remember { mutableStateOf(false) }
     var shoppingModeStoreId by remember { mutableStateOf<Uuid?>(null) }
-    var pendingActualTotal by remember { mutableStateOf(0L) }
 
     // Calculate displayed sections based on mode
     val displayedSections = if (shoppingModeStoreId != null) {
@@ -65,7 +66,7 @@ fun ShoppingListView() {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (shoppingModeStoreId != null) {
                     MpFloatingActionButton(
-                        onClick = { showCompleteDialog = true },
+                        onClick = { viewModel.openReceiptDialog(shoppingModeStoreId) },
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Icon(Icons.Default.Check, contentDescription = "Complete Trip")
@@ -214,41 +215,29 @@ fun ShoppingListView() {
         )
     }
 
-    if (showCompleteDialog) {
+    if (showReceiptDialog) {
         CompleteShoppingDialog(
             estimatedTotalCents = cartTotal,
-            onDismiss = { showCompleteDialog = false },
-            onConfirm = { actualTotal, shouldUpdatePrices ->
-                pendingActualTotal = actualTotal
-                showCompleteDialog = false
-                if (shouldUpdatePrices) {
-                    showPriceUpdateDialog = true
-                } else {
-                    viewModel.finalizeTrip(actualTotal, shoppingModeStoreId)
-                    if (shoppingModeStoreId != null) shoppingModeStoreId = null
-                }
+            onDismiss = { viewModel.dismissReceiptDialog() },
+            onConfirm = { actualTotal, _ ->
+                viewModel.submitReceiptTotal(actualTotal)
             }
         )
     }
     
-    if (showPriceUpdateDialog) {
+    if (showDiscrepancyDialog && pendingActualTotal != null) {
         // Collect cart items to edit from displayed sections
         val cartItems = displayedSections.flatMap { it.items }.filter { it.isInCart && !it.isCustom }
         
         PriceUpdateDialog(
             cartItems = cartItems,
             onDismiss = { 
-                viewModel.finalizeTrip(pendingActualTotal, shoppingModeStoreId)
-                showPriceUpdateDialog = false
+                viewModel.skipPriceUpdate()
                 if (shoppingModeStoreId != null) shoppingModeStoreId = null
             },
             onConfirm = { updates ->
-                // Apply updates
-                updates.forEach { (id, price) ->
-                    viewModel.updatePrice(id, price)
-                }
-                viewModel.finalizeTrip(pendingActualTotal, shoppingModeStoreId)
-                showPriceUpdateDialog = false
+                val priceUpdates = updates.map { PriceUpdate(it.key, it.value) }
+                viewModel.updatePricesAndFinalize(priceUpdates)
                 if (shoppingModeStoreId != null) shoppingModeStoreId = null
             }
         )

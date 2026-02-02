@@ -35,7 +35,17 @@ fun MealsView() {
     var selectedMeal by remember { mutableStateOf<Meal?>(null) }
     var creationName by remember { mutableStateOf("") }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ListControlToolbar(
                 searchQuery = uiState.searchQuery,
