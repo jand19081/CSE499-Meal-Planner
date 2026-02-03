@@ -1,43 +1,38 @@
 package io.github.and19081.mealplanner.ingredients
 
-import io.github.and19081.mealplanner.Measure
 import kotlin.uuid.Uuid
+
+data class Category(
+    val id: Uuid = Uuid.random(),
+    val name: String
+)
 
 data class Store(
     val id: Uuid = Uuid.random(),
     val name: String
 )
 
-data class PurchaseOption(
+data class Package(
     val id: Uuid = Uuid.random(),
     val ingredientId: Uuid,
     val storeId: Uuid,
 
-    val priceCents: Long,     // 350 = $3.50
-    val quantity: Measure,    // "12 Count" or "5 Lbs"
+    val priceCents: Int,
+    val quantity: Double,
+    val unitId: Uuid
+)
 
-    val label: String? = null // "Organic", "Family Pack", etc.
-) {
-    val unitPrice: Double
-        get() = if (quantity.normalizedAmount > 0) priceCents / quantity.normalizedAmount else Double.MAX_VALUE
-}
-
-data class UnitBridge(
+data class BridgeConversion(
     val id: Uuid = Uuid.random(),
     val ingredientId: Uuid,
-
-    val from: Measure, // e.g. 1.0 CUP
-    val to: Measure,   // e.g. 120.0 GRAM
-) {
-    val densityRatio: Double
-        get() = from.normalizedAmount / to.normalizedAmount
-}
+    val fromUnitId: Uuid,
+    val fromQuantity: Double,
+    val toUnitId: Uuid,
+    val toQuantity: Double
+)
 
 data class Ingredient(
     val id : Uuid = Uuid.random(),
     val name: String,
-    val category: String,
-
-    val purchaseOptions: List<PurchaseOption> = emptyList(),
-    val conversionBridges: List<UnitBridge> = emptyList()
+    val categoryId: Uuid
 )

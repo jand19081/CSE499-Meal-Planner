@@ -451,54 +451,6 @@ fun SearchableDropdown(
 
 // --- Refactored Components ---
 
-@Composable
-fun MeasureInputRow(
-    quantity: String,
-    onQuantityChange: (String) -> Unit,
-    unit: MeasureUnit,
-    onUnitChange: (MeasureUnit) -> Unit,
-    modifier: Modifier = Modifier,
-    label: String = "Quantity"
-) {
-    var unitExpanded by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        MpOutlinedTextField(
-            value = quantity,
-            onValueChange = onQuantityChange,
-            label = { Text(label) },
-            modifier = Modifier.weight(1f),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-
-        Box(modifier = Modifier.width(IntrinsicSize.Min).defaultMinSize(minWidth = 100.dp)) {
-            MpOutlinedButton(
-                onClick = { unitExpanded = true },
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max).padding(top = 6.dp) // Align with TextField approx
-            ) {
-                Text(unit.name)
-            }
-            DropdownMenu(
-                expanded = unitExpanded,
-                onDismissRequest = { unitExpanded = false }
-            ) {
-                MeasureUnit.entries.forEach { u ->
-                    DropdownMenuItem(
-                        text = { Text(u.name) },
-                        onClick = {
-                            onUnitChange(u)
-                            unitExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun CreateNewItemRow(

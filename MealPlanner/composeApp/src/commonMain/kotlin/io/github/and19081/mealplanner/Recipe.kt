@@ -1,22 +1,25 @@
 package io.github.and19081.mealplanner
 
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.uuid.Uuid
+
+enum class RecipeMealType {
+    Breakfast, Lunch, Dinner, Snack, Other
+}
+
+data class RecipeIngredient(
+    val ingredientId: Uuid,
+    val quantity: Double,
+    val unitId: Uuid
+)
 
 data class Recipe(
     val id: Uuid = Uuid.random(),
     val name: String,
     val description: String? = null,
-    val baseServings: Double, // The recipe makes food for 4 people
-    val instructions: List<String>
+    val instructions: List<String> = emptyList(),
+    val servings: Double,
+    val mealType: RecipeMealType,
+    val prepTimeMinutes: Int = 0,
+    val cookTimeMinutes: Int = 0,
+    val ingredients: List<RecipeIngredient> = emptyList()
 )
-
-// The Join Table: Recipe <-> Ingredient
-// "This recipe needs 2 cups of Flour"
-data class RecipeIngredient(
-    val id: Uuid = Uuid.random(),
-    val recipeId: Uuid,
-    val ingredientId: Uuid,
-    val quantity: Measure // e.g. 2.0 CUPS
-)
-

@@ -1,6 +1,7 @@
 package io.github.and19081.mealplanner
 
-import io.github.and19081.mealplanner.shoppinglist.ShoppingTrip
+import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
+import io.github.and19081.mealplanner.shoppinglist.ShoppingListItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -10,23 +11,27 @@ object PantryRepository {
     private val _pantryItems = MutableStateFlow<List<PantryItem>>(emptyList())
     val pantryItems = _pantryItems.asStateFlow()
 
-    fun updateQuantity(ingredientId: Uuid, quantity: Measure) {
+    fun updateQuantity(ingredientId: Uuid, quantity: Double, unitId: Uuid) {
          _pantryItems.update { current ->
              val list = current.toMutableList()
              list.removeAll { it.ingredientId == ingredientId }
-             if (quantity.amount > 0) {
-                 list.add(PantryItem(ingredientId, quantity))
+             if (quantity > 0) {
+                 list.add(PantryItem(ingredientId = ingredientId, quantity = quantity, unitId = unitId))
              }
              list
          }
     }
+    
+    fun setPantryItems(items: List<PantryItem>) {
+        _pantryItems.value = items
+    }
 }
 
-object CustomItemRepository {
-    private val _items = MutableStateFlow<List<CustomShoppingItem>>(emptyList())
+object ShoppingListItemRepository {
+    private val _items = MutableStateFlow<List<ShoppingListItem>>(emptyList())
     val items = _items.asStateFlow()
 
-    fun addItem(item: CustomShoppingItem) {
+    fun addItem(item: ShoppingListItem) {
         _items.update { it + item }
     }
     
@@ -35,12 +40,12 @@ object CustomItemRepository {
     }
     
     fun toggleItem(id: Uuid) {
-        _items.update { list -> list.map { if(it.id == id) it.copy(isChecked = !it.isChecked) else it } }
+        _items.update { list -> list.map { if(it.id == id) it.copy(isPurchased = !it.isPurchased) else it } }
     }
 }
 
 object ShoppingSessionRepository {
-    // Set of IDs (Ingredient ID or Custom Item ID) that are currently in the cart
+    // Set of IDs (Shopping List Item IDs or Ingredient IDs if legacy logic persists, but likely ShoppingListItem IDs now)
     private val _inCartItems = MutableStateFlow<Set<Uuid>>(emptySet())
     val inCartItems = _inCartItems.asStateFlow()
 
@@ -59,11 +64,15 @@ object ShoppingSessionRepository {
     }
 }
 
-object ShoppingHistoryRepository {
-    private val _trips = MutableStateFlow<List<ShoppingTrip>>(emptyList())
+object ReceiptHistoryRepository {
+    private val _trips = MutableStateFlow<List<ReceiptHistory>>(emptyList())
     val trips = _trips.asStateFlow()
 
-    fun addTrip(trip: ShoppingTrip) {
+    fun addTrip(trip: ReceiptHistory) {
         _trips.update { it + trip }
+    }
+    
+    fun setTrips(history: List<ReceiptHistory>) {
+        _trips.value = history
     }
 }

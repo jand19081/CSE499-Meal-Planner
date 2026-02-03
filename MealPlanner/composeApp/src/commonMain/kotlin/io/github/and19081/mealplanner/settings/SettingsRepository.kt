@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 object SettingsRepository {
-    // 0.08 = 8%
-    val salesTaxRate = MutableStateFlow(0.0)
+    private val _appSettings = MutableStateFlow(AppSettings())
+    val appSettings = _appSettings.asStateFlow()
 
     private val _theme = MutableStateFlow(AppTheme.SYSTEM)
     val theme = _theme.asStateFlow()
@@ -20,8 +20,9 @@ object SettingsRepository {
     private val _dashboardConfig = MutableStateFlow(DashboardConfig())
     val dashboardConfig = _dashboardConfig.asStateFlow()
 
-    private val _notificationConfig = MutableStateFlow(NotificationConfig())
-    val notificationConfig = _notificationConfig.asStateFlow()
+    fun updateSettings(update: (AppSettings) -> AppSettings) {
+        _appSettings.update(update)
+    }
 
     fun setTheme(theme: AppTheme) {
         _theme.value = theme
@@ -35,15 +36,7 @@ object SettingsRepository {
         _accentColor.value = color
     }
 
-    fun setDashboardConfig(config: DashboardConfig) {
-        _dashboardConfig.value = config
-    }
-    
     fun updateDashboardConfig(update: (DashboardConfig) -> DashboardConfig) {
         _dashboardConfig.update(update)
-    }
-
-    fun setNotificationDelay(minutes: Int) {
-        _notificationConfig.update { it.copy(mealConsumedDelayMinutes = minutes) }
     }
 }

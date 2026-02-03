@@ -7,9 +7,13 @@ import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.domain.PriceCalculator
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.ingredients.BridgeConversion
+import io.github.and19081.mealplanner.ingredients.Store
+import io.github.and19081.mealplanner.ingredients.StoreRepository
 import io.github.and19081.mealplanner.meals.MealRepository
 import io.github.and19081.mealplanner.recipes.RecipeRepository
-import io.github.and19081.mealplanner.shoppinglist.ShoppingTrip
+import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -24,57 +28,63 @@ class AnalyticsViewModel : ViewModel() {
 
     // Helper for typed combination
     data class InputData(
-        val entries: List<MealPlanEntry>,
-        val meals: List<Meal>,
-        val components: List<MealComponent>,
+        val entries: List<ScheduledMeal>,
+        val meals: List<PrePlannedMeal>,
         val recipes: List<Recipe>,
         val ingredients: List<Ingredient>,
-        val recipeIngredients: List<RecipeIngredient>,
-        val shoppingHistory: List<ShoppingTrip>
+        val packages: List<Package>,
+        val bridges: List<BridgeConversion>,
+        val receiptHistory: List<ReceiptHistory>,
+        val stores: List<Store>,
+        val allUnits: List<UnitModel>
     )
 
     val uiState = combine(
         MealPlanRepository.entries,
         MealRepository.meals,
-        MealRepository.mealComponents,
         RecipeRepository.recipes,
         IngredientRepository.ingredients,
-        RecipeRepository.recipeIngredients,
-        ShoppingHistoryRepository.trips
+        IngredientRepository.packages,
+        IngredientRepository.bridges,
+        ReceiptHistoryRepository.trips,
+        StoreRepository.stores,
+        UnitRepository.units
     ) { args: Array<Any> ->
         val data = InputData(
-            entries = args[0] as List<MealPlanEntry>,
-            meals = args[1] as List<Meal>,
-            components = args[2] as List<MealComponent>,
-            recipes = args[3] as List<Recipe>,
-            ingredients = args[4] as List<Ingredient>,
-            recipeIngredients = args[5] as List<RecipeIngredient>,
-            shoppingHistory = args[6] as List<ShoppingTrip>
+            entries = args[0] as List<ScheduledMeal>,
+            meals = args[1] as List<PrePlannedMeal>,
+            recipes = args[2] as List<Recipe>,
+            ingredients = args[3] as List<Ingredient>,
+            packages = args[4] as List<Package>,
+            bridges = args[5] as List<BridgeConversion>,
+            receiptHistory = args[6] as List<ReceiptHistory>,
+            stores = args[7] as List<Store>,
+            allUnits = args[8] as List<UnitModel>
         )
         
         // Pre-calculate Maps for O(1) Lookups
         val mealsMap = data.meals.associateBy { it.id }
         val recipesMap = data.recipes.associateBy { it.id }
         val ingredientsMap = data.ingredients.associateBy { it.id }
-        val componentsMap = data.components.groupBy { it.mealId }
-        val recipeIngredientsMap = data.recipeIngredients.groupBy { it.recipeId }
+        val storeMap = data.stores.associateBy { it.id }
 
         // Cost Per Meal (Average)
-        val meaningfulMeals = data.meals.filter { m -> componentsMap.containsKey(m.id) }
-        val mealCosts = meaningfulMeals.map { meal ->
-            val cost = PriceCalculator.calculateMealCost(meal, componentsMap, recipesMap, ingredientsMap, recipeIngredientsMap)
+        val mealCosts = data.meals.map { meal ->
+            val cost = PriceCalculator.calculateMealCost(
+                meal = meal, 
+                recipesMap = recipesMap, 
+                ingredientsMap = ingredientsMap, 
+                allPackages = data.packages, 
+                allBridges = data.bridges,
+                allUnits = data.allUnits
+            )
             meal.name to cost
         }.sortedByDescending { it.second }
 
         val avgMealCost = if (mealCosts.isNotEmpty()) mealCosts.map { it.second }.average() else 0.0
 
         // Avg Cost Per Person
-        val mealCostsPerPerson = meaningfulMeals.map { meal ->
-            val cost = PriceCalculator.calculateMealCost(meal, componentsMap, recipesMap, ingredientsMap, recipeIngredientsMap)
-            val servings = 1.0 // Placeholder
-            cost / 4.0
-        }
-        val avgCostPerPerson = if (mealCostsPerPerson.isNotEmpty()) mealCostsPerPerson.average() else 0.0
+        val avgCostPerPerson = avgMealCost / 4.0
 
 
         // Projected Costs (Future)
@@ -83,9 +93,17 @@ class AnalyticsViewModel : ViewModel() {
         val next7DaysEntries = data.entries.filter { it.date >= today && it.date < today.plus(DatePeriod(days=7)) }
         val next30DaysEntries = data.entries.filter { it.date >= today && it.date < today.plus(DatePeriod(days=30)) }
         
-        fun sumCost(list: List<MealPlanEntry>): Long {
+        fun sumCost(list: List<ScheduledMeal>): Long {
             return list.sumOf { entry ->
-                PriceCalculator.calculateEstimatedCost(entry, mealsMap, componentsMap, recipesMap, ingredientsMap, recipeIngredientsMap)
+                PriceCalculator.calculateEstimatedCost(
+                    entry = entry, 
+                    mealsMap = mealsMap, 
+                    recipesMap = recipesMap, 
+                    ingredientsMap = ingredientsMap, 
+                    allPackages = data.packages, 
+                    allBridges = data.bridges,
+                    allUnits = data.allUnits
+                )
             }
         }
         
@@ -94,16 +112,17 @@ class AnalyticsViewModel : ViewModel() {
 
         // Actual Costs (Past)
         // Last 7 days
-        val last7Days = data.shoppingHistory.filter { it.date >= today.minus(DatePeriod(days=7)) && it.date <= today }
-        val actualWeek = last7Days.sumOf { it.totalPaidCents }
+        val last7Days = data.receiptHistory.filter { it.date >= today.minus(DatePeriod(days=7)) && it.date <= today }
+        val actualWeek = last7Days.sumOf { it.actualTotalCents.toLong() }
         
         // Last 30 days
-        val last30Days = data.shoppingHistory.filter { it.date >= today.minus(DatePeriod(days=30)) && it.date <= today }
-        val actualMonth = last30Days.sumOf { it.totalPaidCents }
+        val last30Days = data.receiptHistory.filter { it.date >= today.minus(DatePeriod(days=30)) && it.date <= today }
+        val actualMonth = last30Days.sumOf { it.actualTotalCents.toLong() }
 
         // Spending by Store
-        val spendingByStore = data.shoppingHistory.groupBy { it.storeName }
-            .mapValues { (_, trips) -> trips.sumOf { it.totalPaidCents } }
+        val spendingByStore = data.receiptHistory.groupBy { it.storeId }
+            .mapValues { (_, trips) -> trips.sumOf { it.actualTotalCents.toLong() } }
+            .mapKeys { (storeId, _) -> storeMap[storeId]?.name ?: "Unknown Store" }
             .toList()
             .sortedByDescending { it.second }
             .toMap()
@@ -117,9 +136,10 @@ class AnalyticsViewModel : ViewModel() {
             actualMonthCents = actualMonth,
             mostExpensiveMeals = mealCosts.take(5),
             spendingByStore = spendingByStore,
-            recentTrips = data.shoppingHistory.sortedByDescending { it.date }
+            recentTrips = data.receiptHistory.sortedByDescending { it.date },
+            allStores = data.stores
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState(0, 0, 0, 0, 0, 0, emptyList(), emptyMap(), emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState(0, 0, 0, 0, 0, 0, emptyList(), emptyMap(), emptyList(), emptyList()))
 }
 
 data class AnalyticsUiState(
@@ -131,5 +151,6 @@ data class AnalyticsUiState(
     val actualMonthCents: Long,
     val mostExpensiveMeals: List<Pair<String, Long>>,
     val spendingByStore: Map<String, Long>,
-    val recentTrips: List<ShoppingTrip>
+    val recentTrips: List<ReceiptHistory>,
+    val allStores: List<Store>
 )

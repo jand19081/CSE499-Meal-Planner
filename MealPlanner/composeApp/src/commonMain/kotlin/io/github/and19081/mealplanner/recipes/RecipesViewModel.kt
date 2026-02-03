@@ -6,6 +6,8 @@ import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.domain.UnitConverter
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -26,8 +28,10 @@ class RecipesViewModel : ViewModel() {
         _sortByAlpha,
         _filterCanMakeNow,
         IngredientRepository.ingredients,
-        RecipeRepository.recipeIngredients,
         PantryRepository.pantryItems,
+        IngredientRepository.packages,
+        IngredientRepository.bridges,
+        UnitRepository.units,
         _errorMessage
     ) { args: Array<Any?> ->
         val recipes = args[0] as List<Recipe>
@@ -35,13 +39,14 @@ class RecipesViewModel : ViewModel() {
         val isAlpha = args[2] as Boolean
         val canMakeNow = args[3] as Boolean
         val ingredients = args[4] as List<Ingredient>
-        val recipeIngredients = args[5] as List<RecipeIngredient>
-        val pantry = args[6] as List<PantryItem>
-        val error = args[7] as String?
+        val pantry = args[5] as List<PantryItem>
+        val packages = args[6] as List<Package>
+        val bridges = args[7] as List<BridgeConversion>
+        val allUnits = args[8] as List<UnitModel>
+        val error = args[9] as String?
 
         // Pre-calculate Maps for O(1) lookups
         val pantryMap = pantry.associateBy { it.ingredientId }
-        val recipeIngredientsMap = recipeIngredients.groupBy { it.recipeId }
         val ingredientsMap = ingredients.associateBy { it.id }
 
         // 1. Filter by Search Query
@@ -52,22 +57,22 @@ class RecipesViewModel : ViewModel() {
         // 2. Filter by "Can Make Now"
         if (canMakeNow) {
             filtered = filtered.filter { recipe ->
-                val needed = recipeIngredientsMap[recipe.id] ?: emptyList()
+                val needed = recipe.ingredients
                 needed.all { ri ->
                     val pantryItem = pantryMap[ri.ingredientId]
                     if (pantryItem == null) false
                     else {
                         // Check quantity
-                        val ingredient = ingredientsMap[ri.ingredientId]
-                        val bridges = ingredient?.conversionBridges ?: emptyList()
+                        val ingredientBridges = bridges.filter { it.ingredientId == ri.ingredientId }
                         
                         val pantryInRiUnit = UnitConverter.convert(
-                            amount = pantryItem.quantityOnHand.amount,
-                            from = pantryItem.quantityOnHand.unit,
-                            to = ri.quantity.unit,
-                            bridges = bridges
+                            amount = pantryItem.quantity,
+                            fromUnitId = pantryItem.unitId,
+                            toUnitId = ri.unitId,
+                            allUnits = allUnits,
+                            bridges = ingredientBridges
                         )
-                        pantryInRiUnit >= ri.quantity.amount
+                        pantryInRiUnit >= ri.quantity
                     }
                 }
             }
@@ -89,11 +94,14 @@ class RecipesViewModel : ViewModel() {
             searchQuery = query,
             doesExactMatchExist = exactMatch,
             allIngredients = ingredients,
-            allRecipeIngredients = recipeIngredients,
+            allPackages = packages,
+            allBridges = bridges,
+            allUnits = allUnits,
             isCanMakeNowFilterActive = canMakeNow,
             errorMessage = error
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RecipesUiState(emptyMap(), "", false, emptyList(), emptyList(), false))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 
+        RecipesUiState(emptyMap(), "", false, emptyList(), emptyList(), emptyList(), emptyList(), false))
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -108,14 +116,14 @@ class RecipesViewModel : ViewModel() {
         _errorMessage.value = null
     }
 
-    fun saveRecipe(recipe: Recipe, ingredients: List<RecipeIngredient>) {
+    fun saveRecipe(recipe: Recipe) {
         val nameVal = io.github.and19081.mealplanner.domain.Validators.validateRecipeName(recipe.name)
         if (nameVal.isFailure) {
             _errorMessage.value = nameVal.exceptionOrNull()?.message
             return
         }
 
-        val servingsVal = io.github.and19081.mealplanner.domain.Validators.validateServings(recipe.baseServings)
+        val servingsVal = io.github.and19081.mealplanner.domain.Validators.validateServings(recipe.servings)
         if (servingsVal.isFailure) {
             _errorMessage.value = servingsVal.exceptionOrNull()?.message
             return
@@ -123,11 +131,6 @@ class RecipesViewModel : ViewModel() {
 
         _errorMessage.value = null
         RecipeRepository.upsertRecipe(recipe)
-        
-        RecipeRepository.removeRecipeIngredients(recipe.id)
-        ingredients.forEach { 
-            RecipeRepository.addRecipeIngredient(it)
-        }
     }
 
     fun deleteRecipe(id: Uuid) {
@@ -136,19 +139,13 @@ class RecipesViewModel : ViewModel() {
 }
 
 data class RecipesUiState(
-
     val groupedRecipes: Map<String, List<Recipe>>,
-
     val searchQuery: String,
-
     val doesExactMatchExist: Boolean,
-
     val allIngredients: List<Ingredient>,
-
-    val allRecipeIngredients: List<RecipeIngredient>,
-
+    val allPackages: List<Package>,
+    val allBridges: List<BridgeConversion>,
+    val allUnits: List<UnitModel>,
     val isCanMakeNowFilterActive: Boolean,
-
     val errorMessage: String? = null
-
 )

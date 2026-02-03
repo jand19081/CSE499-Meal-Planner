@@ -47,6 +47,7 @@ import io.github.and19081.mealplanner.shoppinglist.ShoppingListView
 import kotlinx.datetime.plus
 
 import io.github.and19081.mealplanner.settings.SettingsRepository
+import io.github.and19081.mealplanner.settings.CornerStyle // Added import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +152,6 @@ fun MainView(
                                 label = { Text(destination.label) },
                                 icon = { Icon(destination.icon, contentDescription = destination.label) },
                                 selected = selectedItemIndex == index,
-                                // shape = if (cornerStyle == CornerStyle.ROUNDED) CircleShape else RectangleShape,
                                 onClick = {
                                     navController.navigate(destination.route) {
                                         launchSingleTop = true

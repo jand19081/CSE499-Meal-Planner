@@ -1,36 +1,42 @@
 package io.github.and19081.mealplanner
 
-enum class MeasureType { MASS, VOLUME, COUNT }
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlin.uuid.Uuid
 
-enum class MeasureUnit(val type: MeasureType, val baseFactor: Double) {
-    // Mass Base: Gram
-    GRAM(MeasureType.MASS, 1.0),
-    KG(MeasureType.MASS, 1000.0),
-    OZ(MeasureType.MASS, 28.3495),
-    LB(MeasureType.MASS, 453.592),
-
-    // Volume Base: Milliliter
-    ML(MeasureType.VOLUME, 1.0),
-    LITER(MeasureType.VOLUME, 1000.0),
-    TSP(MeasureType.VOLUME, 4.92892),
-    TBSP(MeasureType.VOLUME, 14.7868),
-    FL_OZ(MeasureType.VOLUME, 29.5735),
-    CUP(MeasureType.VOLUME, 236.588), // US Cup
-    PINT(MeasureType.VOLUME, 473.176),
-    QUART(MeasureType.VOLUME, 946.353),
-    GALLON(MeasureType.VOLUME, 3785.41),
-
-    // Count Base: Each
-    EACH(MeasureType.COUNT, 1.0),
-    DOZEN(MeasureType.COUNT, 12.0)
+enum class UnitType {
+    Weight, Volume, Count, Custom
 }
 
+data class UnitModel(
+    val id: Uuid = Uuid.random(),
+    val type: UnitType,
+    val abbreviation: String,
+    val displayName: String,
+    val isSystemUnit: Boolean
+)
+
+// Legacy compatibility helper or Value Object for usage in UI
 data class Measure(
     val amount: Double,
-    val unit: MeasureUnit
-) {
-    // Normalize to base unit
-    val normalizedAmount: Double get() = amount * unit.baseFactor
+    val unitId: Uuid,
+    // Optional: cache the unit object for display if needed, or look it up
+)
 
-    override fun toString(): String = "$amount ${unit.name}"
+object UnitRepository {
+    private val _units = MutableStateFlow<List<UnitModel>>(emptyList())
+    val units = _units.asStateFlow()
+
+    fun addUnit(unit: UnitModel) {
+        _units.update { it + unit }
+    }
+    
+    fun setUnits(newUnits: List<UnitModel>) {
+        _units.value = newUnits
+    }
+    
+    fun getUnit(id: Uuid): UnitModel? {
+        return _units.value.find { it.id == id }
+    }
 }

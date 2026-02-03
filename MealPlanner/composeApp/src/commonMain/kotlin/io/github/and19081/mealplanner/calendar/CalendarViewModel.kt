@@ -29,7 +29,7 @@ data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
     val weekDates: List<DateUiModel>,
-    val availableMeals: List<Meal> = emptyList(),
+    val availableMeals: List<PrePlannedMeal> = emptyList(),
     val errorMessage: String? = null
 ) {
     data class DateUiModel(
@@ -40,6 +40,14 @@ data class CalendarUiState(
         val events: List<CalendarEvent> = emptyList()
     )
 }
+
+data class CalendarEvent(
+    val entryId: Uuid,
+    val mealType: RecipeMealType,
+    val title: String,
+    val peopleCount: Int,
+    val isConsumed: Boolean
+)
 
 // The Logic to generate the grid
 object CalendarDataSource {
@@ -82,13 +90,13 @@ class CalendarViewModel(
             val daysEntries = entriesByDate[date] ?: emptyList()
 
             val resolvedEvents = daysEntries.map { entry ->
-                val mealName = mealsById[entry.mealId]?.name ?: "Unknown Meal"
+                val mealName = mealsById[entry.prePlannedMealId]?.name ?: "Unknown Meal"
 
                 CalendarEvent(
                     entryId = entry.id,
                     mealType = entry.mealType,
                     title = mealName,
-                    servings = entry.targetServings,
+                    peopleCount = entry.peopleCount,
                     isConsumed = entry.isConsumed
                 )
             }
@@ -139,19 +147,13 @@ class CalendarViewModel(
         _errorMessage.value = null
     }
 
-    fun addPlan(date: LocalDate, meal: Meal, mealType: MealType, servings: Double) {
-        val valResult = io.github.and19081.mealplanner.domain.Validators.validateServings(servings)
-        if (valResult.isFailure) {
-            _errorMessage.value = valResult.exceptionOrNull()?.message
-            return
-        }
-
+    fun addPlan(date: LocalDate, meal: PrePlannedMeal, mealType: RecipeMealType, peopleCount: Int) {
         _errorMessage.value = null
-        val newEntry = MealPlanEntry(
+        val newEntry = ScheduledMeal(
             date = date,
             mealType = mealType,
-            targetServings = servings,
-            mealId = meal.id
+            peopleCount = peopleCount,
+            prePlannedMealId = meal.id
         )
 
         MealPlanRepository.addPlan(newEntry)
@@ -165,49 +167,52 @@ class CalendarViewModel(
         MealPlanRepository.markConsumed(entryId)
 
         // Decrement Pantry Logic
-        val meal = MealRepository.meals.value.find { it.id == entry.mealId } ?: return
-        val components = MealRepository.mealComponents.value.filter { it.mealId == meal.id }
+        val meal = MealRepository.meals.value.find { it.id == entry.prePlannedMealId } ?: return
+        
         val allRecipes = RecipeRepository.recipes.value
-        val allRecipeIngredients = RecipeRepository.recipeIngredients.value
         val allIngredients = IngredientRepository.ingredients.value
+        val allBridges = IngredientRepository.bridges.value
+        val allUnits = UnitRepository.units.value
         
         // Helper to decrement
-        fun decrement(ingId: Uuid, qtyUsed: Double, unit: MeasureUnit) {
+        fun decrement(ingId: Uuid, qtyUsed: Double, unitId: Uuid) {
             // Get Current Pantry
             val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == ingId }
             if (currentPantryItem == null) return
 
             val ingredient = allIngredients.find { it.id == ingId }
-            val bridges = ingredient?.conversionBridges ?: emptyList()
+            val bridges = allBridges.filter { it.ingredientId == ingId }
 
             // Convert used qty to pantry unit
             val usedInPantryUnit = UnitConverter.convert(
                 amount = qtyUsed,
-                from = unit,
-                to = currentPantryItem.quantityOnHand.unit,
+                fromUnitId = unitId,
+                toUnitId = currentPantryItem.unitId,
+                allUnits = allUnits,
                 bridges = bridges
             )
             
-            val newQty = max(0.0, currentPantryItem.quantityOnHand.amount - usedInPantryUnit)
+            val newQty = max(0.0, currentPantryItem.quantity - usedInPantryUnit)
             
-            PantryRepository.updateQuantity(ingId, Measure(newQty, currentPantryItem.quantityOnHand.unit))
+            PantryRepository.updateQuantity(ingId, newQty, currentPantryItem.unitId)
         }
 
-        components.forEach { comp ->
-            if (comp.ingredientId != null) {
-                if (comp.quantity != null) {
-                    decrement(comp.ingredientId, comp.quantity.amount * entry.targetServings, comp.quantity.unit)
-                }
-            } else if (comp.recipeId != null) {
-                val recipe = allRecipes.find { it.id == comp.recipeId }
-                if (recipe != null) {
-                    val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
-                    val ris = allRecipeIngredients.filter { it.recipeId == recipe.id }
-                    ris.forEach { ri ->
-                        decrement(ri.ingredientId, ri.quantity.amount * scale, ri.quantity.unit)
-                    }
+        // 1. Recipes
+        meal.recipes.forEach { rId ->
+            val recipe = allRecipes.find { it.id == rId }
+            if (recipe != null) {
+                val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
+                recipe.ingredients.forEach { ri ->
+                    decrement(ri.ingredientId, ri.quantity * scale, ri.unitId)
                 }
             }
+        }
+        
+        // 2. Independent Ingredients
+        meal.independentIngredients.forEach { item ->
+            // Assume quantity is per person
+            val totalQty = item.quantity * entry.peopleCount
+            decrement(item.ingredientId, totalQty, item.unitId)
         }
     }
 }

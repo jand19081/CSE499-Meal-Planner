@@ -1,60 +1,41 @@
 package io.github.and19081.mealplanner
 
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlin.uuid.Uuid
 
-enum class MealType {
-    BREAKFAST, LUNCH, DINNER, SNACK, DESSERT, CUSTOM
-}
+data class Restaurant(
+    val id: Uuid = Uuid.random(),
+    val name: String
+)
 
-/**
- * A Meal Definition.
- * Examples: "Taco Night", "Thanksgiving Dinner", "Quick Snack".
- * Consists of one or more Recipes and/or Ingredients.
- */
-data class Meal(
+data class MealIngredient(
+    val ingredientId: Uuid,
+    val quantity: Double,
+    val unitId: Uuid
+)
+
+data class PrePlannedMeal(
     val id: Uuid = Uuid.random(),
     val name: String,
-    val description: String? = null
+    val recipes: List<Uuid> = emptyList(),
+    val independentIngredients: List<MealIngredient> = emptyList()
 )
 
-/**
- * Items that make up a Meal Definition.
- */
-data class MealComponent(
-    val id: Uuid = Uuid.random(),
-    val mealId: Uuid,
-
-    val recipeId: Uuid? = null,
-    val ingredientId: Uuid? = null,
-
-    val quantity: Measure? = null
-)
-
-/**
- * Represents a specific "Slot" on the calendar.
- * Example: "Lunch on Jan 15th, 2026 for 3 people"
- */
-data class MealPlanEntry(
+data class ScheduledMeal(
     val id: Uuid = Uuid.random(),
     val date: LocalDate,
-    val mealType: MealType,
-    val targetServings: Double,
-    
-    // The defined meal being eaten
-    val mealId: Uuid,
+    val time: LocalTime? = null,
+    val mealType: RecipeMealType, // Using existing Enum from Recipe.kt
+    val prePlannedMealId: Uuid? = null,
+    val restaurantId: Uuid? = null,
+    val peopleCount: Int,
     val isConsumed: Boolean = false
 )
 
-data class CustomShoppingItem(
-    val id: Uuid = Uuid.random(),
-    val name: String,
-    val quantity: Double,
-    val unit: MeasureUnit = MeasureUnit.EACH,
-    val isChecked: Boolean = false
-)
-
 data class PantryItem(
+    val id: Uuid = Uuid.random(),
     val ingredientId: Uuid,
-    val quantityOnHand: Measure
+    val quantity: Double,
+    val unitId: Uuid
 )

@@ -101,9 +101,9 @@ fun SettingsView() {
             HorizontalDivider()
             SectionHeader("Notifications")
             
-            Text("Meal Consumed Check Delay: ${uiState.notificationConfig.mealConsumedDelayMinutes} min", style = MaterialTheme.typography.titleSmall)
+            Text("Meal Consumed Check Delay: ${uiState.notificationDelayMinutes} min", style = MaterialTheme.typography.titleSmall)
             Slider(
-                value = uiState.notificationConfig.mealConsumedDelayMinutes.toFloat(),
+                value = uiState.notificationDelayMinutes.toFloat(),
                 onValueChange = { viewModel.setNotificationDelay(it.toInt()) },
                 valueRange = 5f..120f,
                 steps = 22 // (120-5)/5 - 1 roughly

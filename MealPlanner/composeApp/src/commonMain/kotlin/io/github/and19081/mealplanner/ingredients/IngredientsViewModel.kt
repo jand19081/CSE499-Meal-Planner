@@ -10,6 +10,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlin.uuid.Uuid
 
+data class IngredientsUiState(
+    val groupedIngredients: Map<String, List<Ingredient>>, // Key is Category Name
+    val isSortByCategory: Boolean,
+    val searchQuery: String,
+    val allStores: List<Store>,
+    val allCategories: List<Category>,
+    val allPackages: List<Package>,
+    val allBridges: List<BridgeConversion>,
+    val allUnits: List<UnitModel>,
+    val doesExactMatchExist: Boolean = false,
+    val errorMessage: String? = null
+)
+
 class IngredientsViewModel : ViewModel() {
 
     // --- State ---
@@ -22,8 +35,21 @@ class IngredientsViewModel : ViewModel() {
         _sortByCategory,
         _errorMessage,
         IngredientRepository.ingredients,
-        StoreRepository.stores
-    ) { query, isGrouped, error, allIngredients, allStores ->
+        IngredientRepository.categories,
+        IngredientRepository.packages,
+        IngredientRepository.bridges,
+        StoreRepository.stores,
+        UnitRepository.units
+    ) { args: Array<Any?> ->
+        val query = args[0] as String
+        val isGrouped = args[1] as Boolean
+        val error = args[2] as? String
+        val allIngredients = args[3] as List<Ingredient>
+        val allCategories = args[4] as List<Category>
+        val allPackages = args[5] as List<Package>
+        val allBridges = args[6] as List<BridgeConversion>
+        val allStores = args[7] as List<Store>
+        val allUnits = args[8] as List<UnitModel>
 
         // 1. Filter
         val filtered = if (query.isBlank()) allIngredients else {
@@ -32,11 +58,12 @@ class IngredientsViewModel : ViewModel() {
 
         // 2. Sort & Group
         val grouped: Map<String, List<Ingredient>> = if (isGrouped) {
-            filtered.groupBy { it.category }.toSortedMap()
+            val catMap = allCategories.associateBy { it.id }
+            filtered.groupBy { catMap[it.categoryId]?.name ?: "Uncategorized" }.toSortedMap()
         } else {
             // Group by First Letter for A-Z
             filtered.sortedBy { it.name }
-                .groupBy { it.name.first().uppercase() }
+                .groupBy { if (it.name.isNotEmpty()) it.name.first().uppercase() else "?" }
                 .toSortedMap()
         }
 
@@ -48,12 +75,15 @@ class IngredientsViewModel : ViewModel() {
             isSortByCategory = isGrouped,
             searchQuery = query,
             allStores = allStores,
-            // Derive unique categories from existing ingredients + defaults
-            allCategories = (allIngredients.map { it.category } + "Produce" + "Dairy" + "Pantry").distinct().sorted(),
+            allCategories = allCategories,
+            allPackages = allPackages,
+            allBridges = allBridges,
+            allUnits = allUnits,
             doesExactMatchExist = exactMatch,
             errorMessage = error
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), IngredientsUiState(emptyMap(), true, "", emptyList(), emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 
+        IngredientsUiState(emptyMap(), true, "", emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
 
     // --- Actions ---
 
@@ -96,6 +126,20 @@ class IngredientsViewModel : ViewModel() {
         IngredientRepository.removeIngredient(id)
     }
 
+    // --- Child Entities ---
+    fun savePackage(pkg: Package) {
+        val exists = IngredientRepository.packages.value.any { it.id == pkg.id }
+        if (exists) IngredientRepository.updatePackage(pkg) else IngredientRepository.addPackage(pkg)
+    }
+    
+    fun deletePackage(id: Uuid) {
+        IngredientRepository.removePackage(id)
+    }
+    
+    fun saveBridge(bridge: BridgeConversion) {
+        IngredientRepository.addBridge(bridge) // Only add for now, logic simplified
+    }
+
     // --- Store Management ---
 
     fun addStore(name: String) {
@@ -106,25 +150,21 @@ class IngredientsViewModel : ViewModel() {
 
     fun deleteStore(storeId: Uuid) {
         StoreRepository.deleteStore(storeId)
-        IngredientRepository.removePurchaseOptionsForStore(storeId)
+        IngredientRepository.removePackagesForStore(storeId)
     }
 
     // --- Category Management ---
+    
+    fun addCategory(name: String) {
+         if (IngredientRepository.categories.value.none { it.name.equals(name, ignoreCase = true) }) {
+            IngredientRepository.addCategory(Category(name = name))
+        }
+    }
 
-    fun deleteCategory(categoryName: String) {
-        val toDelete = IngredientRepository.ingredients.value.filter { it.category == categoryName }
+    fun deleteCategory(categoryId: Uuid) {
+        val toDelete = IngredientRepository.ingredients.value.filter { it.categoryId == categoryId }
         toDelete.forEach { 
             IngredientRepository.removeIngredient(it.id)
         }
     }
 }
-
-data class IngredientsUiState(
-    val groupedIngredients: Map<String, List<Ingredient>>,
-    val isSortByCategory: Boolean,
-    val searchQuery: String,
-    val allStores: List<Store>,
-    val allCategories: List<String>,
-    val doesExactMatchExist: Boolean = false,
-    val errorMessage: String? = null
-)

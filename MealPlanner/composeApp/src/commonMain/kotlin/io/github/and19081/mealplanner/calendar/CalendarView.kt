@@ -27,8 +27,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.and19081.mealplanner.Meal
-import io.github.and19081.mealplanner.MealType
+import io.github.and19081.mealplanner.PrePlannedMeal
+import io.github.and19081.mealplanner.RecipeMealType
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Clock
 import kotlinx.datetime.DayOfWeek
@@ -137,8 +137,8 @@ fun CalendarView(
             date = selectedDateForDialog!!,
             availableMeals = uiState.availableMeals,
             onDismiss = { showAddDialog = false },
-            onConfirm = { date, meal, mealType, servings ->
-                viewModel.addPlan(date, meal, mealType, servings)
+            onConfirm = { date, meal, mealType, count ->
+                viewModel.addPlan(date, meal, mealType, count)
                 showAddDialog = false
             }
         )
@@ -227,9 +227,9 @@ fun MealEventCard(event: CalendarEvent, onConsume: (Uuid) -> Unit) {
                     .background(
                         if (event.isConsumed) Color.Gray 
                         else when(event.mealType) {
-                            MealType.BREAKFAST -> MaterialTheme.colorScheme.tertiary
-                            MealType.LUNCH -> MaterialTheme.colorScheme.secondary
-                            MealType.DINNER -> MaterialTheme.colorScheme.primary
+                            RecipeMealType.Breakfast -> MaterialTheme.colorScheme.tertiary
+                            RecipeMealType.Lunch -> MaterialTheme.colorScheme.secondary
+                            RecipeMealType.Dinner -> MaterialTheme.colorScheme.primary
                             else -> MaterialTheme.colorScheme.outline
                         }
                     )
@@ -253,7 +253,7 @@ fun MealEventCard(event: CalendarEvent, onConsume: (Uuid) -> Unit) {
                         color = if (event.isConsumed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Serves: ${event.servings}",
+                        text = "People: ${event.peopleCount}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -362,9 +362,9 @@ fun CalendarCell(
                             .background(
                                 color = if (event.isConsumed) MaterialTheme.colorScheme.outline 
                                 else when(event.mealType) {
-                                    MealType.BREAKFAST -> MaterialTheme.colorScheme.tertiary
-                                    MealType.LUNCH -> MaterialTheme.colorScheme.secondary
-                                    MealType.DINNER -> MaterialTheme.colorScheme.primary
+                                    RecipeMealType.Breakfast -> MaterialTheme.colorScheme.tertiary
+                                    RecipeMealType.Lunch -> MaterialTheme.colorScheme.secondary
+                                    RecipeMealType.Dinner -> MaterialTheme.colorScheme.primary
                                     else -> MaterialTheme.colorScheme.outline
                                 },
                                 shape = MaterialTheme.shapes.extraSmall
@@ -430,19 +430,19 @@ fun DayOverviewDialog(
 @Composable
 fun AddPlanDialog(
     date: LocalDate,
-    availableMeals: List<Meal>,
+    availableMeals: List<PrePlannedMeal>,
     onDismiss: () -> Unit,
-    onConfirm: (LocalDate, Meal, MealType, Double) -> Unit
+    onConfirm: (LocalDate, PrePlannedMeal, RecipeMealType, Int) -> Unit
 ) {
-    var selectedMeal by remember { mutableStateOf<Meal?>(null) }
-    var selectedType by remember { mutableStateOf(MealType.DINNER) }
-    var servingsText by remember { mutableStateOf("4") }
+    var selectedMeal by remember { mutableStateOf<PrePlannedMeal?>(null) }
+    var selectedType by remember { mutableStateOf(RecipeMealType.Dinner) }
+    var peopleText by remember { mutableStateOf("4") }
     // Store current display date in state so it updates when Picker confirms
     var currentDisplayDate by remember { mutableStateOf(date) }
 
     var expandedMeal by remember { mutableStateOf(false) }
     var expandedType by remember { mutableStateOf(false) }
-
+    
     val initialDateMillis = currentDisplayDate.atStartOfDayIn(KTimeZone.currentSystemDefault()).toEpochMilliseconds()
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialDateMillis,
@@ -492,7 +492,7 @@ fun AddPlanDialog(
                         Text(selectedType.name)
                     }
                     DropdownMenu(expanded = expandedType, onDismissRequest = { expandedType = false }) {
-                        MealType.entries.forEach { type ->
+                        RecipeMealType.entries.forEach { type ->
                             DropdownMenuItem(
                                 text = { Text(type.name) },
                                 onClick = {
@@ -506,9 +506,9 @@ fun AddPlanDialog(
 
                 // Servings Input
                 MpOutlinedTextField(
-                    value = servingsText,
-                    onValueChange = { servingsText = it },
-                    label = { Text("Servings") },
+                    value = peopleText,
+                    onValueChange = { peopleText = it },
+                    label = { Text("People Count") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -518,13 +518,13 @@ fun AddPlanDialog(
             DialogActionButtons(
                 onCancel = onDismiss,
                 onSave = {
-                    val servings = servingsText.toDoubleOrNull()
+                    val count = peopleText.toIntOrNull()
                     // Use state date
-                    if (selectedMeal != null && servings != null) {
-                        onConfirm(currentDisplayDate, selectedMeal!!, selectedType, servings)
+                    if (selectedMeal != null && count != null) {
+                        onConfirm(currentDisplayDate, selectedMeal!!, selectedType, count)
                     }
                 },
-                saveEnabled = selectedMeal != null && servingsText.toDoubleOrNull() != null,
+                saveEnabled = selectedMeal != null && peopleText.toIntOrNull() != null,
                 saveLabel = "Add"
             )
         },

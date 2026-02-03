@@ -9,25 +9,25 @@ import kotlinx.coroutines.flow.stateIn
 class SettingsViewModel : ViewModel() {
 
     val uiState = combine(
-        SettingsRepository.salesTaxRate,
+        SettingsRepository.appSettings,
         SettingsRepository.theme,
         SettingsRepository.cornerStyle,
         SettingsRepository.accentColor,
-        SettingsRepository.dashboardConfig,
-        SettingsRepository.notificationConfig
+        SettingsRepository.dashboardConfig
     ) { args: Array<Any> ->
+        val appSettings = args[0] as AppSettings
         SettingsUiState(
-            taxRate = args[0] as Double,
+            taxRate = appSettings.defaultTaxRatePercentage,
             appTheme = args[1] as AppTheme,
             cornerStyle = args[2] as CornerStyle,
             accentColor = args[3] as AccentColor,
             dashboardConfig = args[4] as DashboardConfig,
-            notificationConfig = args[5] as NotificationConfig
+            notificationDelayMinutes = appSettings.mealConsumedNotificationDelayMinutes
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
     fun updateTaxRate(rate: Double) {
-        SettingsRepository.salesTaxRate.value = rate
+        SettingsRepository.updateSettings { it.copy(defaultTaxRatePercentage = rate) }
     }
 
     fun setTheme(theme: AppTheme) {
@@ -55,7 +55,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun setNotificationDelay(minutes: Int) {
-        SettingsRepository.setNotificationDelay(minutes)
+        SettingsRepository.updateSettings { it.copy(mealConsumedNotificationDelayMinutes = minutes) }
     }
 }
 
@@ -65,5 +65,5 @@ data class SettingsUiState(
     val cornerStyle: CornerStyle = CornerStyle.SQUARE,
     val accentColor: AccentColor = AccentColor.GREEN,
     val dashboardConfig: DashboardConfig = DashboardConfig(),
-    val notificationConfig: NotificationConfig = NotificationConfig()
+    val notificationDelayMinutes: Int = 30
 )

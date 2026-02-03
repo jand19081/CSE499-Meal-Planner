@@ -7,11 +7,14 @@ import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.domain.UnitConverter
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import io.github.and19081.mealplanner.ingredients.Store
 import io.github.and19081.mealplanner.ingredients.StoreRepository
 import io.github.and19081.mealplanner.meals.MealRepository
 import io.github.and19081.mealplanner.recipes.RecipeRepository
 import io.github.and19081.mealplanner.settings.SettingsRepository
+import io.github.and19081.mealplanner.settings.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,18 +35,19 @@ class ShoppingListViewModel : ViewModel() {
         val recipes: List<Recipe>,
         val allIngredients: List<Ingredient>,
         val allStores: List<Store>,
-        val allRecipeIngredients: List<RecipeIngredient>,
+        val allPackages: List<Package>,
+        val allBridges: List<BridgeConversion>,
+        val allUnits: List<UnitModel>,
         val taxRate: Double
     )
 
     // Helper data class to group user/dynamic data
     data class UserData(
-        val entries: List<MealPlanEntry>,
-        val meals: List<Meal>,
-        val mealComponents: List<MealComponent>,
+        val entries: List<ScheduledMeal>,
+        val meals: List<PrePlannedMeal>,
         val overrides: Map<Uuid, ShoppingListOverride>,
         val pantryItems: List<PantryItem>,
-        val customItems: List<CustomShoppingItem>,
+        val customItems: List<ShoppingListItem>,
         val inCartItems: Set<Uuid>
     )
 
@@ -51,72 +55,77 @@ class ShoppingListViewModel : ViewModel() {
         RecipeRepository.recipes,
         IngredientRepository.ingredients,
         StoreRepository.stores,
-        RecipeRepository.recipeIngredients,
-        SettingsRepository.salesTaxRate
-    ) { recipes, ingredients, stores, recipeIngredients, tax ->
-        CoreData(recipes, ingredients, stores, recipeIngredients, tax)
+        IngredientRepository.packages,
+        IngredientRepository.bridges,
+        UnitRepository.units,
+        SettingsRepository.appSettings
+    ) { args: Array<Any> ->
+        CoreData(
+            args[0] as List<Recipe>,
+            args[1] as List<Ingredient>,
+            args[2] as List<Store>,
+            args[3] as List<Package>,
+            args[4] as List<BridgeConversion>,
+            args[5] as List<UnitModel>,
+            (args[6] as AppSettings).defaultTaxRatePercentage
+        )
     }
 
     private val userDataFlow = combine(
         MealPlanRepository.entries,
         MealRepository.meals,
-        MealRepository.mealComponents,
         ShoppingListRepository.overrides,
         PantryRepository.pantryItems,
-        CustomItemRepository.items,
+        ShoppingListItemRepository.items,
         ShoppingSessionRepository.inCartItems
     ) { args: Array<Any> ->
         UserData(
-            entries = args[0] as List<MealPlanEntry>,
-            meals = args[1] as List<Meal>,
-            mealComponents = args[2] as List<MealComponent>,
-            overrides = args[3] as Map<Uuid, ShoppingListOverride>,
-            pantryItems = args[4] as List<PantryItem>,
-            customItems = args[5] as List<CustomShoppingItem>,
-            inCartItems = args[6] as Set<Uuid>
+            entries = args[0] as List<ScheduledMeal>,
+            meals = args[1] as List<PrePlannedMeal>,
+            overrides = args[2] as Map<Uuid, ShoppingListOverride>,
+            pantryItems = args[3] as List<PantryItem>,
+            customItems = args[4] as List<ShoppingListItem>,
+            inCartItems = args[5] as Set<Uuid>
         )
     }
 
     // Map the combined data to UI State
     val uiState = combine(coreDataFlow, userDataFlow) { core, user ->
-        val (recipes, allIngredients, allStores, allRecipeIngredients, taxRate) = core
-        val (entries, meals, mealComponents, overrides, pantryItems, customItems, inCartItems) = user
+        val (recipes, allIngredients, allStores, allPackages, allBridges, allUnits, taxRate) = core
+        val (entries, meals, overrides, pantryItems, customItems, inCartItems) = user
 
         // Pre-calculate Maps for O(1) Lookups
         val mealsMap = meals.associateBy { it.id }
         val recipesMap = recipes.associateBy { it.id }
         val ingredientsMap = allIngredients.associateBy { it.id }
-        val mealComponentsMap = mealComponents.groupBy { it.mealId }
-        val recipeIngredientsMap = allRecipeIngredients.groupBy { it.recipeId }
 
         // 1. Calculate Requirements (Normalized to Base Unit)
         val grossRequirements = mutableMapOf<Uuid, Double>()
 
         entries.forEach { entry ->
-            val meal = mealsMap[entry.mealId]
+            val meal = mealsMap[entry.prePlannedMealId]
             if (meal != null) {
-                val components = mealComponentsMap[meal.id] ?: emptyList()
-                components.forEach { comp ->
-                    fun add(ingId: Uuid, qty: Double, unit: MeasureUnit) {
-                        val (baseQty, _) = UnitConverter.toStandard(qty, unit)
-                        grossRequirements[ingId] = (grossRequirements[ingId] ?: 0.0) + baseQty
-                    }
+                fun add(ingId: Uuid, qty: Double, unitId: Uuid) {
+                    val unit = allUnits.find { it.id == unitId } ?: return
+                    val (baseQty, _) = UnitConverter.toStandard(qty, unit, allUnits)
+                    grossRequirements[ingId] = (grossRequirements[ingId] ?: 0.0) + baseQty
+                }
 
-                    if (comp.ingredientId != null) {
-                        val ing = ingredientsMap[comp.ingredientId]
-                        if (ing != null && comp.quantity != null) {
-                            add(ing.id, comp.quantity.amount * entry.targetServings, comp.quantity.unit)
-                        }
-                    } else if (comp.recipeId != null) {
-                        val recipe = recipesMap[comp.recipeId]
-                        if (recipe != null) {
-                            val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
-                            val recipeIngs = recipeIngredientsMap[recipe.id] ?: emptyList()
-                            recipeIngs.forEach { ri ->
-                                add(ri.ingredientId, ri.quantity.amount * scale, ri.quantity.unit)
-                            }
+                // Recipes
+                meal.recipes.forEach { rId ->
+                    val recipe = recipesMap[rId]
+                    if (recipe != null) {
+                        val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
+                        recipe.ingredients.forEach { ri ->
+                             add(ri.ingredientId, ri.quantity * scale, ri.unitId)
                         }
                     }
+                }
+                
+                // Independent Ingredients
+                meal.independentIngredients.forEach { item ->
+                    // Assuming qty is per person
+                    add(item.ingredientId, item.quantity * entry.peopleCount, item.unitId)
                 }
             }
         }
@@ -128,7 +137,8 @@ class ShoppingListViewModel : ViewModel() {
         grossRequirements.forEach { (ingId, reqQty) ->
             val pantryItem = pantryItems.find { it.ingredientId == ingId }
             val ownedQty = if (pantryItem != null) {
-                UnitConverter.toStandard(pantryItem.quantityOnHand.amount, pantryItem.quantityOnHand.unit).first
+                val unit = allUnits.find { it.id == pantryItem.unitId }
+                if (unit != null) UnitConverter.toStandard(pantryItem.quantity, unit, allUnits).first else 0.0
             } else 0.0
 
             val needed = max(0.0, reqQty - ownedQty)
@@ -160,12 +170,14 @@ class ShoppingListViewModel : ViewModel() {
                 return@forEach
             }
 
+            val packages = allPackages.filter { it.ingredientId == ingId }
+            
             val forcedStoreId = override?.forceStoreId
             val bestOption = if (forcedStoreId != null) {
-                 ing.purchaseOptions.find { it.storeId == forcedStoreId }
-                     ?: ing.purchaseOptions.minByOrNull { it.unitPrice }
+                 packages.find { it.storeId == forcedStoreId }
+                     ?: packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
             } else {
-                ing.purchaseOptions.minByOrNull { it.unitPrice }
+                packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
             }
 
             val targetStoreId = bestOption?.storeId ?: forcedStoreId ?: anyStoreId
@@ -174,17 +186,24 @@ class ShoppingListViewModel : ViewModel() {
             var price = 0L
             var displayUnit = "Units"
 
-            if (bestOption != null) {
-                val (baseOptionQty, _) = UnitConverter.toStandard(bestOption.quantity.amount, bestOption.quantity.unit)
-                if (baseOptionQty > 0) {
-                     val packs = ceil(baseQtyNeeded / baseOptionQty).toLong()
-                     purchaseQty = packs * bestOption.quantity.amount
-                     price = packs * bestOption.priceCents
-                     displayUnit = bestOption.quantity.unit.name
+            if (bestOption != null && bestOption.quantity > 0) {
+                val optUnit = allUnits.find { it.id == bestOption.unitId }
+                if (optUnit != null) {
+                    val (baseOptionQty, _) = UnitConverter.toStandard(bestOption.quantity, optUnit, allUnits)
+                    if (baseOptionQty > 0) {
+                         val packs = ceil(baseQtyNeeded / baseOptionQty).toLong()
+                         purchaseQty = packs * bestOption.quantity
+                         price = packs * bestOption.priceCents.toLong()
+                         displayUnit = optUnit.abbreviation
+                    }
                 }
             } else {
-                val (_, stdUnit) = UnitConverter.toStandard(baseQtyNeeded, MeasureUnit.EACH)
-                displayUnit = stdUnit.name
+                // Safe fallback for unit
+                val countUnit = allUnits.find { it.type == UnitType.Count }
+                if (countUnit != null) {
+                    val (_, stdUnit) = UnitConverter.toStandard(baseQtyNeeded, countUnit, allUnits)
+                    displayUnit = stdUnit?.abbreviation ?: "?"
+                }
             }
 
             val item = ShoppingListItemUi(
@@ -207,13 +226,14 @@ class ShoppingListViewModel : ViewModel() {
         }
 
         customItems.forEach { custom ->
-            if (!custom.isChecked) {
+            if (!custom.isPurchased) {
+                val unit = allUnits.find { it.id == custom.unitId }
                 val item = ShoppingListItemUi(
                     id = custom.id,
-                    name = custom.name,
-                    quantity = custom.quantity,
-                    requiredQuantity = custom.quantity,
-                    unit = custom.unit.name,
+                    name = custom.customName ?: "Unknown",
+                    quantity = custom.neededQuantity ?: 0.0,
+                    requiredQuantity = custom.neededQuantity ?: 0.0,
+                    unit = unit?.abbreviation ?: "?",
                     priceCents = 0,
                     isOwned = false,
                     isCustom = true,
@@ -239,13 +259,14 @@ class ShoppingListViewModel : ViewModel() {
                     isInCart = false
                 )
             } else null
-        } + customItems.filter { it.isChecked }.map { 
+        } + customItems.filter { it.isPurchased }.map { item ->
+             val unit = allUnits.find { it.id == item.unitId }
              ShoppingListItemUi(
-                 id = it.id,
-                 name = it.name,
-                 quantity = it.quantity,
-                 requiredQuantity = it.quantity,
-                 unit = it.unit.name,
+                 id = item.id,
+                 name = item.customName ?: "Unknown Item",
+                 quantity = item.neededQuantity ?: 0.0,
+                 requiredQuantity = item.neededQuantity ?: 0.0,
+                 unit = unit?.abbreviation ?: "?",
                  priceCents = 0,
                  isOwned = true,
                  isCustom = true,
@@ -261,39 +282,42 @@ class ShoppingListViewModel : ViewModel() {
             }
             .sortedBy { if(it.storeName == "Other / Custom") "ZZZ" else it.storeName }
 
-        ShoppingListUiState(finalSections, ownedItemsUi, allStores, taxRate)
+        ShoppingListUiState(finalSections, ownedItemsUi, allStores, allUnits, taxRate)
 
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ShoppingListUiState(emptyList(), emptyList(), emptyList(), 0.0))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ShoppingListUiState(emptyList(), emptyList(), emptyList(), emptyList(), 0.0))
 
+    // ... ensureNeeded ...
     private fun ensureNeeded(ingredientId: Uuid) {
         viewModelScope.launch {
              val entries = MealPlanRepository.entries.value
              val meals = MealRepository.meals.value
-             val components = MealRepository.mealComponents.value
              val recipes = RecipeRepository.recipes.value
-             val allRecipeIngredients = RecipeRepository.recipeIngredients.value
+             val allUnits = UnitRepository.units.value
              
              var req = 0.0
              entries.forEach { entry ->
-                val meal = meals.find { it.id == entry.mealId }
+                val meal = meals.find { it.id == entry.prePlannedMealId }
                 if (meal != null) {
-                    val comps = components.filter { it.mealId == meal.id }
-                    comps.forEach { comp ->
-                        if (comp.ingredientId == ingredientId) {
-                            if (comp.quantity != null) {
-                                val (base, _) = UnitConverter.toStandard(comp.quantity.amount * entry.targetServings, comp.quantity.unit)
-                                req += base
-                            }
-                        } else if (comp.recipeId != null) {
-                            val recipe = recipes.find { it.id == comp.recipeId }
-                            if (recipe != null) {
-                                val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
-                                val ris = allRecipeIngredients.filter { it.recipeId == recipe.id && it.ingredientId == ingredientId }
-                                ris.forEach { ri ->
-                                    val (base, _) = UnitConverter.toStandard(ri.quantity.amount * scale, ri.quantity.unit)
-                                    req += base
-                                }
-                            }
+                    // Recipes
+                    meal.recipes.forEach { rId ->
+                        val recipe = recipes.find { it.id == rId }
+                        if (recipe != null) {
+                             val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
+                             recipe.ingredients.filter { it.ingredientId == ingredientId }.forEach { ri ->
+                                 val unit = allUnits.find { it.id == ri.unitId }
+                                 if (unit != null) {
+                                     val (base, _) = UnitConverter.toStandard(ri.quantity * scale, unit, allUnits)
+                                     req += base
+                                 }
+                             }
+                        }
+                    }
+                    // Independent
+                    meal.independentIngredients.filter { it.ingredientId == ingredientId }.forEach { item ->
+                        val unit = allUnits.find { it.id == item.unitId }
+                        if (unit != null) {
+                            val (base, _) = UnitConverter.toStandard(item.quantity * entry.peopleCount, unit, allUnits)
+                            req += base
                         }
                     }
                 }
@@ -301,9 +325,14 @@ class ShoppingListViewModel : ViewModel() {
              
              val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == ingredientId }
              if (currentPantryItem != null) {
-                 val (currentBase, currentUnit) = UnitConverter.toStandard(currentPantryItem.quantityOnHand.amount, currentPantryItem.quantityOnHand.unit)
-                 val newBase = max(0.0, currentBase - req)
-                 PantryRepository.updateQuantity(ingredientId, Measure(newBase, currentUnit))
+                 val unit = allUnits.find { it.id == currentPantryItem.unitId }
+                 if (unit != null) {
+                     val (currentBase, currentUnit) = UnitConverter.toStandard(currentPantryItem.quantity, unit, allUnits)
+                     val newBase = max(0.0, currentBase - req)
+                     if (currentUnit != null) {
+                         PantryRepository.updateQuantity(ingredientId, newBase, currentUnit.id)
+                     }
+                 }
              }
         }
     }
@@ -380,6 +409,7 @@ class ShoppingListViewModel : ViewModel() {
     fun finalizeTrip(totalPaidCents: Long, storeId: Uuid? = null) {
         viewModelScope.launch {
             val currentState = uiState.value
+            val allUnits = currentState.allUnits
             
             // 1. Capture Trip Data
             val cartItems = if (storeId == null) {
@@ -396,47 +426,45 @@ class ShoppingListViewModel : ViewModel() {
                 currentState.sections.maxByOrNull { it.items.count { i -> i.isInCart } }?.storeName ?: "Mixed Stores"
             }
             
-            val receiptItems = cartItems.map { 
-                ReceiptItem(
-                    name = it.name,
-                    quantity = it.quantity,
-                    unit = it.unit,
-                    priceCents = it.priceCents,
-                    ingredientId = if (it.isCustom) null else it.id
-                )
+            val dominantStoreId = if (storeId != null) storeId else {
+                 currentState.sections.maxByOrNull { it.items.count { i -> i.isInCart } }?.storeId ?: Uuid.random()
             }
             
-            val subtotalCents = receiptItems.sumOf { it.priceCents }
+            val subtotalCents = cartItems.sumOf { it.priceCents }
             val taxCents = max(0L, totalPaidCents - subtotalCents)
 
-            val trip = ShoppingTrip(
+            val trip = ReceiptHistory(
                 date = Clock.System.todayIn(TimeZone.currentSystemDefault()),
-                storeName = dominantStore,
-                subtotalCents = subtotalCents,
-                taxCents = taxCents,
-                totalPaidCents = totalPaidCents,
-                items = receiptItems
+                storeId = dominantStoreId,
+                projectedTotalCents = subtotalCents.toInt(),
+                actualTotalCents = totalPaidCents.toInt(),
+                taxPaidCents = taxCents.toInt()
             )
-            ShoppingHistoryRepository.addTrip(trip)
+            ReceiptHistoryRepository.addTrip(trip)
 
             // 2. Process Ingredients in Cart
             cartItems.filter { !it.isCustom }.forEach { item ->
-                val unit = MeasureUnit.entries.find { it.name == item.unit } ?: MeasureUnit.EACH
-                val (baseQtyToAdd, _) = UnitConverter.toStandard(item.quantity, unit)
-                
-                val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == item.id }
-                val currentBaseQty = if (currentPantryItem != null) {
-                    UnitConverter.toStandard(currentPantryItem.quantityOnHand.amount, currentPantryItem.quantityOnHand.unit).first
-                } else 0.0
-                
-                val newQty = currentBaseQty + baseQtyToAdd
-                val (_, stdUnit) = UnitConverter.toStandard(0.0, unit)
-                PantryRepository.updateQuantity(item.id, Measure(newQty, stdUnit))
+                val unit = allUnits.find { it.abbreviation == item.unit }
+                if (unit != null) {
+                    val (baseQtyToAdd, _) = UnitConverter.toStandard(item.quantity, unit, allUnits)
+                    
+                    val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == item.id }
+                    val currentBaseQty = if (currentPantryItem != null) {
+                        val pUnit = allUnits.find { it.id == currentPantryItem.unitId }
+                        if (pUnit != null) UnitConverter.toStandard(currentPantryItem.quantity, pUnit, allUnits).first else 0.0
+                    } else 0.0
+                    
+                    val newQty = currentBaseQty + baseQtyToAdd
+                    val (_, stdUnit) = UnitConverter.toStandard(0.0, unit, allUnits)
+                    if (stdUnit != null) {
+                        PantryRepository.updateQuantity(item.id, newQty, stdUnit.id)
+                    }
+                }
             }
             
             // 3. Process Custom Items in Cart
             cartItems.filter { it.isCustom }.forEach { item ->
-                CustomItemRepository.toggleItem(item.id) // Marks as checked/owned
+                ShoppingListItemRepository.toggleItem(item.id) // Marks as purchased
             }
             
             // 4. Clear Cart
@@ -448,50 +476,46 @@ class ShoppingListViewModel : ViewModel() {
         }
     }
     
-    fun updatePrice(ingredientId: Uuid, newPriceCents: Long) {
+    fun updatePrice(ingredientId: Uuid, newPriceCents: Int) {
         viewModelScope.launch {
             // Update the purchase option for this ingredient
-            val ingredients = IngredientRepository.ingredients.value
-            val ing = ingredients.find { it.id == ingredientId } ?: return@launch
+            val packages = IngredientRepository.packages.value
+            val pkg = packages.filter { it.ingredientId == ingredientId }.minByOrNull { it.priceCents }
             
-            if (ing.purchaseOptions.isNotEmpty()) {
-                // Find min price option to update
-                val minOpt = ing.purchaseOptions.minByOrNull { it.priceCents }
-                if (minOpt != null) {
-                    val updatedOptions = ing.purchaseOptions.map { 
-                        if (it.id == minOpt.id) it.copy(priceCents = newPriceCents) else it 
-                    }
-                    IngredientRepository.updateIngredient(ing.copy(purchaseOptions = updatedOptions))
-                }
-            } else {
-                // No options exist, maybe create one?
-                // Skip for now as we need store ID.
+            if (pkg != null) {
+                IngredientRepository.updatePackage(pkg.copy(priceCents = newPriceCents))
             }
         }
     }
 
     fun markOwned(item: ShoppingListItemUi) {
         if (item.isCustom) {
-            CustomItemRepository.toggleItem(item.id)
+            ShoppingListItemRepository.toggleItem(item.id)
         } else {
-            val unit = MeasureUnit.entries.find { it.name == item.unit } ?: MeasureUnit.EACH
-            val (baseQtyToAdd, _) = UnitConverter.toStandard(item.quantity, unit)
-            
-            val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == item.id }
-            val currentBaseQty = if (currentPantryItem != null) {
-                UnitConverter.toStandard(currentPantryItem.quantityOnHand.amount, currentPantryItem.quantityOnHand.unit).first
-            } else 0.0
-            
-            val newQty = currentBaseQty + baseQtyToAdd
-            
-            val (_, stdUnit) = UnitConverter.toStandard(0.0, unit)
-            PantryRepository.updateQuantity(item.id, Measure(newQty, stdUnit))
+            val allUnits = UnitRepository.units.value
+            val unit = allUnits.find { it.abbreviation == item.unit }
+            if (unit != null) {
+                val (baseQtyToAdd, _) = UnitConverter.toStandard(item.quantity, unit, allUnits)
+                
+                val currentPantryItem = PantryRepository.pantryItems.value.find { it.ingredientId == item.id }
+                val currentBaseQty = if (currentPantryItem != null) {
+                    val pUnit = allUnits.find { it.id == currentPantryItem.unitId }
+                    if (pUnit != null) UnitConverter.toStandard(currentPantryItem.quantity, pUnit, allUnits).first else 0.0
+                } else 0.0
+                
+                val newQty = currentBaseQty + baseQtyToAdd
+                
+                val (_, stdUnit) = UnitConverter.toStandard(0.0, unit, allUnits)
+                if (stdUnit != null) {
+                    PantryRepository.updateQuantity(item.id, newQty, stdUnit.id)
+                }
+            }
         }
     }
 
     fun markUnowned(item: ShoppingListItemUi) {
         if (item.isCustom) {
-            CustomItemRepository.toggleItem(item.id)
+            ShoppingListItemRepository.toggleItem(item.id)
         } else {
             ensureNeeded(item.id)
         }
@@ -502,8 +526,16 @@ class ShoppingListViewModel : ViewModel() {
         ensureNeeded(ingredientId)
     }
 
-    fun addCustomItem(name: String, qty: Double, unit: MeasureUnit) {
-        CustomItemRepository.addItem(CustomShoppingItem(name = name, quantity = qty, unit = unit))
+    fun addCustomItem(name: String, qty: Double, unitId: Uuid) {
+        ShoppingListItemRepository.addItem(
+            ShoppingListItem(
+                customName = name, 
+                neededQuantity = qty, 
+                unitId = unitId,
+                storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"), // Default Any Store
+                isPurchased = false
+            )
+        )
     }
 }
 
@@ -511,6 +543,7 @@ data class ShoppingListUiState(
     val sections: List<ShoppingListSection>,
     val ownedItems: List<ShoppingListItemUi>,
     val allStores: List<Store>,
+    val allUnits: List<UnitModel>,
     val taxRate: Double = 0.0
 )
 

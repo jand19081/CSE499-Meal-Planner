@@ -23,7 +23,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.domain.PriceCalculator
 import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlin.uuid.Uuid
 
 @Composable
@@ -105,8 +108,10 @@ fun RecipesView() {
                 items(recipes) { recipe ->
                     RecipeRow(
                         recipe = recipe,
-                        allRecipeIngredients = uiState.allRecipeIngredients,
                         allIngredients = uiState.allIngredients,
+                        allPackages = uiState.allPackages,
+                        allBridges = uiState.allBridges,
+                        allUnits = uiState.allUnits,
                         onEditClick = {
                             selectedRecipe = recipe
                             showEditDialog = true
@@ -132,10 +137,10 @@ fun RecipesView() {
             recipe = selectedRecipe,
             initialName = creationName,
             allIngredients = uiState.allIngredients,
-            initialRecipeIngredients = uiState.allRecipeIngredients.filter { it.recipeId == (selectedRecipe?.id ?: Uuid.NIL) },
+            allUnits = uiState.allUnits,
             onDismiss = { showEditDialog = false },
-            onSave = { recipe, ingredients ->
-                viewModel.saveRecipe(recipe, ingredients)
+            onSave = { recipe ->
+                viewModel.saveRecipe(recipe)
                 showEditDialog = false
             },
             onDelete = if (selectedRecipe != null) { { viewModel.deleteRecipe(selectedRecipe!!.id) } } else null
@@ -146,18 +151,20 @@ fun RecipesView() {
 @Composable
 fun RecipeRow(
     recipe: Recipe,
-    allRecipeIngredients: List<RecipeIngredient>,
     allIngredients: List<Ingredient>,
+    allPackages: List<Package>,
+    allBridges: List<BridgeConversion>,
+    allUnits: List<UnitModel>,
     onEditClick: () -> Unit
 ) {
-    val ingredientCount = allRecipeIngredients.count { it.recipeId == recipe.id }
-    val costCents = calculateRecipeCost(recipe, allIngredients, allRecipeIngredients)
+    val ingredientCount = recipe.ingredients.size
+    val costCents = PriceCalculator.calculateRecipeCost(recipe, allIngredients.associateBy { it.id }, allPackages, allBridges, allUnits)
     val costStr = if (costCents > 0) "$${String.format("%.2f", costCents / 100.0)}" else "No price data"
     
-    val perPersonCents = if (recipe.baseServings > 0) (costCents / recipe.baseServings).toLong() else costCents
+    val perPersonCents = if (recipe.servings > 0) (costCents / recipe.servings).toLong() else costCents
     val perPersonStr = if (costCents > 0) " ($${String.format("%.2f", perPersonCents / 100.0)}/person)" else ""
 
-    val subtitle = "Serves ${recipe.baseServings} • $ingredientCount ingredients • Total: $costStr$perPersonStr"
+    val subtitle = "Serves ${recipe.servings} • $ingredientCount ingredients • Total: $costStr$perPersonStr"
 
     ExpandableListItem(
         title = recipe.name,
@@ -168,6 +175,9 @@ fun RecipeRow(
             Text(recipe.description, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
             Spacer(modifier = Modifier.height(8.dp))
         }
+        
+        Text("Time: Prep ${recipe.prepTimeMinutes}m / Cook ${recipe.cookTimeMinutes}m", style = MaterialTheme.typography.bodySmall)
+        Spacer(modifier = Modifier.height(4.dp))
 
         Text("Instructions:", style = MaterialTheme.typography.labelMedium)
         if (recipe.instructions.isEmpty()) {
@@ -186,18 +196,24 @@ fun RecipeEditDialog(
     recipe: Recipe?,
     initialName: String,
     allIngredients: List<Ingredient>,
-    initialRecipeIngredients: List<RecipeIngredient>,
+    allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onSave: (Recipe, List<RecipeIngredient>) -> Unit,
+    onSave: (Recipe) -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(recipe?.name ?: initialName) }
-    var servingsStr by remember { mutableStateOf(recipe?.baseServings?.toString() ?: "4.0") }
+    var servingsStr by remember { mutableStateOf(recipe?.servings?.toString() ?: "4.0") }
     var description by remember { mutableStateOf(recipe?.description ?: "") }
     var instructionsText by remember { mutableStateOf(recipe?.instructions?.joinToString("\n") ?: "") }
+    
+    var prepTimeStr by remember { mutableStateOf(recipe?.prepTimeMinutes?.toString() ?: "0") }
+    var cookTimeStr by remember { mutableStateOf(recipe?.cookTimeMinutes?.toString() ?: "0") }
+    
+    // Default MealType
+    var mealType by remember { mutableStateOf(recipe?.mealType ?: RecipeMealType.Dinner) }
 
     val recipeId = remember { recipe?.id ?: Uuid.random() }
-    var currentIngredients by remember { mutableStateOf(initialRecipeIngredients) }
+    var currentIngredients by remember { mutableStateOf(recipe?.ingredients ?: emptyList()) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("General", "Ingredients")
@@ -210,10 +226,14 @@ fun RecipeEditDialog(
                 id = recipeId,
                 name = name,
                 description = description.ifBlank { null },
-                baseServings = servingsStr.toDoubleOrNull() ?: 4.0,
-                instructions = instructionsText.lines().filter { it.isNotBlank() }
+                servings = servingsStr.toDoubleOrNull() ?: 4.0,
+                instructions = instructionsText.lines().filter { it.isNotBlank() },
+                mealType = mealType,
+                prepTimeMinutes = prepTimeStr.toIntOrNull() ?: 0,
+                cookTimeMinutes = cookTimeStr.toIntOrNull() ?: 0,
+                ingredients = currentIngredients
             )
-            onSave(finalRecipe, currentIngredients)
+            onSave(finalRecipe)
         },
         saveEnabled = name.isNotBlank(),
         onDelete = if (onDelete != null) {
@@ -235,13 +255,40 @@ fun RecipeEditDialog(
                         label = { Text("Name") },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    MpOutlinedTextField(
-                        value = servingsStr,
-                        onValueChange = { servingsStr = it },
-                        label = { Text("Base Servings") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MpOutlinedTextField(
+                            value = servingsStr,
+                            onValueChange = { servingsStr = it },
+                            label = { Text("Servings") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        // Meal Type - Simplified selector
+                        Box(modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
+                            // Ideally a dropdown, for now text or simple logic.
+                            // Assuming default is Dinner, no UI to change yet to save complexity unless asked.
+                            Text("Type: ${mealType.name}")
+                        }
+                    }
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MpOutlinedTextField(
+                            value = prepTimeStr,
+                            onValueChange = { prepTimeStr = it },
+                            label = { Text("Prep (min)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        MpOutlinedTextField(
+                            value = cookTimeStr,
+                            onValueChange = { cookTimeStr = it },
+                            label = { Text("Cook (min)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
                     MpOutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
@@ -259,9 +306,9 @@ fun RecipeEditDialog(
             }
             1 -> { // Ingredients
                 RecipeIngredientsEditor(
-                    recipeId = recipeId,
                     currentIngredients = currentIngredients,
                     allIngredients = allIngredients,
+                    allUnits = allUnits,
                     onUpdate = { currentIngredients = it }
                 )
             }
@@ -271,16 +318,15 @@ fun RecipeEditDialog(
 
 @Composable
 fun RecipeIngredientsEditor(
-    recipeId: Uuid,
     currentIngredients: List<RecipeIngredient>,
     allIngredients: List<Ingredient>,
+    allUnits: List<UnitModel>,
     onUpdate: (List<RecipeIngredient>) -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
     var selectedIngredientName by remember { mutableStateOf("") }
     var quantityStr by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf(MeasureUnit.EACH) }
-    var unitExpanded by remember { mutableStateOf(false) }
+    var selectedUnitName by remember { mutableStateOf(allUnits.firstOrNull()?.abbreviation ?: "") }
 
     Column {
         if (currentIngredients.isEmpty()) {
@@ -289,12 +335,13 @@ fun RecipeIngredientsEditor(
             LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 200.dp)) {
                 items(currentIngredients) { ri ->
                     val ing = allIngredients.find { it.id == ri.ingredientId }
+                    val uName = allUnits.find { it.id == ri.unitId }?.abbreviation ?: "?"
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${ing?.name ?: "Unknown"}: ${ri.quantity}", style = MaterialTheme.typography.bodySmall)
+                        Text("${ing?.name ?: "Unknown"}: ${ri.quantity} $uName", style = MaterialTheme.typography.bodySmall)
                         IconButton(onClick = { onUpdate(currentIngredients - ri) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                         }
@@ -325,25 +372,40 @@ fun RecipeIngredientsEditor(
                         deleteWarningMessage = ""
                     )
 
-                    MeasureInputRow(
-                        quantity = quantityStr,
-                        onQuantityChange = { quantityStr = it },
-                        unit = unit,
-                        onUnitChange = { unit = it },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row {
+                        MpOutlinedTextField(
+                            value = quantityStr,
+                            onValueChange = { quantityStr = it },
+                            label = { Text("Qty") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(modifier = Modifier.weight(1f)) {
+                            SearchableDropdown(
+                                label = "Unit",
+                                options = allUnits.map { it.abbreviation },
+                                selectedOption = selectedUnitName,
+                                onOptionSelected = { selectedUnitName = it },
+                                onAddOption = {},
+                                onDeleteOption = {},
+                                deleteWarningMessage = ""
+                            )
+                        }
+                    }
 
                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                         MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
                         MpButton(
                             onClick = {
                                 val ing = allIngredients.find { it.name == selectedIngredientName }
+                                val unit = allUnits.find { it.abbreviation == selectedUnitName }
                                 val qty = quantityStr.toDoubleOrNull()
-                                if (ing != null && qty != null) {
+                                if (ing != null && qty != null && unit != null) {
                                     val newRi = RecipeIngredient(
-                                        recipeId = recipeId,
                                         ingredientId = ing.id,
-                                        quantity = Measure(qty, unit)
+                                        quantity = qty,
+                                        unitId = unit.id
                                     )
                                     onUpdate(currentIngredients + newRi)
                                     isAdding = false
@@ -351,7 +413,7 @@ fun RecipeIngredientsEditor(
                                     quantityStr = ""
                                 }
                             },
-                            enabled = selectedIngredientName.isNotBlank() && quantityStr.isNotBlank()
+                            enabled = selectedIngredientName.isNotBlank() && quantityStr.isNotBlank() && selectedUnitName.isNotBlank()
                         ) {
                             Text("Add")
                         }

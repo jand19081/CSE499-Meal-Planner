@@ -34,20 +34,22 @@ class DashboardViewModel : ViewModel() {
         MealRepository.meals,
         PantryRepository.pantryItems,
         SettingsRepository.dashboardConfig,
-        ShoppingHistoryRepository.trips
+        ReceiptHistoryRepository.trips
     ) { entries, meals, pantry, config, trips ->
         
         val mealsMap = meals.associateBy { it.id }
 
         // 1. Today's Meals
-        val todaysEntries = entries.filter { it.date == today }.sortedBy { it.mealType.ordinal }
+        val todaysEntries = entries.filter { it.date == today }
+            .sortedBy { it.mealType.ordinal }
+            
         val todaysEvents = todaysEntries.map { entry ->
-            val meal = mealsMap[entry.mealId]
+            val meal = mealsMap[entry.prePlannedMealId]
             CalendarEvent(
                 entryId = entry.id,
                 title = meal?.name ?: "Unknown Meal",
                 mealType = entry.mealType,
-                servings = entry.targetServings,
+                peopleCount = entry.peopleCount,
                 isConsumed = entry.isConsumed
             )
         }
@@ -60,18 +62,8 @@ class DashboardViewModel : ViewModel() {
         // 3. Shopping List Count
         val shoppingCount = 0 
         
-        // 4. Weekly Cost (Actual from last 7 days for now, as defined in Analytics)
-        // Simplified logic here or duplicate from AnalyticsViewModel
-        // Let's just sum last 7 days shopping trips
-        // Note: This is "Actual" cost. Requirement just says "cost overview".
-        val last7DaysTrips = trips.filter { 
-             // Simple date check
-             // Note: date logic here is simplified without DatePeriod imports in this file usually
-             // Assuming trips are recent. 
-             // Actually let's just take all trips for now or skip complex date math if imports missing
-             true
-        }
-        val cost = last7DaysTrips.sumOf { it.totalPaidCents }
+        // 4. Weekly Cost (Sum of actual totals in cents)
+        val cost = trips.sumOf { it.actualTotalCents.toLong() }
 
         DashboardUiState(
             todaysMeals = todaysEvents,

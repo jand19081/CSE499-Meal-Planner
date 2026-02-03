@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.DialogActionButtons
 import io.github.and19081.mealplanner.EmptyListMessage
-import io.github.and19081.mealplanner.MeasureUnit
 import io.github.and19081.mealplanner.ListControlToolbar
-import io.github.and19081.mealplanner.MeasureInputRow
 import io.github.and19081.mealplanner.SearchableDropdown
+import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.MpOutlinedTextField // Added import
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -43,8 +43,6 @@ fun PantryView() {
 
     Scaffold(
         topBar = {
-            // Re-use list toolbar or make custom? Reuse for consistency.
-            // But we don't have sort toggle logic in VM yet.
             ListControlToolbar(
                 searchQuery = "", // TODO: Bind to uiState.searchQuery when available
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
@@ -90,9 +88,10 @@ fun PantryView() {
         PantryEditDialog(
             item = selectedItem,
             allIngredients = uiState.allIngredients,
+            allUnits = uiState.allUnits,
             onDismiss = { showEditDialog = false },
-            onSave = { ingId, qty, unit ->
-                viewModel.updateQuantity(ingId, qty, unit)
+            onSave = { ingId, qty, unitId ->
+                viewModel.updateQuantity(ingId, qty, unitId)
                 showEditDialog = false
             }
         )
@@ -117,7 +116,7 @@ fun PantryItemRow(
             Text(item.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
-            "${String.format("%.2f", item.quantity.amount)} ${item.quantity.unit.name}",
+            "${String.format("%.2f", item.quantity)} ${item.unit.abbreviation}",
             style = MaterialTheme.typography.bodyLarge
         )
     }
@@ -127,13 +126,13 @@ fun PantryItemRow(
 fun PantryEditDialog(
     item: PantryItemUi?,
     allIngredients: List<Ingredient>,
+    allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onSave: (Uuid, Double, MeasureUnit) -> Unit
+    onSave: (Uuid, Double, Uuid) -> Unit
 ) {
     var selectedIngName by remember { mutableStateOf(item?.name ?: "") }
-    var quantityStr by remember { mutableStateOf(item?.quantity?.amount?.toString() ?: "") }
-    var unit by remember { mutableStateOf(item?.quantity?.unit ?: MeasureUnit.EACH) }
-    var unitExpanded by remember { mutableStateOf(false) }
+    var quantityStr by remember { mutableStateOf(item?.quantity?.toString() ?: "") }
+    var selectedUnitName by remember { mutableStateOf(item?.unit?.abbreviation ?: (allUnits.firstOrNull()?.abbreviation ?: "")) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -146,7 +145,7 @@ fun PantryEditDialog(
                         options = allIngredients.map { it.name },
                         selectedOption = selectedIngName,
                         onOptionSelected = { selectedIngName = it },
-                        onAddOption = {}, // Don't allow creating new ingredients here, simple flow
+                        onAddOption = {}, 
                         onDeleteOption = {},
                         deleteWarningMessage = ""
                     )
@@ -154,13 +153,27 @@ fun PantryEditDialog(
                     Text(item.name, style = MaterialTheme.typography.titleMedium)
                 }
 
-                MeasureInputRow(
-                    quantity = quantityStr,
-                    onQuantityChange = { quantityStr = it },
-                    unit = unit,
-                    onUnitChange = { unit = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row {
+                    MpOutlinedTextField(
+                        value = quantityStr,
+                        onValueChange = { quantityStr = it },
+                        label = { Text("Qty") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        SearchableDropdown(
+                            label = "Unit",
+                            options = allUnits.map { it.abbreviation },
+                            selectedOption = selectedUnitName,
+                            onOptionSelected = { selectedUnitName = it },
+                            onAddOption = {},
+                            onDeleteOption = {},
+                            deleteWarningMessage = ""
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -169,12 +182,13 @@ fun PantryEditDialog(
                 onSave = {
                     val qty = quantityStr.toDoubleOrNull()
                     val ingId = if (item != null) item.id else allIngredients.find { it.name == selectedIngName }?.id
+                    val unit = allUnits.find { it.abbreviation == selectedUnitName }
                     
-                    if (ingId != null && qty != null) {
-                        onSave(ingId, qty, unit)
+                    if (ingId != null && qty != null && unit != null) {
+                        onSave(ingId, qty, unit.id)
                     }
                 },
-                saveEnabled = (item != null || selectedIngName.isNotBlank()) && quantityStr.toDoubleOrNull() != null
+                saveEnabled = (item != null || selectedIngName.isNotBlank()) && quantityStr.toDoubleOrNull() != null && selectedUnitName.isNotBlank()
             )
         },
         dismissButton = {}

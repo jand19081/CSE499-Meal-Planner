@@ -13,6 +13,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+enum class AppTheme { LIGHT, DARK, SYSTEM }
+enum class CornerStyle { ROUNDED, SQUARE }
+enum class AccentColor(val color: Color, val label: String) {
+    GREEN(Color(0xFF4CAF50), "Green"),
+    BLUE(Color(0xFF2196F3), "Blue"),
+    RED(Color(0xFFF44336), "Red"),
+    PURPLE(Color(0xFF9C27B0), "Purple"),
+    ORANGE(Color(0xFFFF9800), "Orange")
+}
+
 @Composable
 fun MealPlannerTheme(
     content: @Composable () -> Unit

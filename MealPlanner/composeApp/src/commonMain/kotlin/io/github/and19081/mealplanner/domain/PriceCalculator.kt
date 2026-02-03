@@ -2,6 +2,8 @@ package io.github.and19081.mealplanner.domain
 
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlin.uuid.Uuid
 
 object PriceCalculator {
@@ -9,28 +11,32 @@ object PriceCalculator {
     fun calculateRecipeCost(
         recipe: Recipe,
         ingredientsMap: Map<Uuid, Ingredient>,
-        recipeIngredientsMap: Map<Uuid, List<RecipeIngredient>>
+        allPackages: List<Package>,
+        allBridges: List<BridgeConversion>,
+        allUnits: List<UnitModel>
     ): Long {
-        val recipeIngredients = recipeIngredientsMap[recipe.id] ?: emptyList()
         var totalCents = 0L
 
-        for (ri in recipeIngredients) {
+        for (ri in recipe.ingredients) {
             val ingredient = ingredientsMap[ri.ingredientId]
             if (ingredient != null) {
-                 val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
-                 if (bestOption != null && bestOption.quantity.amount > 0) {
+                 val packages = allPackages.filter { it.ingredientId == ingredient.id }
+                 val bridges = allBridges.filter { it.ingredientId == ingredient.id }
+                 
+                 val bestOption = packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
+                 
+                 if (bestOption != null && bestOption.quantity > 0) {
                      val convertedReqQty = UnitConverter.convert(
-                         amount = ri.quantity.amount,
-                         from = ri.quantity.unit,
-                         to = bestOption.quantity.unit,
-                         bridges = ingredient.conversionBridges
+                         amount = ri.quantity,
+                         fromUnitId = ri.unitId,
+                         toUnitId = bestOption.unitId,
+                         allUnits = allUnits,
+                         bridges = bridges
                      )
                      
                      if (convertedReqQty > 0) {
-                         val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
+                         val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
                          totalCents += (pricePerUnit * convertedReqQty).toLong()
-                     } else if (convertedReqQty <= 0 && ri.quantity.amount > 0) {
-                         println("Warning: Cannot convert units for ${ingredient.name}")
                      }
                  }
             }
@@ -39,117 +45,124 @@ object PriceCalculator {
     }
 
     fun calculateMealCost(
-        meal: Meal,
-        componentsMap: Map<Uuid, List<MealComponent>>,
+        meal: PrePlannedMeal,
         recipesMap: Map<Uuid, Recipe>,
         ingredientsMap: Map<Uuid, Ingredient>,
-        recipeIngredientsMap: Map<Uuid, List<RecipeIngredient>>
+        allPackages: List<Package>,
+        allBridges: List<BridgeConversion>,
+        allUnits: List<UnitModel>
     ): Long {
-        val components = componentsMap[meal.id] ?: emptyList()
         var totalCents = 0L
 
-        for (comp in components) {
-            if (comp.recipeId != null) {
-                val recipe = recipesMap[comp.recipeId]
-                if (recipe != null) {
-                    totalCents += calculateRecipeCost(recipe, ingredientsMap, recipeIngredientsMap)
-                }
-            } else if (comp.ingredientId != null) {
-                val ingredient = ingredientsMap[comp.ingredientId]
-                if (ingredient != null && comp.quantity != null) {
-                     val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
-                     if (bestOption != null && bestOption.quantity.amount > 0) {
-                         val convertedReqQty = UnitConverter.convert(
-                             amount = comp.quantity.amount,
-                             from = comp.quantity.unit,
-                             to = bestOption.quantity.unit,
-                             bridges = ingredient.conversionBridges
-                         )
-                         
-                         if (convertedReqQty > 0) {
-                            val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
-                            totalCents += (pricePerUnit * convertedReqQty).toLong()
-                         } else if (convertedReqQty <= 0 && comp.quantity.amount > 0) {
-                             println("Warning: Cannot convert units for ${ingredient.name}")
-                         }
+        // 1. Recipes
+        for (recipeId in meal.recipes) {
+            val recipe = recipesMap[recipeId]
+            if (recipe != null) {
+                totalCents += calculateRecipeCost(recipe, ingredientsMap, allPackages, allBridges, allUnits)
+            }
+        }
+        
+        // 2. Independent Ingredients
+        for (comp in meal.independentIngredients) {
+            val ingredient = ingredientsMap[comp.ingredientId]
+            if (ingredient != null) {
+                 val packages = allPackages.filter { it.ingredientId == ingredient.id }
+                 val bridges = allBridges.filter { it.ingredientId == ingredient.id }
+                 
+                 val bestOption = packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
+                 
+                 if (bestOption != null && bestOption.quantity > 0) {
+                     val convertedReqQty = UnitConverter.convert(
+                         amount = comp.quantity,
+                         fromUnitId = comp.unitId,
+                         toUnitId = bestOption.unitId,
+                         allUnits = allUnits,
+                         bridges = bridges
+                     )
+                     
+                     if (convertedReqQty > 0) {
+                        val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
+                        totalCents += (pricePerUnit * convertedReqQty).toLong()
                      }
-                }
+                 }
             }
         }
         return totalCents
     }
 
     fun calculateEstimatedCost(
-        entry: MealPlanEntry,
-        mealsMap: Map<Uuid, Meal>,
-        componentsMap: Map<Uuid, List<MealComponent>>,
+        entry: ScheduledMeal,
+        mealsMap: Map<Uuid, PrePlannedMeal>,
         recipesMap: Map<Uuid, Recipe>,
         ingredientsMap: Map<Uuid, Ingredient>,
-        recipeIngredientsMap: Map<Uuid, List<RecipeIngredient>>
+        allPackages: List<Package>,
+        allBridges: List<BridgeConversion>,
+        allUnits: List<UnitModel>
     ): Long {
         // Find Meal
-        val meal = mealsMap[entry.mealId] ?: return 0L
+        val meal = mealsMap[entry.prePlannedMealId] ?: return 0L
         
-        // Find Components
-        val components = componentsMap[meal.id] ?: emptyList()
-
         var totalCents = 0L
 
-        for (comp in components) {
-            if (comp.recipeId != null) {
-                val recipe = recipesMap[comp.recipeId]
-                if (recipe != null) {
-                    val scale = if (recipe.baseServings > 0) entry.targetServings / recipe.baseServings else 1.0
+        // 1. Recipes with Scaling
+        for (recipeId in meal.recipes) {
+            val recipe = recipesMap[recipeId]
+            if (recipe != null) {
+                val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
 
-                    val recipeIngredients = recipeIngredientsMap[recipe.id] ?: emptyList()
+                for (ri in recipe.ingredients) {
+                    val ingredient = ingredientsMap[ri.ingredientId]
+                    if (ingredient != null) {
+                         val packages = allPackages.filter { it.ingredientId == ingredient.id }
+                         val bridges = allBridges.filter { it.ingredientId == ingredient.id }
 
-                    for (ri in recipeIngredients) {
-                        val ingredient = ingredientsMap[ri.ingredientId]
-                        if (ingredient != null) {
-                            val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
+                        val bestOption = packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
 
-                            if (bestOption != null && bestOption.quantity.amount > 0) {
-                                val convertedReqQty = UnitConverter.convert(
-                                    amount = ri.quantity.amount * scale,
-                                    from = ri.quantity.unit,
-                                    to = bestOption.quantity.unit,
-                                    bridges = ingredient.conversionBridges
-                                )
-                                 if (convertedReqQty > 0) {
-                                    val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
-                                    totalCents += (pricePerUnit * convertedReqQty).toLong()
-                                 } else if (convertedReqQty <= 0 && ri.quantity.amount > 0) {
-                                     println("Warning: Cannot convert units for ${ingredient.name}")
-                                 }
-                            }
+                        if (bestOption != null && bestOption.quantity > 0) {
+                            val convertedReqQty = UnitConverter.convert(
+                                amount = ri.quantity * scale,
+                                fromUnitId = ri.unitId,
+                                toUnitId = bestOption.unitId,
+                                allUnits = allUnits,
+                                bridges = bridges
+                            )
+                             if (convertedReqQty > 0) {
+                                val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
+                                totalCents += (pricePerUnit * convertedReqQty).toLong()
+                             }
                         }
-                    }
-                }
-            } else if (comp.ingredientId != null) {
-                val ingredient = ingredientsMap[comp.ingredientId]
-                if (ingredient != null) {
-                    val qty = comp.quantity?.amount ?: 1.0
-                    val requiredAmount = qty * entry.targetServings
-                    
-                    val bestOption = ingredient.purchaseOptions.minByOrNull { it.priceCents }
-
-                    if (bestOption != null && bestOption.quantity.amount > 0) {
-                         val convertedReqQty = UnitConverter.convert(
-                             amount = requiredAmount,
-                             from = comp.quantity?.unit ?: MeasureUnit.EACH,
-                             to = bestOption.quantity.unit,
-                             bridges = ingredient.conversionBridges
-                         )
-                         if (convertedReqQty > 0) {
-                            val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity.amount
-                            totalCents += (pricePerUnit * convertedReqQty).toLong()
-                         } else if (convertedReqQty <= 0 && requiredAmount > 0) {
-                             println("Warning: Cannot convert units for ${ingredient.name}")
-                         }
                     }
                 }
             }
         }
+        
+        // 2. Independent Ingredients with Scaling
+        for (comp in meal.independentIngredients) {
+             val ingredient = ingredientsMap[comp.ingredientId]
+             if (ingredient != null) {
+                 val requiredAmount = comp.quantity * entry.peopleCount // Assuming quantity is per person
+                 
+                 val packages = allPackages.filter { it.ingredientId == ingredient.id }
+                 val bridges = allBridges.filter { it.ingredientId == ingredient.id }
+
+                 val bestOption = packages.minByOrNull { if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE }
+
+                 if (bestOption != null && bestOption.quantity > 0) {
+                      val convertedReqQty = UnitConverter.convert(
+                          amount = requiredAmount,
+                          fromUnitId = comp.unitId,
+                          toUnitId = bestOption.unitId,
+                          allUnits = allUnits,
+                          bridges = bridges
+                      )
+                      if (convertedReqQty > 0) {
+                         val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
+                         totalCents += (pricePerUnit * convertedReqQty).toLong()
+                      }
+                 }
+             }
+        }
+        
         return totalCents
     }
 }

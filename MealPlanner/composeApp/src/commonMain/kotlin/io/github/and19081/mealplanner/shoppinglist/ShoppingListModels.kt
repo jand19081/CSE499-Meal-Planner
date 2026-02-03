@@ -1,31 +1,29 @@
 package io.github.and19081.mealplanner.shoppinglist
 
 import kotlinx.datetime.LocalDate
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
-data class ReceiptItem(
-    val name: String,
-    val quantity: Double,
-    val unit: String,
-    val priceCents: Long,
-    val ingredientId: Uuid?
+data class ShoppingListItem(
+    val id: Uuid = Uuid.random(),
+    val ingredientId: Uuid? = null,
+    val customName: String? = null,
+    val storeId: Uuid,
+    val neededQuantity: Double? = null,
+    val unitId: Uuid? = null,
+    val packageId: Uuid? = null,
+    val isPurchased: Boolean = false
 )
 
-@OptIn(ExperimentalUuidApi::class)
-data class ShoppingTrip(
+data class ReceiptHistory(
     val id: Uuid = Uuid.random(),
     val date: LocalDate,
-    val storeName: String,
-    val subtotalCents: Long,
-    val taxCents: Long,
-    val totalPaidCents: Long,
-    val items: List<ReceiptItem>,
-    val actualReceiptTotalCents: Long? = null
+    val storeId: Uuid,
+    val projectedTotalCents: Int,
+    val actualTotalCents: Int,
+    val taxPaidCents: Int
 )
 
 data class PriceUpdate(
     val ingredientId: Uuid,
-    val newPriceCents: Long
+    val newPriceCents: Int
 )

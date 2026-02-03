@@ -1,6 +1,6 @@
 package io.github.and19081.mealplanner.calendar
 
-import io.github.and19081.mealplanner.MealPlanEntry
+import io.github.and19081.mealplanner.ScheduledMeal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.update
 import kotlin.uuid.Uuid
 
 object MealPlanRepository {
-    private val _entries = MutableStateFlow<List<MealPlanEntry>>(emptyList())
+    private val _entries = MutableStateFlow<List<ScheduledMeal>>(emptyList())
 
-    val entries: StateFlow<List<MealPlanEntry>> = _entries.asStateFlow()
+    val entries: StateFlow<List<ScheduledMeal>> = _entries.asStateFlow()
 
-    fun addPlan(entry: MealPlanEntry) {
+    fun addPlan(entry: ScheduledMeal) {
         _entries.update { it + entry }
     }
 

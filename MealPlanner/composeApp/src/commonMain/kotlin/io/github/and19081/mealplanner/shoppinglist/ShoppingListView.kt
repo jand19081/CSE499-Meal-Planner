@@ -202,14 +202,10 @@ fun ShoppingListView() {
     
     if (showAddDialog) {
         AddAnyItemDialog(
-            allIngredients = emptyList(), 
+            allUnits = uiState.allUnits,
             onDismiss = { showAddDialog = false },
-            onAddCustom = { name, qty, unit -> 
-                viewModel.addCustomItem(name, qty, unit)
-                showAddDialog = false
-            },
-            onAddIngredient = { name, qty, unit ->
-                viewModel.addCustomItem(name, qty, unit)
+            onAddCustom = { name, qty, unitId -> 
+                viewModel.addCustomItem(name, qty, unitId)
                 showAddDialog = false
             }
         )
@@ -236,7 +232,7 @@ fun ShoppingListView() {
                 if (shoppingModeStoreId != null) shoppingModeStoreId = null
             },
             onConfirm = { updates ->
-                val priceUpdates = updates.map { PriceUpdate(it.key, it.value) }
+                val priceUpdates = updates.map { PriceUpdate(it.key, it.value.toInt()) }
                 viewModel.updatePricesAndFinalize(priceUpdates)
                 if (shoppingModeStoreId != null) shoppingModeStoreId = null
             }
@@ -379,15 +375,13 @@ fun ShoppingListItemRow(
 
 @Composable
 fun AddAnyItemDialog(
-    allIngredients: List<Ingredient>,
+    allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onAddCustom: (String, Double, MeasureUnit) -> Unit,
-    onAddIngredient: (String, Double, MeasureUnit) -> Unit
+    onAddCustom: (String, Double, Uuid) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var qtyStr by remember { mutableStateOf("1") }
-    var unit by remember { mutableStateOf(MeasureUnit.EACH) }
-    var unitExpanded by remember { mutableStateOf(false) }
+    var selectedUnitName by remember { mutableStateOf(allUnits.firstOrNull()?.abbreviation ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -401,13 +395,27 @@ fun AddAnyItemDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                MeasureInputRow(
-                    quantity = qtyStr,
-                    onQuantityChange = { qtyStr = it },
-                    unit = unit,
-                    onUnitChange = { unit = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row {
+                    MpOutlinedTextField(
+                        value = qtyStr,
+                        onValueChange = { qtyStr = it },
+                        label = { Text("Qty") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        SearchableDropdown(
+                            label = "Unit",
+                            options = allUnits.map { it.abbreviation },
+                            selectedOption = selectedUnitName,
+                            onOptionSelected = { selectedUnitName = it },
+                            onAddOption = {},
+                            onDeleteOption = {},
+                            deleteWarningMessage = ""
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -415,11 +423,12 @@ fun AddAnyItemDialog(
                 onCancel = onDismiss,
                 onSave = {
                     val q = qtyStr.toDoubleOrNull()
-                    if (name.isNotBlank() && q != null) {
-                        onAddCustom(name, q, unit)
+                    val unit = allUnits.find { it.abbreviation == selectedUnitName }
+                    if (name.isNotBlank() && q != null && unit != null) {
+                        onAddCustom(name, q, unit.id)
                     }
                 },
-                saveEnabled = name.isNotBlank() && qtyStr.isNotBlank()
+                saveEnabled = name.isNotBlank() && qtyStr.isNotBlank() && selectedUnitName.isNotBlank()
             )
         },
         dismissButton = {}
