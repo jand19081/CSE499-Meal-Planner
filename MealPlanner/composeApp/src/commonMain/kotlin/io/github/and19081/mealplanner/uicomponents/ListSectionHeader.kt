@@ -1,4 +1,4 @@
-package io.github.and19081.mealplanner.UiWrappers
+package io.github.and19081.mealplanner.uicomponents
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding

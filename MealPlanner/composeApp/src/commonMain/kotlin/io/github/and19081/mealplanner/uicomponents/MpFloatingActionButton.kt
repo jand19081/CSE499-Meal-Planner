@@ -1,4 +1,4 @@
-package io.github.and19081.mealplanner.UiWrappers
+package io.github.and19081.mealplanner.uicomponents
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.FloatingActionButton

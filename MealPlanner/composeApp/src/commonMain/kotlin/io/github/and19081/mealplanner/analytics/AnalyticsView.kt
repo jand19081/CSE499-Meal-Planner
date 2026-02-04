@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.and19081.mealplanner.UiWrappers.MpButton
-import io.github.and19081.mealplanner.UiWrappers.MpCard
+import io.github.and19081.mealplanner.uicomponents.MpButton
+import io.github.and19081.mealplanner.uicomponents.MpCard
 import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
 import kotlin.uuid.ExperimentalUuidApi
 

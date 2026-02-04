@@ -16,13 +16,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.and19081.mealplanner.UiWrappers.DialogActionButtons
-import io.github.and19081.mealplanner.UiWrappers.EmptyListMessage
-import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
-import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.DialogActionButtons
+import io.github.and19081.mealplanner.uicomponents.EmptyListMessage
+import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
+import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField // Added import
+import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField // Added import
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

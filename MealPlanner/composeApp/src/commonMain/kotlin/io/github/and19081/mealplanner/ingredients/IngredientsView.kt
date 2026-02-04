@@ -20,16 +20,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
-import io.github.and19081.mealplanner.UiWrappers.CreateNewItemRow
-import io.github.and19081.mealplanner.UiWrappers.ExpandableListItem
-import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
-import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
-import io.github.and19081.mealplanner.UiWrappers.MpButton
-import io.github.and19081.mealplanner.UiWrappers.MpCard
-import io.github.and19081.mealplanner.UiWrappers.MpEditDialogScaffold
-import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
-import io.github.and19081.mealplanner.UiWrappers.MpTextButton
-import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.CreateNewItemRow
+import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
+import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
+import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
+import io.github.and19081.mealplanner.uicomponents.MpButton
+import io.github.and19081.mealplanner.uicomponents.MpCard
+import io.github.and19081.mealplanner.uicomponents.MpEditDialogScaffold
+import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
+import io.github.and19081.mealplanner.uicomponents.MpTextButton
+import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

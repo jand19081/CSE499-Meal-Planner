@@ -38,20 +38,20 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.rememberDatePickerState
-import io.github.and19081.mealplanner.UiWrappers.DialogActionButtons
-import io.github.and19081.mealplanner.UiWrappers.EmptyListMessage
-import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
+import io.github.and19081.mealplanner.uicomponents.DialogActionButtons
+import io.github.and19081.mealplanner.uicomponents.EmptyListMessage
+import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
 import kotlin.time.Instant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.TimeZone as KTimeZone
 import kotlin.uuid.Uuid
-import io.github.and19081.mealplanner.UiWrappers.MpButton
-import io.github.and19081.mealplanner.UiWrappers.MpTextButton
-import io.github.and19081.mealplanner.UiWrappers.MpOutlinedButton
-import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
-import io.github.and19081.mealplanner.UiWrappers.MpCard
-import io.github.and19081.mealplanner.UiWrappers.MpFloatingActionButton
+import io.github.and19081.mealplanner.uicomponents.MpButton
+import io.github.and19081.mealplanner.uicomponents.MpTextButton
+import io.github.and19081.mealplanner.uicomponents.MpOutlinedButton
+import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
+import io.github.and19081.mealplanner.uicomponents.MpCard
+import io.github.and19081.mealplanner.uicomponents.MpFloatingActionButton
 
 @Composable
 fun CalendarView(

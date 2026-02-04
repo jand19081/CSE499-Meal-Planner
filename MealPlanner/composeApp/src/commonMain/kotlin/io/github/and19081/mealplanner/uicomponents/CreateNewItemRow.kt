@@ -1,4 +1,4 @@
-package io.github.and19081.mealplanner.UiWrappers
+package io.github.and19081.mealplanner.uicomponents
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column

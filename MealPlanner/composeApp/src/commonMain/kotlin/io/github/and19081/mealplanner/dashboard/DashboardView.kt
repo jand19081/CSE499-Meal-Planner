@@ -25,8 +25,8 @@ import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
-import io.github.and19081.mealplanner.UiWrappers.MpButton
-import io.github.and19081.mealplanner.UiWrappers.MpCard
+import io.github.and19081.mealplanner.uicomponents.MpButton
+import io.github.and19081.mealplanner.uicomponents.MpCard
 
 @Composable
 fun DashboardView() {
