@@ -3,15 +3,11 @@
 package io.github.and19081.mealplanner.inventory
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,13 +16,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.and19081.mealplanner.DialogActionButtons
-import io.github.and19081.mealplanner.EmptyListMessage
-import io.github.and19081.mealplanner.ListControlToolbar
-import io.github.and19081.mealplanner.SearchableDropdown
+import io.github.and19081.mealplanner.UiWrappers.DialogActionButtons
+import io.github.and19081.mealplanner.UiWrappers.EmptyListMessage
+import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
+import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
 import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.MpOutlinedTextField // Added import
+import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField // Added import
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

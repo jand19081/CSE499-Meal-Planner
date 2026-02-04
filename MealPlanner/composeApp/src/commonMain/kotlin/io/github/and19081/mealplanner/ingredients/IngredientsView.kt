@@ -2,7 +2,6 @@
 
 package io.github.and19081.mealplanner.ingredients
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,17 +12,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.UiWrappers.CreateNewItemRow
+import io.github.and19081.mealplanner.UiWrappers.ExpandableListItem
+import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
+import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
+import io.github.and19081.mealplanner.UiWrappers.MpButton
+import io.github.and19081.mealplanner.UiWrappers.MpCard
+import io.github.and19081.mealplanner.UiWrappers.MpEditDialogScaffold
+import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
+import io.github.and19081.mealplanner.UiWrappers.MpTextButton
+import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -191,13 +197,20 @@ fun IngredientRow(
         Spacer(modifier = Modifier.height(4.dp))
 
         if (packages.isEmpty()) {
-            Text("No purchase options listed.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+            Text(
+                "No purchase options listed.",
+                style = MaterialTheme.typography.bodySmall,
+                fontStyle = FontStyle.Italic
+            )
         } else {
             Text("Purchase Options:", style = MaterialTheme.typography.labelMedium)
             packages.forEach { opt ->
                 val storeName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown Store"
                 val unitName = allUnits.find { it.id == opt.unitId }?.abbreviation ?: "?"
-                Text("• $storeName: $${opt.priceCents / 100.0} for ${opt.quantity} $unitName", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "• $storeName: $${opt.priceCents / 100.0} for ${opt.quantity} $unitName",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -238,7 +251,8 @@ fun IngredientEditDialog(
         title = if (ingredient == null) "Add Ingredient" else "Edit Ingredient",
         onDismiss = onDismiss,
         onSave = {
-            val catId = allCategories.find { it.name == categoryName }?.id ?: Uuid.random() // Should exist validation
+            val catId = allCategories.find { it.name == categoryName }?.id
+                ?: Uuid.random() // Should exist validation
             val finalIngredient = Ingredient(
                 id = ingredientId,
                 name = name,
@@ -278,6 +292,7 @@ fun IngredientEditDialog(
                     )
                 }
             }
+
             1 -> { // Purchase Options Tab
                 PurchaseOptionsEditor(
                     ingredientId = ingredientId,
@@ -289,6 +304,7 @@ fun IngredientEditDialog(
                     onDeleteStore = onDeleteStore
                 )
             }
+
             2 -> { // Conversions Tab
                 ConversionBridgesEditor(
                     ingredientId = ingredientId,
@@ -375,8 +391,14 @@ fun PurchaseOptionsEditor(
             }
         } else {
             MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (editingOption == null) "New Option" else "Edit Option", style = MaterialTheme.typography.labelMedium)
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        if (editingOption == null) "New Option" else "Edit Option",
+                        style = MaterialTheme.typography.labelMedium
+                    )
 
                     SearchableDropdown(
                         label = "Store",
@@ -388,7 +410,10 @@ fun PurchaseOptionsEditor(
                         deleteWarningMessage = "This will remove this store and ALL associated prices from ALL ingredients."
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         MpOutlinedTextField(
                             value = priceStr,
                             onValueChange = { priceStr = it },
@@ -396,7 +421,7 @@ fun PurchaseOptionsEditor(
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
-                        
+
                         // Qty + Unit
                         Column(modifier = Modifier.weight(1.5f)) {
                             MpOutlinedTextField(
@@ -418,7 +443,10 @@ fun PurchaseOptionsEditor(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
                         MpButton(
                             onClick = {
@@ -502,12 +530,18 @@ fun ConversionBridgesEditor(
             }
         } else {
             MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("New Conversion (e.g. 1 Cup = 120 Grams)", style = MaterialTheme.typography.labelMedium)
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "New Conversion (e.g. 1 Cup = 120 Grams)",
+                        style = MaterialTheme.typography.labelMedium
+                    )
 
                     // FROM
                     Row {
-                         MpOutlinedTextField(
+                        MpOutlinedTextField(
                             value = fromQtyStr,
                             onValueChange = { fromQtyStr = it },
                             label = { Text("Qty") },
@@ -515,7 +549,7 @@ fun ConversionBridgesEditor(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        
+
                         Box(modifier = Modifier.weight(1f)) {
                             SearchableDropdown(
                                 label = "Unit",
@@ -528,12 +562,16 @@ fun ConversionBridgesEditor(
                             )
                         }
                     }
-                    
-                    Text("EQUALS", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                    Text(
+                        "EQUALS",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
 
                     // TO
                     Row {
-                         MpOutlinedTextField(
+                        MpOutlinedTextField(
                             value = toQtyStr,
                             onValueChange = { toQtyStr = it },
                             label = { Text("Qty") },
@@ -554,7 +592,10 @@ fun ConversionBridgesEditor(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
                         MpButton(
                             onClick = {
@@ -562,7 +603,7 @@ fun ConversionBridgesEditor(
                                 val tq = toQtyStr.toDoubleOrNull()
                                 val fUnit = allUnits.find { it.abbreviation == fromUnitName }
                                 val tUnit = allUnits.find { it.abbreviation == toUnitName }
-                                
+
                                 if (fq != null && tq != null && fUnit != null && tUnit != null) {
                                     val newBridge = BridgeConversion(
                                         id = Uuid.random(),

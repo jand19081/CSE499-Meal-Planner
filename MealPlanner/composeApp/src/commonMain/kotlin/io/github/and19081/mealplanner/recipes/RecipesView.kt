@@ -3,13 +3,11 @@
 package io.github.and19081.mealplanner.recipes
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.SortByAlpha
@@ -18,11 +16,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.UiWrappers.CreateNewItemRow
+import io.github.and19081.mealplanner.UiWrappers.EmptyListMessage
+import io.github.and19081.mealplanner.UiWrappers.ExpandableListItem
+import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
+import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
+import io.github.and19081.mealplanner.UiWrappers.MpButton
+import io.github.and19081.mealplanner.UiWrappers.MpCard
+import io.github.and19081.mealplanner.UiWrappers.MpEditDialogScaffold
+import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
+import io.github.and19081.mealplanner.UiWrappers.MpTextButton
+import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
 import io.github.and19081.mealplanner.domain.PriceCalculator
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.Package
@@ -172,19 +180,25 @@ fun RecipeRow(
         onEditClick = onEditClick
     ) {
         if (recipe.description != null) {
-            Text(recipe.description, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
+            Text(
+                recipe.description,
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = FontStyle.Italic
+            )
             Spacer(modifier = Modifier.height(8.dp))
         }
-        
-        Text("Time: Prep ${recipe.prepTimeMinutes}m / Cook ${recipe.cookTimeMinutes}m", style = MaterialTheme.typography.bodySmall)
+
+        Text(
+            "Time: Prep ${recipe.prepTimeMinutes}m / Cook ${recipe.cookTimeMinutes}m",
+            style = MaterialTheme.typography.bodySmall
+        )
         Spacer(modifier = Modifier.height(4.dp))
 
         Text("Instructions:", style = MaterialTheme.typography.labelMedium)
         if (recipe.instructions.isEmpty()) {
             Text("No instructions.", style = MaterialTheme.typography.bodySmall)
         } else {
-            recipe.instructions.forEachIndexed {
-                idx, line ->
+            recipe.instructions.forEachIndexed { idx, line ->
                 Text("${idx + 1}. $line", style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -255,7 +269,7 @@ fun RecipeEditDialog(
                         label = { Text("Name") },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MpOutlinedTextField(
                             value = servingsStr,
@@ -271,7 +285,7 @@ fun RecipeEditDialog(
                             Text("Type: ${mealType.name}")
                         }
                     }
-                    
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MpOutlinedTextField(
                             value = prepTimeStr,
@@ -304,6 +318,7 @@ fun RecipeEditDialog(
                     )
                 }
             }
+
             1 -> { // Ingredients
                 RecipeIngredientsEditor(
                     currentIngredients = currentIngredients,
@@ -359,7 +374,10 @@ fun RecipeIngredientsEditor(
             }
         } else {
             MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text("Add Ingredient Link", style = MaterialTheme.typography.labelMedium)
 
                     SearchableDropdown(
@@ -394,7 +412,10 @@ fun RecipeIngredientsEditor(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
                         MpButton(
                             onClick = {

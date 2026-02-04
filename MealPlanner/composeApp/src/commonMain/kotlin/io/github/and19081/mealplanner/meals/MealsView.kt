@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material3.*
@@ -16,12 +15,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.clickable
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.UiWrappers.CreateNewItemRow
+import io.github.and19081.mealplanner.UiWrappers.ExpandableListItem
+import io.github.and19081.mealplanner.UiWrappers.ListControlToolbar
+import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
+import io.github.and19081.mealplanner.UiWrappers.MpButton
+import io.github.and19081.mealplanner.UiWrappers.MpCard
+import io.github.and19081.mealplanner.UiWrappers.MpEditDialogScaffold
+import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
+import io.github.and19081.mealplanner.UiWrappers.MpTextButton
+import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
 import io.github.and19081.mealplanner.domain.PriceCalculator
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.Package
@@ -223,6 +230,7 @@ fun MealEditDialog(
                     )
                 }
             }
+
             1 -> { // Contents
                 MealContentsEditor(
                     currentRecipes = recipes,
@@ -303,13 +311,22 @@ fun MealContentsEditor(
             }
         } else {
             MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text("Add Item", style = MaterialTheme.typography.labelMedium)
 
                     Row {
-                        FilterChip(selected = selectedType == "Recipe", onClick = { selectedType = "Recipe"; selectedItemName = "" }, label = { Text("Recipe") })
+                        FilterChip(
+                            selected = selectedType == "Recipe",
+                            onClick = { selectedType = "Recipe"; selectedItemName = "" },
+                            label = { Text("Recipe") })
                         Spacer(modifier = Modifier.width(8.dp))
-                        FilterChip(selected = selectedType == "Ingredient", onClick = { selectedType = "Ingredient"; selectedItemName = "" }, label = { Text("Ingredient") })
+                        FilterChip(
+                            selected = selectedType == "Ingredient",
+                            onClick = { selectedType = "Ingredient"; selectedItemName = "" },
+                            label = { Text("Ingredient") })
                     }
 
                     SearchableDropdown(
@@ -346,7 +363,10 @@ fun MealContentsEditor(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
                         MpButton(
                             onClick = {

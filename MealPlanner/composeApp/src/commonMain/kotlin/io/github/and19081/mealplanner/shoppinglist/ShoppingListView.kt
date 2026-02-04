@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.ShoppingCartCheckout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,8 +26,16 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
-import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.UiWrappers.DialogActionButtons
+import io.github.and19081.mealplanner.UiWrappers.ListSectionHeader
+import io.github.and19081.mealplanner.UiWrappers.MpButton
+import io.github.and19081.mealplanner.UiWrappers.MpFloatingActionButton
+import io.github.and19081.mealplanner.UiWrappers.MpOutlinedTextField
+import io.github.and19081.mealplanner.UiWrappers.MpSurface
+import io.github.and19081.mealplanner.UiWrappers.MpTextButton
+import io.github.and19081.mealplanner.UiWrappers.SearchableDropdown
 import io.github.and19081.mealplanner.ingredients.Store
+import kotlin.math.abs
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -84,7 +91,7 @@ fun ShoppingListView() {
                     ) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = "Go Shopping")
                     }
-                    
+
                     MpFloatingActionButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add Item")
                     }
@@ -164,7 +171,7 @@ fun ShoppingListView() {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     uiState.sections.filter { it.items.isNotEmpty() }.forEach { section ->
                         MpTextButton(
-                            onClick = { 
+                            onClick = {
                                 shoppingModeStoreId = section.storeId
                                 showStoreSelectDialog = false
                             },
@@ -180,13 +187,19 @@ fun ShoppingListView() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    section.storeName, 
+                                    section.storeName,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("${section.items.size} items", style = MaterialTheme.typography.bodyMedium)
-                                    Text("$${String.format("%.2f", section.totalCents / 100.0)}", style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        "${section.items.size} items",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        "$${String.format("%.2f", section.totalCents / 100.0)}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }
@@ -246,7 +259,10 @@ fun ShoppingListHeader(section: ShoppingListSection) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
                     text = section.storeName,
                     style = MaterialTheme.typography.titleMedium,
@@ -262,7 +278,12 @@ fun ShoppingListHeader(section: ShoppingListSection) {
             }
             if (section.items.isNotEmpty()) {
                 Text(
-                    text = "Subtotal: $${String.format("%.2f", section.subtotalCents / 100.0)} + Tax: $${String.format("%.2f", section.taxCents / 100.0)}",
+                    text = "Subtotal: $${
+                        String.format(
+                            "%.2f",
+                            section.subtotalCents / 100.0
+                        )
+                    } + Tax: $${String.format("%.2f", section.taxCents / 100.0)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
@@ -451,7 +472,7 @@ fun CompleteShoppingDialog(
             text = { Text("The actual total differed from the estimate. Would you like to review item prices?") },
             confirmButton = {
                 MpButton(
-                    onClick = { 
+                    onClick = {
                         onConfirm((actualTotalStr.toDoubleOrNull() ?: 0.0 * 100).toLong(), true)
                     }
                 ) {
@@ -461,7 +482,7 @@ fun CompleteShoppingDialog(
             dismissButton = {
                 MpTextButton(
                     onClick = {
-                         onConfirm((actualTotalStr.toDoubleOrNull() ?: 0.0 * 100).toLong(), false)
+                        onConfirm((actualTotalStr.toDoubleOrNull() ?: 0.0 * 100).toLong(), false)
                     }
                 ) { Text("No, Just Complete") }
             }
@@ -490,7 +511,7 @@ fun CompleteShoppingDialog(
                         val actual = actualTotalStr.toDoubleOrNull()
                         if (actual != null) {
                             val actualCents = (actual * 100).toLong()
-                            if (kotlin.math.abs(actualCents - estimatedTotalCents) > 50) { // > $0.50 diff
+                            if (abs(actualCents - estimatedTotalCents) > 50) { // > $0.50 diff
                                 showPriceUpdatePrompt = true
                             } else {
                                 onConfirm(actualCents, false)
@@ -540,7 +561,7 @@ fun PriceUpdateDialog(
                             Text(item.name, style = MaterialTheme.typography.bodyMedium)
                             Text("${item.quantity} ${item.unit}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                         }
-                        
+
                         MpOutlinedTextField(
                             value = priceEdits[item.id] ?: "",
                             onValueChange = { priceEdits[item.id] = it },

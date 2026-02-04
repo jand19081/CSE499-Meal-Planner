@@ -11,7 +11,7 @@ import kotlin.uuid.ExperimentalUuidApi
 @Composable
 @Preview
 fun App() {
-    // Initialize Mock Data Once
+    // Initialize Mock Data
     LaunchedEffect(Unit) {
         MockData.initialize()
     }
