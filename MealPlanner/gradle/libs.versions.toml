@@ -20,6 +20,8 @@ kotlinx-coroutines = "1.10.2"
 kotlinx-datetime = "0.7.1"
 kotlinx-serialization = "1.10.0"
 material3 = "1.9.0"
+material3Adaptive = "1.0.0-alpha03"
+material3AdaptiveNavigationSuite = "1.7.0-beta02"
 materialIconsExtended = "1.7.3"
 nav = "2.9.7"
 runtime = "1.10.0"
@@ -43,6 +45,8 @@ kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-s
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
+material3-adaptive-navigation-suite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNavigationSuite" }
+material3-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "material3Adaptive" }
 nav = { module = "androidx.navigation:navigation-compose", version.ref = "nav"}
 runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "runtime" }
 ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "uiTooling" }

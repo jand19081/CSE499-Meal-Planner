@@ -1,9 +1,8 @@
-package io.github.and19081.mealplanner.inventory
+package io.github.and19081.mealplanner.pantry
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
-import io.github.and19081.mealplanner.PantryItem
 import io.github.and19081.mealplanner.PantryRepository
 import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.UnitRepository

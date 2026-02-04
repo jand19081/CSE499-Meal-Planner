@@ -2,10 +2,17 @@ package io.github.and19081.mealplanner.settings
 
 import kotlin.uuid.Uuid
 
+enum class Mode {
+    AUTO,
+    DESKTOP,
+    MOBILE
+}
+
 data class AppSettings(
     val id: Uuid = Uuid.random(),
     val mealConsumedNotificationDelayMinutes: Int = 30,
-    val defaultTaxRatePercentage: Double = 0.0
+    val defaultTaxRatePercentage: Double = 0.0,
+    val view: Mode = Mode.AUTO
 )
 
 data class DashboardConfig(

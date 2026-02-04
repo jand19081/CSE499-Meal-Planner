@@ -22,12 +22,17 @@ class SettingsViewModel : ViewModel() {
             cornerStyle = args[2] as CornerStyle,
             accentColor = args[3] as AccentColor,
             dashboardConfig = args[4] as DashboardConfig,
-            notificationDelayMinutes = appSettings.mealConsumedNotificationDelayMinutes
+            notificationDelayMinutes = appSettings.mealConsumedNotificationDelayMinutes,
+            appMode = appSettings.view
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
     fun updateTaxRate(rate: Double) {
         SettingsRepository.updateSettings { it.copy(defaultTaxRatePercentage = rate) }
+    }
+
+    fun setAppMode(mode: Mode) {
+        SettingsRepository.updateSettings { it.copy(view = mode) }
     }
 
     fun setTheme(theme: AppTheme) {
@@ -65,5 +70,6 @@ data class SettingsUiState(
     val cornerStyle: CornerStyle = CornerStyle.SQUARE,
     val accentColor: AccentColor = AccentColor.GREEN,
     val dashboardConfig: DashboardConfig = DashboardConfig(),
-    val notificationDelayMinutes: Int = 30
+    val notificationDelayMinutes: Int = 30,
+    val appMode: Mode = Mode.AUTO
 )

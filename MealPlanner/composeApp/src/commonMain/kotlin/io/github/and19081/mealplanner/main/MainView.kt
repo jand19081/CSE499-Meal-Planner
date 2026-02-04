@@ -38,16 +38,16 @@ import androidx.navigation.compose.rememberNavController
 import io.github.and19081.mealplanner.calendar.CalendarView
 import io.github.and19081.mealplanner.dashboard.DashboardView
 import io.github.and19081.mealplanner.ingredients.IngredientsView
-import io.github.and19081.mealplanner.inventory.PantryView
+import io.github.and19081.mealplanner.pantry.PantryView
 import io.github.and19081.mealplanner.analytics.AnalyticsView
 import io.github.and19081.mealplanner.meals.MealsView
 import io.github.and19081.mealplanner.recipes.RecipesView
 import io.github.and19081.mealplanner.settings.SettingsView
 import io.github.and19081.mealplanner.shoppinglist.ShoppingListView
+import io.github.and19081.mealplanner.uicomponents.MpNav
 import kotlinx.datetime.plus
 
 import io.github.and19081.mealplanner.settings.SettingsRepository
-import io.github.and19081.mealplanner.settings.CornerStyle // Added import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +63,7 @@ fun MainView(
     val isNavRailVisible = viewModel.isNavRailVisible.value
     val currentMonth by viewModel.currentMonth.collectAsState()
     val cornerStyle by SettingsRepository.cornerStyle.collectAsState()
+    val appSettings by SettingsRepository.appSettings.collectAsState()
 
     // Sync ViewModel state with Navigation State
     LaunchedEffect(currentDestination) {
@@ -100,7 +101,7 @@ fun MainView(
                                 Text(currentMonth.month.name.lowercase().replaceFirstChar { it.uppercase() } + " " + currentMonth.year)
                             }
                             CalendarViewMode.WEEK -> {
-                                val week = viewModel.currentMonth.value
+                                val week = viewModel.currentMonth.collectAsState().value
                                 Text(
                                     "${week.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${week.day} - " +
                                             "${week.plus(kotlinx.datetime.DatePeriod(days = 6)).day}, ${week.year}"
@@ -137,54 +138,13 @@ fun MainView(
             )
         }
     ) { innerPadding ->
-
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-
-            if (isNavRailVisible) {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    NavigationRail {
-                        AppDestinations.entries.forEachIndexed { index, destination ->
-                            NavigationRailItem(
-                                label = { Text(destination.label) },
-                                icon = { Icon(destination.icon, contentDescription = destination.label) },
-                                selected = selectedItemIndex == index,
-                                onClick = {
-                                    navController.navigate(destination.route) {
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-
-            NavHost(
-                navController = navController,
-                startDestination = DashboardRoute,
-                modifier = Modifier.weight(1f)
-            ) {
-                composable<DashboardRoute> { DashboardView() }
-                composable<CalendarRoute> {
-                    CalendarView(
-                        currentMonthFlow = viewModel.currentMonth,
-                        calendarViewMode = viewModel.calendarViewMode.value
-                    )
-                }
-                composable<IngredientsRoute> { IngredientsView() }
-                composable<MealsRoute> { MealsView() }
-                composable<RecipesRoute> { RecipesView() }
-                composable<ShoppingListRoute> { ShoppingListView() }
-                composable<PantryRoute> { PantryView() }
-                composable<AnalyticsRoute> { AnalyticsView() }
-                composable<SettingsRoute> { SettingsView() }
-            }
-        }
+        MpNav(
+            mode = appSettings.view,
+            isNavRailVisible = isNavRailVisible,
+            navController = navController,
+            selectedItemIndex = selectedItemIndex,
+            viewModel = viewModel,
+            modifier = Modifier.padding(innerPadding)
+        )
     }
 }

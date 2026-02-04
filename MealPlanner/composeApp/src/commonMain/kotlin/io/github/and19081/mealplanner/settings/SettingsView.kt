@@ -45,6 +45,19 @@ fun SettingsView() {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            Text("App Mode", style = MaterialTheme.typography.titleSmall)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Mode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = uiState.appMode == mode,
+                        onClick = { viewModel.setAppMode(mode) },
+                        label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             
             Text("Corner Style", style = MaterialTheme.typography.titleSmall)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
