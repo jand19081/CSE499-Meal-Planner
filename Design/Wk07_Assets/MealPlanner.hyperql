@@ -1,0 +1,238 @@
+-- ============================================================================
+-- Meal Planner Knowledge Graph - HyperQL v0.17 (Revised)
+-- ============================================================================
+
+DEFINE NAMESPACE MealPlanner STRICT_MODE = true;
+
+-- ============================================================================
+-- ENUMERATIONS
+-- ============================================================================
+
+DEFINE ENUM UnitType {
+  MASS, VOLUME, COUNT, CUSTOM
+};
+
+DEFINE ENUM RecipeMealType {
+  BREAKFAST, LUNCH, DINNER, SNACK, OTHER
+};
+
+DEFINE ENUM ViewMode {
+  AUTO, DESKTOP, MOBILE
+};
+
+-- ============================================================================
+-- GLOBAL FIELD DEFINITIONS
+-- ============================================================================
+
+-- Identity & Core
+DEFINE FIELD Id: UUID @readonly;
+DEFINE FIELD Name: String @index @required;
+DEFINE FIELD Description: String @index(fulltext);
+DEFINE FIELD CreatedAt: Date @readonly;
+DEFINE FIELD UpdatedAt: Date;
+
+-- Units & Conversions
+DEFINE FIELD Abbreviation: String;
+DEFINE FIELD DisplayName: String;
+DEFINE FIELD IsSystemUnit: Bool;
+DEFINE FIELD FactorToBase: Float;
+DEFINE FIELD UType: Enum<UnitType>;
+DEFINE FIELD FromQuantity: Float;
+DEFINE FIELD ToQuantity: Float;
+
+-- Quantities & Pricing
+DEFINE FIELD Quantity: Float;
+DEFINE FIELD NeededQuantity: Float;
+DEFINE FIELD QuantityBought: Float;
+DEFINE FIELD PriceCents: Int;
+DEFINE FIELD PricePaidCents: Int;
+DEFINE FIELD ProjectedTotalCents: Int;
+DEFINE FIELD ActualTotalCents: Int;
+DEFINE FIELD TaxPaidCents: Int;
+
+-- Recipes & Meals
+DEFINE FIELD Servings: Float;
+DEFINE FIELD MealType: Enum<RecipeMealType>;
+DEFINE FIELD PrepTimeMinutes: Int;
+DEFINE FIELD CookTimeMinutes: Int;
+DEFINE FIELD Instructions: List<String>;
+DEFINE FIELD Date: Date;
+DEFINE FIELD Time: String;
+DEFINE FIELD PeopleCount: Int;
+DEFINE FIELD IsConsumed: Bool;
+
+-- Shopping & Settings
+DEFINE FIELD CustomName: String;
+DEFINE FIELD IsPurchased: Bool;
+DEFINE FIELD NotificationDelayMinutes: Int;
+DEFINE FIELD DefaultTaxRatePercentage: Float;
+DEFINE FIELD AppMode: Enum<ViewMode>;
+
+-- ============================================================================
+-- ROLES - Define N-ary endpoints
+-- ============================================================================
+
+DEFINE ROLE category ALLOWS [Category];
+DEFINE ROLE ingredient ALLOWS [Ingredient];
+DEFINE ROLE store ALLOWS [Store];
+DEFINE ROLE unit ALLOWS [Unit];
+DEFINE ROLE from_unit ALLOWS [Unit];
+DEFINE ROLE to_unit ALLOWS [Unit];
+DEFINE ROLE recipe ALLOWS [Recipe];
+DEFINE ROLE pre_planned_meal ALLOWS [PrePlannedMeal];
+DEFINE ROLE scheduled_meal ALLOWS [ScheduledMeal];
+DEFINE ROLE restaurant ALLOWS [Restaurant];
+DEFINE ROLE receipt ALLOWS [StoreReceipt];
+
+-- ============================================================================
+-- TRAITS - Composable interfaces
+-- ============================================================================
+
+DEFINE TRAIT Identifiable {
+  Id,
+  Name
+};
+
+DEFINE TRAIT Auditable {
+  CreatedAt,
+  UpdatedAt
+};
+
+-- ============================================================================
+-- NODE TYPES
+-- ============================================================================
+
+DEFINE ABSTRACT NODE Entity EXTENDS [Identifiable] {
+  Id,
+  Name
+};
+
+-- Unified Unit Node: Relies on FactorToBase rather than a complex node hierarchy
+DEFINE NODE Unit EXTENDS [Entity] {
+  Id, Name, Abbreviation, DisplayName, IsSystemUnit, FactorToBase, UType
+};
+
+DEFINE NODE Category EXTENDS [Entity] { Id, Name };
+DEFINE NODE Store EXTENDS [Entity] { Id, Name };
+DEFINE NODE Restaurant EXTENDS [Entity] { Id, Name };
+
+-- Domain Nodes
+DEFINE NODE Ingredient EXTENDS [Entity, Auditable] {
+  Id, Name, CreatedAt, UpdatedAt
+};
+
+DEFINE NODE Recipe EXTENDS [Entity, Auditable] {
+  Id, Name, Description, Instructions, Servings, MealType, PrepTimeMinutes, CookTimeMinutes, CreatedAt, UpdatedAt
+};
+
+DEFINE NODE PrePlannedMeal EXTENDS [Entity] {
+  Id, Name
+};
+
+DEFINE NODE ScheduledMeal {
+  Id, Date, Time, MealType, PeopleCount, IsConsumed
+};
+
+DEFINE NODE AppSettings {
+  Id, NotificationDelayMinutes, DefaultTaxRatePercentage, AppMode
+};
+
+-- Historical Ledger Node
+DEFINE NODE StoreReceipt EXTENDS [Entity] {
+  Id, Name, Date, ProjectedTotalCents, ActualTotalCents, TaxPaidCents
+};
+
+-- ============================================================================
+-- EDGE TYPES - N-ary Graph Relationships
+-- ============================================================================
+
+-- 1. Generic Unit Conversion Bridge
+-- Connects ANY two units (e.g. Volume -> Mass, or Count -> Mass) for a specific ingredient
+DEFINE EDGE UnitConversionBridge {
+  ingredient <- (ONE),
+  from_unit -> (ONE),
+  to_unit -> (ONE),
+  FromQuantity,
+  ToQuantity
+};
+
+-- 2. Ingredient to Category
+DEFINE EDGE IngredientCategory {
+  ingredient <- (MANY),
+  category -> (ONE)
+};
+
+-- 3. Package (Purchase Options)
+DEFINE EDGE PackageOption {
+  store <- (ONE),
+  ingredient -> (MANY),
+  unit -> (ONE),
+  PriceCents,
+  Quantity
+};
+
+-- 4. Recipe Ingredients
+DEFINE EDGE RecipeRequirement {
+  recipe <- (ONE),
+  ingredient -> (MANY) @ordered,
+  unit -> (ONE),
+  Quantity
+};
+
+-- 5. Pre-Planned Meal Components (Relational edges prevent orphaned UUID lists)
+DEFINE EDGE MealRecipe {
+  pre_planned_meal <- (ONE),
+  recipe -> (MANY)
+};
+
+DEFINE EDGE MealIndependentIngredient {
+  pre_planned_meal <- (ONE),
+  ingredient -> (MANY),
+  unit -> (ONE),
+  Quantity
+};
+
+-- 6. Scheduling
+DEFINE EDGE MealSchedule {
+  scheduled_meal <- (MANY),
+  pre_planned_meal -> (ONE),
+  restaurant -> (ONE)
+};
+
+-- 7. Inventory & Pantry
+DEFINE EDGE PantryInventory {
+  ingredient <- (ONE),
+  unit -> (ONE),
+  Quantity
+};
+
+-- 8. Shopping List
+DEFINE EDGE ShoppingCartItem {
+  ingredient <- (ONE),
+  store -> (ONE),
+  unit -> (ONE),
+  CustomName,
+  NeededQuantity,
+  IsPurchased
+};
+
+-- 9. Receipt History & Line Items (Itemized historical tracking)
+DEFINE EDGE IssuedReceipt {
+  store <- (ONE),
+  receipt -> (MANY) @ordered
+};
+
+DEFINE EDGE ReceiptLineItem {
+  receipt <- (ONE),
+  ingredient -> (ONE),
+  unit -> (ONE),
+  QuantityBought,
+  PricePaidCents
+};
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+DEFINE INDEX IngredientNameIndex ON Ingredient (Name);
+DEFINE INDEX RecipeNameIndex ON Recipe (Name);
