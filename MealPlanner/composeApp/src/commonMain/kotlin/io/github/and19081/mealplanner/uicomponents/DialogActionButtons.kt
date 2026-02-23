@@ -3,9 +3,7 @@ package io.github.and19081.mealplanner.uicomponents
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,7 +24,7 @@ fun DialogActionButtons(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onDelete != null) {
-            MpTextButton(
+            TextButton(
                 onClick = onDelete,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) {
@@ -35,8 +33,8 @@ fun DialogActionButtons(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MpTextButton(onClick = onCancel) { Text("Cancel") }
-            MpButton(
+            TextButton(onClick = onCancel) { Text("Cancel") }
+            Button(
                 onClick = onSave,
                 enabled = saveEnabled
             ) { Text(saveLabel) }

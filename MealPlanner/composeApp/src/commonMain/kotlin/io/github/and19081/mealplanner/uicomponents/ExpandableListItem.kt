@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 fun ExpandableListItem(
     title: String,
     subtitle: String? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
     onEditClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -73,6 +74,11 @@ fun ExpandableListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+
+            if (trailingIcon != null) {
+                trailingIcon()
+                Spacer(modifier = Modifier.width(4.dp))
             }
 
             IconButton(onClick = onEditClick) {

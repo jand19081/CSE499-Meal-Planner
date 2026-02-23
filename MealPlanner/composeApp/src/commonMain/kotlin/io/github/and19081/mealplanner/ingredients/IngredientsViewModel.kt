@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 data class IngredientsUiState(
@@ -23,7 +24,11 @@ data class IngredientsUiState(
     val errorMessage: String? = null
 )
 
-class IngredientsViewModel : ViewModel() {
+class IngredientsViewModel(
+    private val ingredientRepository: IngredientRepository,
+    private val storeRepository: StoreRepository,
+    private val unitRepository: UnitRepository
+) : ViewModel() {
 
     // --- State ---
     private val _searchQuery = MutableStateFlow("")
@@ -34,12 +39,12 @@ class IngredientsViewModel : ViewModel() {
         _searchQuery,
         _sortByCategory,
         _errorMessage,
-        IngredientRepository.ingredients,
-        IngredientRepository.categories,
-        IngredientRepository.packages,
-        IngredientRepository.bridges,
-        StoreRepository.stores,
-        UnitRepository.units
+        ingredientRepository.ingredients,
+        ingredientRepository.categories,
+        ingredientRepository.packages,
+        ingredientRepository.bridges,
+        storeRepository.stores,
+        unitRepository.units
     ) { args: Array<Any?> ->
         val query = args[0] as String
         val isGrouped = args[1] as Boolean
@@ -114,57 +119,87 @@ class IngredientsViewModel : ViewModel() {
         }
 
         _errorMessage.value = null
-        val exists = IngredientRepository.ingredients.value.any { it.id == ingredient.id }
-        if (exists) {
-            IngredientRepository.updateIngredient(ingredient)
-        } else {
-            IngredientRepository.addIngredient(ingredient)
+        viewModelScope.launch {
+            val exists = ingredientRepository.ingredients.value.any { it.id == ingredient.id }
+            if (exists) {
+                ingredientRepository.updateIngredient(ingredient)
+            } else {
+                ingredientRepository.addIngredient(ingredient)
+            }
         }
     }
 
     fun deleteIngredient(id: Uuid) {
-        IngredientRepository.removeIngredient(id)
+        viewModelScope.launch {
+            ingredientRepository.removeIngredient(id)
+        }
     }
 
     // --- Child Entities ---
     fun savePackage(pkg: Package) {
-        val exists = IngredientRepository.packages.value.any { it.id == pkg.id }
-        if (exists) IngredientRepository.updatePackage(pkg) else IngredientRepository.addPackage(pkg)
+        viewModelScope.launch {
+            val exists = ingredientRepository.packages.value.any { it.id == pkg.id }
+            if (exists) ingredientRepository.updatePackage(pkg) else ingredientRepository.addPackage(pkg)
+        }
     }
     
     fun deletePackage(id: Uuid) {
-        IngredientRepository.removePackage(id)
+        viewModelScope.launch {
+            ingredientRepository.removePackage(id)
+        }
     }
     
     fun saveBridge(bridge: BridgeConversion) {
-        IngredientRepository.addBridge(bridge) // Only add for now, logic simplified
+        viewModelScope.launch {
+            val currentBridges = ingredientRepository.bridges.value
+            val existing = currentBridges.find { 
+                it.ingredientId == bridge.ingredientId && 
+                ((it.fromUnitId == bridge.fromUnitId && it.toUnitId == bridge.toUnitId) ||
+                 (it.fromUnitId == bridge.toUnitId && it.toUnitId == bridge.fromUnitId))
+            }
+
+            if (existing != null) {
+                val newList = currentBridges.filter { it.id != existing.id } + bridge.copy(id = existing.id)
+                ingredientRepository.setBridges(newList)
+            } else {
+                ingredientRepository.addBridge(bridge)
+            }
+        }
     }
 
     // --- Store Management ---
 
     fun addStore(name: String) {
-        if (StoreRepository.stores.value.none { it.name.equals(name, ignoreCase = true) }) {
-            StoreRepository.addStore(Store(name = name))
+        viewModelScope.launch {
+            if (storeRepository.stores.value.none { it.name.equals(name, ignoreCase = true) }) {
+                storeRepository.addStore(Store(name = name))
+            }
         }
     }
 
     fun deleteStore(storeId: Uuid) {
-        StoreRepository.deleteStore(storeId)
-        IngredientRepository.removePackagesForStore(storeId)
+        viewModelScope.launch {
+            storeRepository.deleteStore(storeId)
+            ingredientRepository.removePackagesForStore(storeId)
+        }
     }
 
     // --- Category Management ---
     
     fun addCategory(name: String) {
-         if (IngredientRepository.categories.value.none { it.name.equals(name, ignoreCase = true) }) {
-            IngredientRepository.addCategory(Category(name = name))
+        viewModelScope.launch {
+            if (ingredientRepository.categories.value.none { it.name.equals(name, ignoreCase = true) }) {
+                ingredientRepository.addCategory(Category(name = name))
+            }
         }
     }
 
     fun deleteCategory(categoryId: Uuid) {
-        val toDelete = IngredientRepository.ingredients.value.filter { it.categoryId == categoryId }
-        toDelete.forEach { 
-            IngredientRepository.removeIngredient(it.id)
+        viewModelScope.launch {
+            val toDelete = ingredientRepository.ingredients.value.filter { it.categoryId == categoryId }
+            toDelete.forEach { 
+                ingredientRepository.removeIngredient(it.id)
+            }
         }
     }
 }

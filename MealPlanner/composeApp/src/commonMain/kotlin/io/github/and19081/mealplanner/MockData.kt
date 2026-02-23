@@ -10,6 +10,7 @@ import io.github.and19081.mealplanner.meals.MealRepository
 import io.github.and19081.mealplanner.recipes.RecipeRepository
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
@@ -18,29 +19,38 @@ import kotlin.uuid.Uuid
 
 object MockData {
 
-    fun initialize() {
-        // --- Units ---
-        val uLb = UnitModel(id = Uuid.random(), type = UnitType.Weight, abbreviation = "lb", displayName = "Pounds", isSystemUnit = true)
-        val uOz = UnitModel(id = Uuid.random(), type = UnitType.Weight, abbreviation = "oz", displayName = "Ounces", isSystemUnit = true)
-        val uGram = UnitModel(id = Uuid.random(), type = UnitType.Weight, abbreviation = "g", displayName = "Grams", isSystemUnit = true)
-        val uKg = UnitModel(id = Uuid.random(), type = UnitType.Weight, abbreviation = "kg", displayName = "Kilograms", isSystemUnit = true)
-        
-        val uCup = UnitModel(id = Uuid.random(), type = UnitType.Volume, abbreviation = "cup", displayName = "Cups", isSystemUnit = true)
-        val uMl = UnitModel(id = Uuid.random(), type = UnitType.Volume, abbreviation = "ml", displayName = "Milliliters", isSystemUnit = true)
-        val uLiter = UnitModel(id = Uuid.random(), type = UnitType.Volume, abbreviation = "l", displayName = "Liters", isSystemUnit = true)
-        val uTbsp = UnitModel(id = Uuid.random(), type = UnitType.Volume, abbreviation = "tbsp", displayName = "Tablespoons", isSystemUnit = true)
-        
-        val uEach = UnitModel(id = Uuid.random(), type = UnitType.Count, abbreviation = "each", displayName = "Each", isSystemUnit = true)
-        val uDozen = UnitModel(id = Uuid.random(), type = UnitType.Count, abbreviation = "dozen", displayName = "Dozen", isSystemUnit = true)
+    suspend fun initialize(
+        unitRepository: UnitRepository,
+        storeRepository: StoreRepository,
+        ingredientRepository: IngredientRepository,
+        recipeRepository: RecipeRepository,
+        mealRepository: MealRepository,
+        mealPlanRepository: MealPlanRepository,
+        restaurantRepository: io.github.and19081.mealplanner.ingredients.RestaurantRepository
+    ) {
+        if (ingredientRepository.count() > 0) return
 
-        UnitRepository.setUnits(listOf(uLb, uOz, uGram, uKg, uCup, uMl, uLiter, uTbsp, uEach, uDozen))
+        // --- Units ---
+        val uLb = SystemUnits.Lb
+        val uOz = SystemUnits.Oz
+        val uCup = SystemUnits.Cup
+        val uEach = SystemUnits.Each
+
+        unitRepository.setUnits(SystemUnits.all)
 
         // Stores
         val walmart = Store(id = Uuid.random(), name = "Walmart")
         val winco = Store(id = Uuid.random(), name = "WinCo")
         val costco = Store(id = Uuid.random(), name = "Costco")
         
-        StoreRepository.setStores(listOf(walmart, winco, costco))
+        storeRepository.setStores(listOf(walmart, winco, costco))
+
+        // Restaurants
+        val mcdonalds = Restaurant(id = Uuid.random(), name = "McDonald's")
+        val oliveGarden = Restaurant(id = Uuid.random(), name = "Olive Garden")
+        val chipotle = Restaurant(id = Uuid.random(), name = "Chipotle")
+        
+        restaurantRepository.setRestaurants(listOf(mcdonalds, oliveGarden, chipotle))
 
         // Categories
         val meat = Category(id = Uuid.random(), name = "Meat")
@@ -48,7 +58,7 @@ object MockData {
         val dairy = Category(id = Uuid.random(), name = "Dairy")
         val produce = Category(id = Uuid.random(), name = "Produce")
         
-        IngredientRepository.setCategories(listOf(meat, pantry, dairy, produce))
+        ingredientRepository.setCategories(listOf(meat, pantry, dairy, produce))
 
         // Helper to make packages
         fun makePackage(store: Store, cents: Int, amount: Double, unit: UnitModel, ingredientId: Uuid): Package {
@@ -82,7 +92,7 @@ object MockData {
         val marinaraPkgs = listOf(
             makePackage(walmart, 250, 24.0, uOz, marinara.id),
             makePackage(winco, 198, 24.0, uOz, marinara.id),
-            makePackage(costco, 899, 72.0, uOz, marinara.id) // 3x24oz
+            makePackage(costco, 899, 72.0, uOz, marinara.id)
         )
 
         // --- Cheese (Mozzarella) ---
@@ -116,8 +126,8 @@ object MockData {
         )
 
         val allIngredients = listOf(groundBeef, pasta, marinara, cheese, tortillas, eggs, onion)
-        IngredientRepository.setIngredients(allIngredients)
-        IngredientRepository.setPackages(groundBeefPkgs + pastaPkgs + marinaraPkgs + cheesePkgs + tortillasPkgs + eggsPkgs + onionPkgs)
+        ingredientRepository.setIngredients(allIngredients)
+        ingredientRepository.setPackages(groundBeefPkgs + pastaPkgs + marinaraPkgs + cheesePkgs + tortillasPkgs + eggsPkgs + onionPkgs)
         
         // Recipes
         val rLasagna = Recipe(
@@ -133,11 +143,11 @@ object MockData {
                 "Bake at 375F for 45 mins."
             ),
             ingredients = listOf(
-                RecipeIngredient(groundBeef.id, 1.0, uLb.id),
-                RecipeIngredient(pasta.id, 12.0, uOz.id),
-                RecipeIngredient(marinara.id, 24.0, uOz.id),
-                RecipeIngredient(cheese.id, 2.0, uCup.id),
-                RecipeIngredient(onion.id, 1.0, uEach.id)
+                RecipeIngredient(ingredientId = groundBeef.id, quantity = 1.0, unitId = uLb.id),
+                RecipeIngredient(ingredientId = pasta.id, quantity = 12.0, unitId = uOz.id),
+                RecipeIngredient(ingredientId = marinara.id, quantity = 24.0, unitId = uOz.id),
+                RecipeIngredient(ingredientId = cheese.id, quantity = 2.0, unitId = uCup.id),
+                RecipeIngredient(ingredientId = onion.id, quantity = 1.0, unitId = uEach.id)
             )
         )
         
@@ -154,10 +164,10 @@ object MockData {
                 "Serve with onions and cheese."
             ),
             ingredients = listOf(
-                RecipeIngredient(groundBeef.id, 1.0, uLb.id),
-                RecipeIngredient(tortillas.id, 12.0, uEach.id),
-                RecipeIngredient(cheese.id, 1.0, uCup.id),
-                RecipeIngredient(onion.id, 0.5, uEach.id)
+                RecipeIngredient(ingredientId = groundBeef.id, quantity = 1.0, unitId = uLb.id),
+                RecipeIngredient(ingredientId = tortillas.id, quantity = 12.0, unitId = uEach.id),
+                RecipeIngredient(ingredientId = cheese.id, quantity = 1.0, unitId = uCup.id),
+                RecipeIngredient(ingredientId = onion.id, quantity = 0.5, unitId = uEach.id)
             )
         )
 
@@ -174,12 +184,12 @@ object MockData {
                 "Add cheese and fold."
             ),
             ingredients = listOf(
-                RecipeIngredient(eggs.id, 3.0, uEach.id),
-                RecipeIngredient(cheese.id, 0.5, uCup.id)
+                RecipeIngredient(ingredientId = eggs.id, quantity = 3.0, unitId = uEach.id),
+                RecipeIngredient(ingredientId = cheese.id, quantity = 0.5, unitId = uCup.id)
             )
         )
 
-        RecipeRepository.setRecipes(listOf(rLasagna, rTacos, rOmelette))
+        recipeRepository.setRecipes(listOf(rLasagna, rTacos, rOmelette))
 
         // PrePlanned Meals
         val mLasagna = PrePlannedMeal(
@@ -198,31 +208,45 @@ object MockData {
             recipes = listOf(rOmelette.id)
         )
 
-        MealRepository.setMeals(listOf(mLasagna, mTacos, mOmelette))
+        mealRepository.setMeals(listOf(mLasagna, mTacos, mOmelette))
 
         // Mock Meal Plan
-        MealPlanRepository.clearAll()
+        mealPlanRepository.clearAll()
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
         
         // Plan Tacos for Today
         val entry1 = ScheduledMeal(
             id = Uuid.random(),
             date = today,
+            time = LocalTime(18, 0),
             mealType = RecipeMealType.Dinner,
             peopleCount = 4,
             prePlannedMealId = mTacos.id
         )
-        MealPlanRepository.addPlan(entry1)
+        mealPlanRepository.addPlan(entry1)
 
         // Plan Omelette for Tomorrow Breakfast
         val tomorrow = today + DatePeriod(days = 1)
         val entry2 = ScheduledMeal(
             id = Uuid.random(),
             date = tomorrow,
+            time = LocalTime(8, 0),
             mealType = RecipeMealType.Breakfast,
             peopleCount = 2,
             prePlannedMealId = mOmelette.id
         )
-        MealPlanRepository.addPlan(entry2)
+        mealPlanRepository.addPlan(entry2)
+
+        // Plan Restaurant for Lunch
+        val entry3 = ScheduledMeal(
+            id = Uuid.random(),
+            date = today,
+            time = LocalTime(12, 0),
+            mealType = RecipeMealType.Lunch,
+            peopleCount = 2,
+            restaurantId = chipotle.id,
+            anticipatedCostCents = 2500
+        )
+        mealPlanRepository.addPlan(entry3)
     }
 }

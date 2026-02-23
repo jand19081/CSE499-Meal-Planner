@@ -27,8 +27,9 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Composable
-fun PantryView() {
-    val viewModel = viewModel { PantryViewModel() }
+fun PantryView(
+    viewModel: PantryViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }

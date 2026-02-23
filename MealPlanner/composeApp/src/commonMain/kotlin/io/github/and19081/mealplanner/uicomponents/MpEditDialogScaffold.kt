@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -31,7 +33,11 @@ fun MpEditDialogScaffold(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 if (tabs.isNotEmpty()) {
                     SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
                         tabs.forEachIndexed { index, t ->
@@ -44,7 +50,7 @@ fun MpEditDialogScaffold(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
-                Box(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.heightIn(min = 200.dp)) {
                     content()
                 }
             }

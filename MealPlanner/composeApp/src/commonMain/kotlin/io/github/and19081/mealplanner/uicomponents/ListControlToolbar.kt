@@ -10,10 +10,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,11 +51,11 @@ fun ListControlToolbar(
         }
 
         // Add Button
-        MpFloatingActionButton(
+        FloatingActionButton(
             onClick = onAddClick,
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(48.dp) // Standard small FAB size or just custom?
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(Icons.Default.Add, "Add Item")
         }

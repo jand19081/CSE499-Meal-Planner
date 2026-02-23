@@ -24,18 +24,16 @@ import io.github.and19081.mealplanner.uicomponents.CreateNewItemRow
 import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
 import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
 import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpButton
-import io.github.and19081.mealplanner.uicomponents.MpCard
 import io.github.and19081.mealplanner.uicomponents.MpEditDialogScaffold
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.MpTextButton
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Composable
-fun IngredientsView() {
-    val viewModel = viewModel { IngredientsViewModel() }
+fun IngredientsView(
+    viewModel: IngredientsViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -141,7 +139,6 @@ fun IngredientsView() {
                 newPackages.forEach { viewModel.savePackage(it) }
                 
                 // Handling Bridges (Simplified: just save new, no delete logic exposed properly yet in VM for bridges specifically by ID diff, but we can do additive for now or implement full diff)
-                // Assuming simple additive for bridges in this prototype
                 newBridges.forEach { viewModel.saveBridge(it) }
 
                 showEditDialog = false
@@ -361,8 +358,8 @@ fun PurchaseOptionsEditor(
         if (options.isEmpty() && !isAdding) {
             Text("No options added yet.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
         } else if (!isAdding) {
-            LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 150.dp)) {
-                items(options) { opt ->
+            Column {
+                options.forEach { opt ->
                     val sName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown"
                     val uName = allUnits.find { it.id == opt.unitId }?.abbreviation ?: "?"
                     Row(
@@ -386,11 +383,11 @@ fun PurchaseOptionsEditor(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (!isAdding) {
-            MpButton(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add Purchase Option")
             }
         } else {
-            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(
                     modifier = Modifier.padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -447,8 +444,8 @@ fun PurchaseOptionsEditor(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        MpButton(
+                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        Button(
                             onClick = {
                                 val store = allStores.find { it.name == storeName }
                                 val unit = allUnits.find { it.abbreviation == selectedUnitName }
@@ -492,6 +489,7 @@ fun ConversionBridgesEditor(
     onUpdate: (List<BridgeConversion>) -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
+    var editingBridge by remember { mutableStateOf<BridgeConversion?>(null) }
     
     var fromQtyStr by remember { mutableStateOf("1") }
     var fromUnitName by remember { mutableStateOf(allUnits.firstOrNull()?.abbreviation ?: "") }
@@ -499,16 +497,37 @@ fun ConversionBridgesEditor(
     var toQtyStr by remember { mutableStateOf("") }
     var toUnitName by remember { mutableStateOf(allUnits.firstOrNull()?.abbreviation ?: "") }
 
+    fun startEditing(bridge: BridgeConversion?) {
+        if (bridge != null) {
+            fromQtyStr = bridge.fromQuantity.toString()
+            fromUnitName = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
+            toQtyStr = bridge.toQuantity.toString()
+            toUnitName = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
+            editingBridge = bridge
+            isAdding = true
+        } else {
+            fromQtyStr = "1"
+            fromUnitName = allUnits.firstOrNull()?.abbreviation ?: ""
+            toQtyStr = ""
+            toUnitName = allUnits.firstOrNull()?.abbreviation ?: ""
+            editingBridge = null
+            isAdding = true
+        }
+    }
+
     Column {
         if (currentBridges.isEmpty() && !isAdding) {
             Text("No conversions defined.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
         } else if (!isAdding) {
-            LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 150.dp)) {
-                items(currentBridges) { bridge ->
+            Column {
+                currentBridges.forEach { bridge ->
                     val fName = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: "?"
                     val tName = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: "?"
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { startEditing(bridge) }
+                            .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -525,17 +544,17 @@ fun ConversionBridgesEditor(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (!isAdding) {
-            MpButton(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add Conversion")
             }
         } else {
-            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(
                     modifier = Modifier.padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "New Conversion (e.g. 1 Cup = 120 Grams)",
+                        if (editingBridge == null) "New Conversion" else "Edit Conversion",
                         style = MaterialTheme.typography.labelMedium
                     )
 
@@ -596,8 +615,8 @@ fun ConversionBridgesEditor(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        MpButton(
+                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        Button(
                             onClick = {
                                 val fq = fromQtyStr.toDoubleOrNull()
                                 val tq = toQtyStr.toDoubleOrNull()
@@ -606,20 +625,25 @@ fun ConversionBridgesEditor(
 
                                 if (fq != null && tq != null && fUnit != null && tUnit != null) {
                                     val newBridge = BridgeConversion(
-                                        id = Uuid.random(),
+                                        id = editingBridge?.id ?: Uuid.random(),
                                         ingredientId = ingredientId,
                                         fromUnitId = fUnit.id,
                                         fromQuantity = fq,
                                         toUnitId = tUnit.id,
                                         toQuantity = tq
                                     )
-                                    onUpdate(currentBridges + newBridge)
+                                    val newList = if (editingBridge != null) {
+                                        currentBridges.map { if (it.id == editingBridge!!.id) newBridge else it }
+                                    } else {
+                                        currentBridges + newBridge
+                                    }
+                                    onUpdate(newList)
                                     isAdding = false
                                 }
                             },
                             enabled = fromQtyStr.isNotBlank() && toQtyStr.isNotBlank() && fromUnitName.isNotBlank() && toUnitName.isNotBlank()
                         ) {
-                            Text("Add")
+                            Text("Save")
                         }
                     }
                 }

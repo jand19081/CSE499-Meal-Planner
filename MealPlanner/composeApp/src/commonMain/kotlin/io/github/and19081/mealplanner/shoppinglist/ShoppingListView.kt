@@ -28,21 +28,26 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.uicomponents.DialogActionButtons
 import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpButton
-import io.github.and19081.mealplanner.uicomponents.MpFloatingActionButton
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.MpSurface
-import io.github.and19081.mealplanner.uicomponents.MpTextButton
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.ingredients.Store
+import io.github.and19081.mealplanner.domain.DataWarning
+import androidx.compose.material.icons.filled.Warning
 import kotlin.math.abs
+import kotlin.time.Clock
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 @Composable
-fun ShoppingListView() {
-    val viewModel = viewModel { ShoppingListViewModel() }
+fun ShoppingListView(
+    viewModel: ShoppingListViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
     
     val showReceiptDialog by viewModel.showReceiptDialog.collectAsState()
@@ -72,27 +77,27 @@ fun ShoppingListView() {
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (shoppingModeStoreId != null) {
-                    MpFloatingActionButton(
+                    FloatingActionButton(
                         onClick = { viewModel.openReceiptDialog(shoppingModeStoreId) },
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Icon(Icons.Default.Check, contentDescription = "Complete Trip")
                     }
-                    MpFloatingActionButton(
+                    FloatingActionButton(
                         onClick = { shoppingModeStoreId = null },
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Exit Shopping Mode")
                     }
                 } else {
-                    MpFloatingActionButton(
+                    FloatingActionButton(
                         onClick = { showStoreSelectDialog = true },
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer
                     ) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = "Go Shopping")
                     }
 
-                    MpFloatingActionButton(onClick = { showAddDialog = true }) {
+                    FloatingActionButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add Item")
                     }
                 }
@@ -103,6 +108,18 @@ fun ShoppingListView() {
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 120.dp)
         ) {
+            // Global Warnings
+            if (shoppingModeStoreId == null) {
+                item {
+                    MpValidationWarning(warnings = uiState.warnings)
+                }
+            } else {
+                val currentStoreWarnings = uiState.sections.find { it.storeId == shoppingModeStoreId }?.warnings ?: emptyList()
+                item {
+                    MpValidationWarning(warnings = currentStoreWarnings)
+                }
+            }
+
             // 1. Stores
             if (displayedSections.isEmpty() && shoppingModeStoreId != null) {
                  item {
@@ -142,24 +159,6 @@ fun ShoppingListView() {
                     }
                 }
             }
-
-            // 2. Owned Items (Only show if not in shopping mode)
-            if (shoppingModeStoreId == null && uiState.ownedItems.isNotEmpty()) {
-                stickyHeader {
-                    ListSectionHeader(text = "Already Owned")
-                }
-                items(uiState.ownedItems) { item ->
-                    ShoppingListItemRow(
-                        item = item,
-                        allStores = uiState.allStores,
-                        onMoveToStore = { storeId -> viewModel.moveToStore(item.id, storeId) },
-                        onMarkOwned = { /* Already owned */ },
-                        onMarkUnowned = { viewModel.markUnowned(item) },
-                        onToggleCart = { /* No cart for owned */ }
-                    )
-                    HorizontalDivider()
-                }
-            }
         }
     }
     
@@ -170,7 +169,7 @@ fun ShoppingListView() {
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     uiState.sections.filter { it.items.isNotEmpty() }.forEach { section ->
-                        MpTextButton(
+                        TextButton(
                             onClick = {
                                 shoppingModeStoreId = section.storeId
                                 showStoreSelectDialog = false
@@ -208,7 +207,7 @@ fun ShoppingListView() {
             },
             confirmButton = {},
             dismissButton = {
-                MpTextButton(onClick = { showStoreSelectDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showStoreSelectDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -227,9 +226,10 @@ fun ShoppingListView() {
     if (showReceiptDialog) {
         CompleteShoppingDialog(
             estimatedTotalCents = cartTotal,
+            taxRate = uiState.taxRate,
             onDismiss = { viewModel.dismissReceiptDialog() },
-            onConfirm = { actualTotal, _ ->
-                viewModel.submitReceiptTotal(actualTotal)
+            onConfirm = { actualTotal, time, forceUpdate ->
+                viewModel.submitReceiptTotal(actualTotal, time, forceUpdate)
             }
         )
     }
@@ -255,7 +255,7 @@ fun ShoppingListView() {
 
 @Composable
 fun ShoppingListHeader(section: ShoppingListSection) {
-    MpSurface(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -459,30 +459,48 @@ fun AddAnyItemDialog(
 @Composable
 fun CompleteShoppingDialog(
     estimatedTotalCents: Long,
+    taxRate: Double,
     onDismiss: () -> Unit,
-    onConfirm: (Long, Boolean) -> Unit
+    onConfirm: (Long, LocalTime, Boolean) -> Unit
 ) {
     var actualTotalStr by remember { mutableStateOf((estimatedTotalCents / 100.0).toString()) }
     var showPriceUpdatePrompt by remember { mutableStateOf(false) }
+    
+    val now = remember { 
+        val currentInstant = Clock.System.now()
+        currentInstant.toLocalDateTime(TimeZone.currentSystemDefault()).time 
+    }
+    var selectedTime by remember { mutableStateOf(LocalTime(now.hour, now.minute)) }
+    
+    val timePickerState = rememberTimePickerState(
+        initialHour = selectedTime.hour,
+        initialMinute = selectedTime.minute
+    )
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val hasTax = taxRate > 0.0
+    val label = if (hasTax) "Actual Receipt Total (Incl. Tax) ($)" else "Actual Subtotal ($)"
 
     if (showPriceUpdatePrompt) {
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text("Update Prices?") },
-            text = { Text("The actual total differed from the estimate. Would you like to review item prices?") },
+            text = { Text("The actual amount entered does not match our estimate. Would you like to review and update individual item prices?") },
             confirmButton = {
-                MpButton(
+                Button(
                     onClick = {
-                        onConfirm((actualTotalStr.toDoubleOrNull() ?: 0.0 * 100).toLong(), true)
+                        val actualCents = ((actualTotalStr.toDoubleOrNull() ?: 0.0) * 100).toLong()
+                        onConfirm(actualCents, selectedTime, true)
                     }
                 ) {
                     Text("Yes, Review Prices")
                 }
             },
             dismissButton = {
-                MpTextButton(
+                TextButton(
                     onClick = {
-                        onConfirm((actualTotalStr.toDoubleOrNull() ?: 0.0 * 100).toLong(), false)
+                        val actualCents = ((actualTotalStr.toDoubleOrNull() ?: 0.0) * 100).toLong()
+                        onConfirm(actualCents, selectedTime, false)
                     }
                 ) { Text("No, Just Complete") }
             }
@@ -492,13 +510,17 @@ fun CompleteShoppingDialog(
             onDismissRequest = onDismiss,
             title = { Text("Complete Shopping Trip") },
             text = {
-                Column {
-                    Text("Estimated Total: $${String.format("%.2f", estimatedTotalCents / 100.0)}")
-                    Spacer(modifier = Modifier.height(16.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (hasTax) "Estimated Total: $${String.format("%.2f", estimatedTotalCents / 100.0)}" else "Estimated Subtotal: $${String.format("%.2f", estimatedTotalCents / 100.0)}")
+                    
+                    Button(onClick = { showTimePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Trip Time: $selectedTime")
+                    }
+
                     MpOutlinedTextField(
                         value = actualTotalStr,
                         onValueChange = { actualTotalStr = it },
-                        label = { Text("Actual Receipt Total ($)") },
+                        label = { Text(label) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -511,10 +533,11 @@ fun CompleteShoppingDialog(
                         val actual = actualTotalStr.toDoubleOrNull()
                         if (actual != null) {
                             val actualCents = (actual * 100).toLong()
-                            if (abs(actualCents - estimatedTotalCents) > 50) { // > $0.50 diff
+                            // Exact match check
+                            if (actualCents != estimatedTotalCents) { 
                                 showPriceUpdatePrompt = true
                             } else {
-                                onConfirm(actualCents, false)
+                                onConfirm(actualCents, selectedTime, false)
                             }
                         }
                     },
@@ -523,6 +546,24 @@ fun CompleteShoppingDialog(
                 )
             },
             dismissButton = {}
+        )
+    }
+
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedTime = LocalTime(timePickerState.hour, timePickerState.minute)
+                    showTimePicker = false
+                }) { Text("Ok") }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showTimePicker = false 
+                }) { Text("Cancel") }
+            },
+            text = { TimePicker(state = timePickerState) }
         )
     }
 }

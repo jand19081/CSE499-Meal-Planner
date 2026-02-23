@@ -21,16 +21,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
-import io.github.and19081.mealplanner.uicomponents.MpButton
-import io.github.and19081.mealplanner.uicomponents.MpCard
-
 @Composable
-fun DashboardView() {
-    val viewModel = viewModel { DashboardViewModel() }
+fun DashboardView(
+    viewModel: DashboardViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
 
@@ -52,6 +51,10 @@ fun DashboardView() {
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            item {
+                MpValidationWarning(warnings = uiState.warnings)
             }
             
             // Weekly Cost (If Enabled)
@@ -83,7 +86,7 @@ fun DashboardView() {
                         DashboardStatCard(
                             modifier = Modifier.weight(1f),
                             title = "To Buy",
-                            value = "?", // Placeholder until linked to ShoppingListVM
+                            value = "${uiState.shoppingListCount}",
                             icon = Icons.Default.ShoppingCart,
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -96,7 +99,7 @@ fun DashboardView() {
                 // Next Meal
                 if (uiState.nextMeal != null) {
                     item {
-                        MpCard(
+                        Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                         ) {
                             Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
@@ -113,7 +116,7 @@ fun DashboardView() {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                MpButton(
+                                Button(
                                     onClick = { viewModel.consumeMeal(uiState.nextMeal!!.entryId) },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -141,7 +144,7 @@ fun DashboardView() {
 
                 if (uiState.todaysMeals.isEmpty()) {
                     item {
-                        MpCard(modifier = Modifier.fillMaxWidth()) {
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Box(modifier = Modifier.padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.CalendarToday, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,7 +200,7 @@ fun DashboardStatCard(
     containerColor: Color,
     contentColor: Color
 ) {
-    MpCard(
+    Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor)
     ) {

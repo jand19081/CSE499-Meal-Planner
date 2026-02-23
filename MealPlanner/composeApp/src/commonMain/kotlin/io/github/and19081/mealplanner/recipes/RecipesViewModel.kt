@@ -3,19 +3,28 @@ package io.github.and19081.mealplanner.recipes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.domain.DataQualityValidator
+import io.github.and19081.mealplanner.domain.DataWarning
 import io.github.and19081.mealplanner.domain.UnitConverter
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
 import io.github.and19081.mealplanner.ingredients.Package
 import io.github.and19081.mealplanner.ingredients.BridgeConversion
+import io.github.and19081.mealplanner.ingredients.Category
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
-class RecipesViewModel : ViewModel() {
+class RecipesViewModel(
+    private val recipeRepository: RecipeRepository,
+    private val ingredientRepository: IngredientRepository,
+    private val pantryRepository: PantryRepository,
+    private val unitRepository: UnitRepository
+) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortByAlpha = MutableStateFlow(true)
@@ -23,15 +32,15 @@ class RecipesViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState = combine(
-        RecipeRepository.recipes,
+        recipeRepository.recipes,
         _searchQuery,
         _sortByAlpha,
         _filterCanMakeNow,
-        IngredientRepository.ingredients,
-        PantryRepository.pantryItems,
-        IngredientRepository.packages,
-        IngredientRepository.bridges,
-        UnitRepository.units,
+        ingredientRepository.ingredients,
+        pantryRepository.pantryItems,
+        ingredientRepository.packages,
+        ingredientRepository.bridges,
+        unitRepository.units,
         _errorMessage
     ) { args: Array<Any?> ->
         val recipes = args[0] as List<Recipe>
@@ -49,6 +58,11 @@ class RecipesViewModel : ViewModel() {
         val pantryMap = pantry.associateBy { it.ingredientId }
         val ingredientsMap = ingredients.associateBy { it.id }
 
+        // Validate Recipes
+        val warningsMap = recipes.associate { recipe ->
+            recipe.id to DataQualityValidator.validateRecipe(recipe, ingredientsMap, packages, bridges, allUnits)
+        }
+
         // 1. Filter by Search Query
         var filtered = if (query.isBlank()) recipes else {
             recipes.filter { it.name.contains(query, ignoreCase = true) }
@@ -59,11 +73,12 @@ class RecipesViewModel : ViewModel() {
             filtered = filtered.filter { recipe ->
                 val needed = recipe.ingredients
                 needed.all { ri ->
-                    val pantryItem = pantryMap[ri.ingredientId]
+                    val ingId = ri.ingredientId ?: return@all true // Assume sub-recipes are okay for now or recursion needed
+                    val pantryItem = pantryMap[ingId]
                     if (pantryItem == null) false
                     else {
                         // Check quantity
-                        val ingredientBridges = bridges.filter { it.ingredientId == ri.ingredientId }
+                        val ingredientBridges = bridges.filter { it.ingredientId == ingId }
                         
                         val pantryInRiUnit = UnitConverter.convert(
                             amount = pantryItem.quantity,
@@ -98,10 +113,11 @@ class RecipesViewModel : ViewModel() {
             allBridges = bridges,
             allUnits = allUnits,
             isCanMakeNowFilterActive = canMakeNow,
-            errorMessage = error
+            errorMessage = error,
+            recipeWarnings = warningsMap
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 
-        RecipesUiState(emptyMap(), "", false, emptyList(), emptyList(), emptyList(), emptyList(), false))
+        RecipesUiState(emptyMap(), "", false, emptyList(), emptyList(), emptyList(), emptyList(), false, null, emptyMap()))
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -130,11 +146,35 @@ class RecipesViewModel : ViewModel() {
         }
 
         _errorMessage.value = null
-        RecipeRepository.upsertRecipe(recipe)
+        viewModelScope.launch {
+            recipeRepository.upsertRecipe(recipe)
+        }
     }
 
     fun deleteRecipe(id: Uuid) {
-        RecipeRepository.removeRecipe(id)
+        viewModelScope.launch {
+            recipeRepository.removeRecipe(id)
+        }
+    }
+
+    fun addIngredient(name: String) {
+        viewModelScope.launch {
+            val categories = ingredientRepository.categories.value
+            var miscCategory = categories.find { it.name.equals("Miscellaneous", ignoreCase = true) }
+            
+            if (miscCategory == null) {
+                val newCat = Category(id = Uuid.random(), name = "Miscellaneous")
+                ingredientRepository.addCategory(newCat)
+                miscCategory = newCat
+            }
+
+            val newIngredient = Ingredient(
+                id = Uuid.random(),
+                name = name,
+                categoryId = miscCategory.id
+            )
+            ingredientRepository.addIngredient(newIngredient)
+        }
     }
 }
 
@@ -147,5 +187,6 @@ data class RecipesUiState(
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
     val isCanMakeNowFilterActive: Boolean,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val recipeWarnings: Map<Uuid, List<DataWarning>> = emptyMap()
 )

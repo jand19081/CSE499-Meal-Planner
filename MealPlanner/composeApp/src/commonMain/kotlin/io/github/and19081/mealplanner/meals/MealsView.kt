@@ -10,11 +10,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -23,13 +25,12 @@ import io.github.and19081.mealplanner.uicomponents.CreateNewItemRow
 import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
 import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
 import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpButton
-import io.github.and19081.mealplanner.uicomponents.MpCard
 import io.github.and19081.mealplanner.uicomponents.MpEditDialogScaffold
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.MpTextButton
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.domain.PriceCalculator
+import io.github.and19081.mealplanner.domain.DataWarning
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.Package
 import io.github.and19081.mealplanner.ingredients.BridgeConversion
@@ -37,8 +38,9 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Composable
-fun MealsView() {
-    val viewModel = viewModel { MealsViewModel() }
+fun MealsView(
+    viewModel: MealsViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -104,6 +106,7 @@ fun MealsView() {
                         allPackages = uiState.allPackages,
                         allBridges = uiState.allBridges,
                         allUnits = uiState.allUnits,
+                        warnings = uiState.mealWarnings[meal.id] ?: emptyList(),
                         onEditClick = {
                             selectedMeal = meal
                             showEditDialog = true
@@ -122,6 +125,7 @@ fun MealsView() {
             allRecipes = uiState.allRecipes,
             allIngredients = uiState.allIngredients,
             allUnits = uiState.allUnits,
+            warnings = selectedMeal?.let { uiState.mealWarnings[it.id] } ?: emptyList(),
             onDismiss = { showEditDialog = false },
             onSave = { meal ->
                 viewModel.saveMeal(meal)
@@ -140,6 +144,7 @@ fun MealRow(
     allPackages: List<Package>,
     allBridges: List<BridgeConversion>,
     allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
     onEditClick: () -> Unit
 ) {
     val recipeNames = meal.recipes.mapNotNull { id -> allRecipes.find { it.id == id }?.name }
@@ -162,8 +167,21 @@ fun MealRow(
     ExpandableListItem(
         title = meal.name,
         subtitle = subtitle,
+        trailingIcon = if (warnings.isNotEmpty()) {
+            { Icon(Icons.Default.Warning, "Data Warnings", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+        } else null,
         onEditClick = onEditClick
     ) {
+        if (warnings.isNotEmpty()) {
+            Text(
+                "⚠️ ${warnings.size} data issues (e.g., missing prices/conversions)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
         Text("Contents:", style = MaterialTheme.typography.labelMedium)
         if (allNames.isEmpty()) {
             Text("No items.", style = MaterialTheme.typography.bodySmall)
@@ -182,6 +200,7 @@ fun MealEditDialog(
     allRecipes: List<Recipe>,
     allIngredients: List<Ingredient>,
     allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
     onDismiss: () -> Unit,
     onSave: (PrePlannedMeal) -> Unit,
     onDelete: (() -> Unit)? = null
@@ -219,28 +238,32 @@ fun MealEditDialog(
         selectedTabIndex = selectedTabIndex,
         onTabSelected = { selectedTabIndex = it }
     ) {
-        when (selectedTabIndex) {
-            0 -> { // General
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MpOutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Name") },
-                        modifier = Modifier.fillMaxWidth()
+        Column {
+            MpValidationWarning(warnings = warnings)
+
+            when (selectedTabIndex) {
+                0 -> { // General
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MpOutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                1 -> { // Contents
+                    MealContentsEditor(
+                        currentRecipes = recipes,
+                        currentIngredients = independentIngredients,
+                        allRecipes = allRecipes,
+                        allIngredients = allIngredients,
+                        allUnits = allUnits,
+                        onUpdateRecipes = { recipes = it },
+                        onUpdateIngredients = { independentIngredients = it }
                     )
                 }
-            }
-
-            1 -> { // Contents
-                MealContentsEditor(
-                    currentRecipes = recipes,
-                    currentIngredients = independentIngredients,
-                    allRecipes = allRecipes,
-                    allIngredients = allIngredients,
-                    allUnits = allUnits,
-                    onUpdateRecipes = { recipes = it },
-                    onUpdateIngredients = { independentIngredients = it }
-                )
             }
         }
     }
@@ -267,9 +290,9 @@ fun MealContentsEditor(
         if (currentRecipes.isEmpty() && currentIngredients.isEmpty()) {
             Text("No items added.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
         } else {
-            LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 200.dp)) {
+            Column {
                 // Recipes
-                items(currentRecipes) { rId ->
+                currentRecipes.forEach { rId ->
                     val name = allRecipes.find { it.id == rId }?.name ?: "Unknown Recipe"
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -285,7 +308,7 @@ fun MealContentsEditor(
                 }
                 
                 // Ingredients
-                items(currentIngredients) { item ->
+                currentIngredients.forEach { item ->
                     val name = allIngredients.find { it.id == item.ingredientId }?.name ?: "Unknown Ingredient"
                     val uName = allUnits.find { it.id == item.unitId }?.abbreviation ?: "?"
                     Row(
@@ -306,11 +329,11 @@ fun MealContentsEditor(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (!isAdding) {
-            MpButton(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("Add Item")
             }
         } else {
-            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(
                     modifier = Modifier.padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -367,8 +390,8 @@ fun MealContentsEditor(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        MpButton(
+                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        Button(
                             onClick = {
                                 if (selectedType == "Recipe") {
                                     val r = allRecipes.find { it.name == selectedItemName }

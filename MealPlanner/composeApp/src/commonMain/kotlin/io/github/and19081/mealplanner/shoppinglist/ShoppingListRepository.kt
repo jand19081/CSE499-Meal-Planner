@@ -8,24 +8,24 @@ import kotlin.uuid.Uuid
 data class ShoppingListOverride(
     val ingredientId: Uuid,
     val forceStoreId: Uuid? = null, // If set, force this store.
-    val isOwned: Boolean = false // If true, move to "Owned" list.
+    val inPantry: Boolean = false
 )
 
 @OptIn(ExperimentalUuidApi::class)
-object ShoppingListRepository {
+class ShoppingListRepository {
     // Key: Ingredient ID
     private val _overrides = MutableStateFlow<Map<Uuid, ShoppingListOverride>>(emptyMap())
     val overrides = _overrides
 
     fun setStoreOverride(ingredientId: Uuid, storeId: Uuid) {
         val current = _overrides.value.toMutableMap()
-        current[ingredientId] = ShoppingListOverride(ingredientId, forceStoreId = storeId, isOwned = false)
+        current[ingredientId] = ShoppingListOverride(ingredientId, forceStoreId = storeId, inPantry = false)
         _overrides.value = current
     }
 
-    fun markAsOwned(ingredientId: Uuid) {
+    fun markInPantry(ingredientId: Uuid) {
         val current = _overrides.value.toMutableMap()
-        current[ingredientId] = ShoppingListOverride(ingredientId, isOwned = true)
+        current[ingredientId] = ShoppingListOverride(ingredientId, inPantry = true)
         _overrides.value = current
     }
 

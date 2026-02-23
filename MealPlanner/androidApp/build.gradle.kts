@@ -32,6 +32,7 @@ android {
 
 dependencies {
     implementation(project(":composeApp"))
+    implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.activity.compose)
     implementation(libs.ui.tooling.preview)
     debugImplementation(libs.ui.tooling)

@@ -3,6 +3,8 @@ package io.github.and19081.mealplanner.meals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.domain.DataQualityValidator
+import io.github.and19081.mealplanner.domain.DataWarning
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientRepository
 import io.github.and19081.mealplanner.ingredients.Package
@@ -13,20 +15,27 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlin.uuid.Uuid
 
-class MealsViewModel : ViewModel() {
+class MealsViewModel(
+    private val mealRepository: MealRepository,
+    private val recipeRepository: RecipeRepository,
+    private val ingredientRepository: IngredientRepository,
+    private val unitRepository: UnitRepository
+) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _sortByAlpha = MutableStateFlow(true)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     val uiState = combine(
-        MealRepository.meals,
-        RecipeRepository.recipes,
-        IngredientRepository.ingredients,
-        IngredientRepository.packages,
-        IngredientRepository.bridges,
-        UnitRepository.units,
+        mealRepository.meals,
+        recipeRepository.recipes,
+        ingredientRepository.ingredients,
+        ingredientRepository.packages,
+        ingredientRepository.bridges,
+        unitRepository.units,
         _searchQuery,
         _sortByAlpha,
         _errorMessage
@@ -40,6 +49,15 @@ class MealsViewModel : ViewModel() {
         val query = args[6] as String
         val isAlpha = args[7] as Boolean
         val error = args[8] as String?
+
+        // Pre-calculate Maps
+        val recipesById = recipes.associateBy { it.id }
+        val ingredientsById = ingredients.associateBy { it.id }
+
+        // Validate Meals
+        val warningsMap = meals.associate { meal ->
+            meal.id to DataQualityValidator.validateMeal(meal, recipesById, ingredientsById, packages, bridges, allUnits)
+        }
 
         // 1. Filter
         val filtered = if (query.isBlank()) meals else {
@@ -60,12 +78,13 @@ class MealsViewModel : ViewModel() {
             allPackages = packages,
             allBridges = bridges,
             allUnits = allUnits,
-            errorMessage = error
+            errorMessage = error,
+            mealWarnings = warningsMap
         )
 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
         MealsUiState(emptyMap(), "", emptyList(),
-            emptyList(), emptyList(), emptyList(), emptyList())
+            emptyList(), emptyList(), emptyList(), emptyList(), null, emptyMap())
     )
 
     fun onSearchQueryChange(query: String) {
@@ -85,11 +104,15 @@ class MealsViewModel : ViewModel() {
         }
 
         _errorMessage.value = null
-        MealRepository.upsertMeal(meal)
+        viewModelScope.launch {
+            mealRepository.upsertMeal(meal)
+        }
     }
 
     fun deleteMeal(meal: PrePlannedMeal) {
-        MealRepository.removeMeal(meal.id)
+        viewModelScope.launch {
+            mealRepository.removeMeal(meal.id)
+        }
     }
 }
 
@@ -101,5 +124,6 @@ data class MealsUiState(
     val allPackages: List<Package>,
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val mealWarnings: Map<Uuid, List<DataWarning>> = emptyMap()
 )

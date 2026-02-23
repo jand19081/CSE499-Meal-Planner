@@ -3,6 +3,7 @@
 package io.github.and19081.mealplanner.recipes
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,11 +12,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.SortByAlpha
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -25,21 +28,21 @@ import io.github.and19081.mealplanner.uicomponents.EmptyListMessage
 import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
 import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
 import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpButton
-import io.github.and19081.mealplanner.uicomponents.MpCard
 import io.github.and19081.mealplanner.uicomponents.MpEditDialogScaffold
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.MpTextButton
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.domain.PriceCalculator
+import io.github.and19081.mealplanner.domain.DataWarning
 import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.Package
 import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlin.uuid.Uuid
 
 @Composable
-fun RecipesView() {
-    val viewModel = viewModel { RecipesViewModel() }
+fun RecipesView(
+    viewModel: RecipesViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
@@ -110,7 +113,9 @@ fun RecipesView() {
 
             uiState.groupedRecipes.forEach { (header, recipes) ->
                 stickyHeader {
-                    ListSectionHeader(text = header)
+                    ListSectionHeader(
+                        text = header
+                    )
                 }
 
                 items(recipes) { recipe ->
@@ -120,6 +125,7 @@ fun RecipesView() {
                         allPackages = uiState.allPackages,
                         allBridges = uiState.allBridges,
                         allUnits = uiState.allUnits,
+                        warnings = uiState.recipeWarnings[recipe.id] ?: emptyList(),
                         onEditClick = {
                             selectedRecipe = recipe
                             showEditDialog = true
@@ -145,13 +151,16 @@ fun RecipesView() {
             recipe = selectedRecipe,
             initialName = creationName,
             allIngredients = uiState.allIngredients,
+            allRecipes = uiState.groupedRecipes.values.flatten(), // All recipes from UI state
             allUnits = uiState.allUnits,
+            warnings = selectedRecipe?.let { uiState.recipeWarnings[it.id] } ?: emptyList(),
             onDismiss = { showEditDialog = false },
             onSave = { recipe ->
                 viewModel.saveRecipe(recipe)
                 showEditDialog = false
             },
-            onDelete = if (selectedRecipe != null) { { viewModel.deleteRecipe(selectedRecipe!!.id) } } else null
+            onDelete = if (selectedRecipe != null) { { viewModel.deleteRecipe(selectedRecipe!!.id) } } else null,
+            onAddIngredient = { viewModel.addIngredient(it) }
         )
     }
 }
@@ -163,6 +172,7 @@ fun RecipeRow(
     allPackages: List<Package>,
     allBridges: List<BridgeConversion>,
     allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
     onEditClick: () -> Unit
 ) {
     val ingredientCount = recipe.ingredients.size
@@ -177,8 +187,21 @@ fun RecipeRow(
     ExpandableListItem(
         title = recipe.name,
         subtitle = subtitle,
+        trailingIcon = if (warnings.isNotEmpty()) {
+            { Icon(Icons.Default.Warning, "Data Warnings", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+        } else null,
         onEditClick = onEditClick
     ) {
+        if (warnings.isNotEmpty()) {
+            Text(
+                "⚠️ ${warnings.size} data issues (e.g., missing prices/conversions)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
         if (recipe.description != null) {
             Text(
                 recipe.description,
@@ -210,10 +233,13 @@ fun RecipeEditDialog(
     recipe: Recipe?,
     initialName: String,
     allIngredients: List<Ingredient>,
+    allRecipes: List<Recipe>, // Added
     allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
     onDismiss: () -> Unit,
     onSave: (Recipe) -> Unit,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onAddIngredient: (String) -> Unit
 ) {
     var name by remember { mutableStateOf(recipe?.name ?: initialName) }
     var servingsStr by remember { mutableStateOf(recipe?.servings?.toString() ?: "4.0") }
@@ -228,9 +254,10 @@ fun RecipeEditDialog(
 
     val recipeId = remember { recipe?.id ?: Uuid.random() }
     var currentIngredients by remember { mutableStateOf(recipe?.ingredients ?: emptyList()) }
+    var instructions by remember { mutableStateOf(recipe?.instructions ?: emptyList()) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("General", "Ingredients")
+    val tabs = listOf("General", "Ingredients", "Instructions")
 
     MpEditDialogScaffold(
         title = if (recipe == null) "New Recipe" else "Edit Recipe",
@@ -241,7 +268,7 @@ fun RecipeEditDialog(
                 name = name,
                 description = description.ifBlank { null },
                 servings = servingsStr.toDoubleOrNull() ?: 4.0,
-                instructions = instructionsText.lines().filter { it.isNotBlank() },
+                instructions = instructions.filter { it.isNotBlank() },
                 mealType = mealType,
                 prepTimeMinutes = prepTimeStr.toIntOrNull() ?: 0,
                 cookTimeMinutes = cookTimeStr.toIntOrNull() ?: 0,
@@ -260,73 +287,123 @@ fun RecipeEditDialog(
         selectedTabIndex = selectedTabIndex,
         onTabSelected = { selectedTabIndex = it }
     ) {
-        when (selectedTabIndex) {
-            0 -> { // General
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MpOutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+        Column {
+            MpValidationWarning(warnings = warnings)
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (selectedTabIndex) {
+                0 -> { // General
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         MpOutlinedTextField(
-                            value = servingsStr,
-                            onValueChange = { servingsStr = it },
-                            label = { Text("Servings") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Name") },
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        // Meal Type - Simplified selector
-                        Box(modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
-                            // Ideally a dropdown, for now text or simple logic.
-                            // Assuming default is Dinner, no UI to change yet to save complexity unless asked.
-                            Text("Type: ${mealType.name}")
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MpOutlinedTextField(
+                                value = servingsStr,
+                                onValueChange = { servingsStr = it },
+                                label = { Text("Servings") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                            // Meal Type - Simplified selector
+                            Box(modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
+                                Text("Type: ${mealType.name}")
+                            }
                         }
-                    }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MpOutlinedTextField(
+                                value = prepTimeStr,
+                                onValueChange = { prepTimeStr = it },
+                                label = { Text("Prep (min)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                            MpOutlinedTextField(
+                                value = cookTimeStr,
+                                onValueChange = { cookTimeStr = it },
+                                label = { Text("Cook (min)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
                         MpOutlinedTextField(
-                            value = prepTimeStr,
-                            onValueChange = { prepTimeStr = it },
-                            label = { Text("Prep (min)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
-                        )
-                        MpOutlinedTextField(
-                            value = cookTimeStr,
-                            onValueChange = { cookTimeStr = it },
-                            label = { Text("Cook (min)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
+                            value = description,
+                            onValueChange = { description = it },
+                            label = { Text("Description") },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
+                }
 
-                    MpOutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Description") },
-                        modifier = Modifier.fillMaxWidth()
+                1 -> { // Ingredients
+                    RecipeIngredientsEditor(
+                        currentIngredients = currentIngredients,
+                        allIngredients = allIngredients,
+                        allRecipes = allRecipes, // Added
+                        allUnits = allUnits,
+                        onUpdate = { currentIngredients = it },
+                        onAddIngredient = onAddIngredient
                     )
-                    MpOutlinedTextField(
-                        value = instructionsText,
-                        onValueChange = { instructionsText = it },
-                        label = { Text("Instructions (one per line)") },
-                        minLines = 5,
-                        modifier = Modifier.fillMaxWidth()
+                }
+
+                2 -> { // Instructions
+                    RecipeInstructionsEditor(
+                        instructions = instructions,
+                        onUpdate = { instructions = it }
                     )
                 }
             }
+        }
+    }
+}
 
-            1 -> { // Ingredients
-                RecipeIngredientsEditor(
-                    currentIngredients = currentIngredients,
-                    allIngredients = allIngredients,
-                    allUnits = allUnits,
-                    onUpdate = { currentIngredients = it }
-                )
+@Composable
+fun RecipeInstructionsEditor(
+    instructions: List<String>,
+    onUpdate: (List<String>) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (instructions.isEmpty()) {
+            Text("No instructions added.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+        } else {
+            instructions.forEachIndexed { index, step ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
+                    MpOutlinedTextField(
+                        value = step,
+                        onValueChange = { newStep ->
+                            val newList = instructions.toMutableList()
+                            newList[index] = newStep
+                            onUpdate(newList)
+                        },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Step ${index + 1}") }
+                    )
+                    IconButton(onClick = {
+                        val newList = instructions.toMutableList()
+                        newList.removeAt(index)
+                        onUpdate(newList)
+                    }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+                HorizontalDivider()
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = { onUpdate(instructions + "") }, modifier = Modifier.fillMaxWidth()) {
+            Text("+ Add Step")
         }
     }
 }
@@ -335,28 +412,35 @@ fun RecipeEditDialog(
 fun RecipeIngredientsEditor(
     currentIngredients: List<RecipeIngredient>,
     allIngredients: List<Ingredient>,
+    allRecipes: List<Recipe>, // Added
     allUnits: List<UnitModel>,
-    onUpdate: (List<RecipeIngredient>) -> Unit
+    onUpdate: (List<RecipeIngredient>) -> Unit,
+    onAddIngredient: (String) -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
-    var selectedIngredientName by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf("Ingredient") } // Ingredient or Recipe
+    var selectedItemName by remember { mutableStateOf("") }
     var quantityStr by remember { mutableStateOf("") }
     var selectedUnitName by remember { mutableStateOf(allUnits.firstOrNull()?.abbreviation ?: "") }
 
     Column {
         if (currentIngredients.isEmpty()) {
-            Text("No ingredients added.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+            Text("No items added.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
         } else {
-            LazyColumn(modifier = Modifier.weight(1f, fill = false).heightIn(max = 200.dp)) {
-                items(currentIngredients) { ri ->
-                    val ing = allIngredients.find { it.id == ri.ingredientId }
+            Column {
+                currentIngredients.forEach { ri ->
+                    val name = if (ri.subRecipeId != null) {
+                        allRecipes.find { it.id == ri.subRecipeId }?.name ?: "Unknown Recipe"
+                    } else {
+                        allIngredients.find { it.id == ri.ingredientId }?.name ?: "Unknown Ingredient"
+                    }
                     val uName = allUnits.find { it.id == ri.unitId }?.abbreviation ?: "?"
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${ing?.name ?: "Unknown"}: ${ri.quantity} $uName", style = MaterialTheme.typography.bodySmall)
+                        Text("${if (ri.subRecipeId != null) "[Recipe] " else ""}$name: ${ri.quantity} $uName", style = MaterialTheme.typography.bodySmall)
                         IconButton(onClick = { onUpdate(currentIngredients - ri) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                         }
@@ -369,23 +453,35 @@ fun RecipeIngredientsEditor(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (!isAdding) {
-            MpButton(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Add Ingredient")
+            Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add Component")
             }
         } else {
-            MpCard(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(
                     modifier = Modifier.padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Add Ingredient Link", style = MaterialTheme.typography.labelMedium)
+                    Text("Add Ingredient or Sub-Recipe", style = MaterialTheme.typography.labelMedium)
+
+                    Row {
+                        FilterChip(
+                            selected = selectedType == "Ingredient",
+                            onClick = { selectedType = "Ingredient"; selectedItemName = "" },
+                            label = { Text("Ingredient") })
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilterChip(
+                            selected = selectedType == "Recipe",
+                            onClick = { selectedType = "Recipe"; selectedItemName = "" },
+                            label = { Text("Recipe") })
+                    }
 
                     SearchableDropdown(
-                        label = "Ingredient",
-                        options = allIngredients.map { it.name },
-                        selectedOption = selectedIngredientName,
-                        onOptionSelected = { selectedIngredientName = it },
-                        onAddOption = { },
+                        label = if (selectedType == "Ingredient") "Ingredient" else "Recipe",
+                        options = if (selectedType == "Ingredient") allIngredients.map { it.name } else allRecipes.map { it.name },
+                        selectedOption = selectedItemName,
+                        onOptionSelected = { selectedItemName = it },
+                        onAddOption = { if (selectedType == "Ingredient") onAddIngredient(it) },
                         onDeleteOption = { },
                         deleteWarningMessage = ""
                     )
@@ -416,25 +512,30 @@ fun RecipeIngredientsEditor(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        MpTextButton(onClick = { isAdding = false }) { Text("Cancel") }
-                        MpButton(
+                        TextButton(onClick = { isAdding = false }) { Text("Cancel") }
+                        Button(
                             onClick = {
-                                val ing = allIngredients.find { it.name == selectedIngredientName }
+                                val item = if (selectedType == "Ingredient") {
+                                    allIngredients.find { it.name == selectedItemName }
+                                } else {
+                                    allRecipes.find { it.name == selectedItemName }
+                                }
                                 val unit = allUnits.find { it.abbreviation == selectedUnitName }
                                 val qty = quantityStr.toDoubleOrNull()
-                                if (ing != null && qty != null && unit != null) {
-                                    val newRi = RecipeIngredient(
-                                        ingredientId = ing.id,
-                                        quantity = qty,
-                                        unitId = unit.id
-                                    )
+                                
+                                if (item != null && qty != null && unit != null) {
+                                    val newRi = if (selectedType == "Ingredient") {
+                                        RecipeIngredient(ingredientId = (item as Ingredient).id, quantity = qty, unitId = unit.id)
+                                    } else {
+                                        RecipeIngredient(subRecipeId = (item as Recipe).id, quantity = qty, unitId = unit.id)
+                                    }
                                     onUpdate(currentIngredients + newRi)
                                     isAdding = false
-                                    selectedIngredientName = ""
+                                    selectedItemName = ""
                                     quantityStr = ""
                                 }
                             },
-                            enabled = selectedIngredientName.isNotBlank() && quantityStr.isNotBlank() && selectedUnitName.isNotBlank()
+                            enabled = selectedItemName.isNotBlank() && quantityStr.isNotBlank() && selectedUnitName.isNotBlank()
                         ) {
                             Text("Add")
                         }

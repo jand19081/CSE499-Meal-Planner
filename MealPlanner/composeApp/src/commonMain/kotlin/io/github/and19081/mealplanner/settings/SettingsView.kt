@@ -20,9 +20,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.lazy.items
+import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.ingredients.*
+import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+
 @Composable
-fun SettingsView() {
-    val viewModel = viewModel { SettingsViewModel() }
+fun SettingsView(
+    viewModel: SettingsViewModel
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     LazyColumn(
@@ -109,6 +118,28 @@ fun SettingsView() {
             )
         }
 
+        // Data Management Section
+        item {
+            HorizontalDivider()
+            SectionHeader("Administrative")
+            
+            var showManager by remember { mutableStateOf<String?>(null) }
+
+            Button(
+                onClick = { showManager = "Data" },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Manage System Data (Stores, Categories, etc.)")
+            }
+
+            if (showManager == "Data") {
+                DataManagementDialog(
+                    onDismiss = { showManager = null },
+                    viewModel = viewModel
+                )
+            }
+        }
+
         // Notifications Section
         item {
             HorizontalDivider()
@@ -149,6 +180,214 @@ fun SettingsView() {
         
         item {
             Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DataManagementDialog(
+    onDismiss: () -> Unit,
+    viewModel: SettingsViewModel
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Stores", "Categories", "Restaurants", "Units")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage System Data") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp)) {
+                SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = { Text(title, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Box(modifier = Modifier.weight(1f)) {
+                    when (selectedTabIndex) {
+                        0 -> GenericDataManager(
+                            items = uiState.allStores.map { it.id to it.name },
+                            onSave = { id, name -> viewModel.saveStore(io.github.and19081.mealplanner.ingredients.Store(id ?: kotlin.uuid.Uuid.random(), name)) },
+                            onDelete = { viewModel.deleteStore(it) },
+                            label = "Store"
+                        )
+                        1 -> GenericDataManager(
+                            items = uiState.allCategories.map { it.id to it.name },
+                            onSave = { id, name -> viewModel.saveCategory(io.github.and19081.mealplanner.ingredients.Category(id ?: kotlin.uuid.Uuid.random(), name)) },
+                            onDelete = { viewModel.deleteCategory(it) },
+                            label = "Category"
+                        )
+                        2 -> GenericDataManager(
+                            items = uiState.allRestaurants.map { it.id to it.name },
+                            onSave = { id, name -> viewModel.saveRestaurant(io.github.and19081.mealplanner.Restaurant(id ?: kotlin.uuid.Uuid.random(), name)) },
+                            onDelete = { viewModel.deleteRestaurant(it) },
+                            label = "Restaurant"
+                        )
+                        3 -> UnitDataManager(
+                            units = uiState.allUnits,
+                            onSave = { viewModel.saveUnit(it) },
+                            onDelete = { viewModel.deleteUnit(it) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+fun GenericDataManager(
+    items: List<Pair<kotlin.uuid.Uuid, String>>,
+    onSave: (kotlin.uuid.Uuid?, String) -> Unit,
+    onDelete: (kotlin.uuid.Uuid) -> Unit,
+    label: String
+) {
+    var editingId by remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
+    var textValue by remember { mutableStateOf("") }
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = textValue,
+                onValueChange = { textValue = it },
+                label = { Text(if (editingId == null) "Add New $label" else "Rename $label") },
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = { 
+                    onSave(editingId, textValue)
+                    textValue = ""
+                    editingId = null
+                },
+                enabled = textValue.isNotBlank()
+            ) {
+                Text(if (editingId == null) "Add" else "Save")
+            }
+            if (editingId != null) {
+                IconButton(onClick = { editingId = null; textValue = "" }) {
+                    Icon(Icons.Default.Close, null)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(items.sortedBy { it.second }) { (id, name) ->
+                ListItem(
+                    headlineContent = { Text(name) },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { editingId = id; textValue = name }) {
+                                Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                            IconButton(onClick = { onDelete(id) }) {
+                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+fun UnitDataManager(
+    units: List<UnitModel>,
+    onSave: (UnitModel) -> Unit,
+    onDelete: (kotlin.uuid.Uuid) -> Unit
+) {
+    var editingUnit by remember { mutableStateOf<UnitModel?>(null) }
+    
+    var name by remember { mutableStateOf("") }
+    var abbr by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(UnitType.Weight) }
+    var factor by remember { mutableStateOf("1.0") }
+
+    fun reset() {
+        editingUnit = null
+        name = ""
+        abbr = ""
+        type = UnitType.Weight
+        factor = "1.0"
+    }
+
+    Column {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (editingUnit == null) "Add Custom Unit" else "Edit Unit", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = abbr, onValueChange = { abbr = it }, label = { Text("Abbr") }, modifier = Modifier.weight(0.5f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SearchableDropdown(
+                            label = "Type",
+                            options = UnitType.entries.map { it.name },
+                            selectedOption = type.name,
+                            onOptionSelected = { type = UnitType.valueOf(it) },
+                            onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
+                        )
+                    }
+                    OutlinedTextField(value = factor, onValueChange = { factor = it }, label = { Text("Factor to Base") }, modifier = Modifier.weight(1f))
+                }
+                Button(
+                    onClick = {
+                        val f = factor.toDoubleOrNull() ?: 1.0
+                        onSave(UnitModel(editingUnit?.id ?: kotlin.uuid.Uuid.random(), type, abbr, name, false, f))
+                        reset()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = name.isNotBlank() && abbr.isNotBlank()
+                ) {
+                    Text(if (editingUnit == null) "Add Unit" else "Save Changes")
+                }
+                if (editingUnit != null) {
+                    TextButton(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Cancel Edit") }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(units.filter { !it.isSystemUnit }) { unit ->
+                ListItem(
+                    headlineContent = { Text(unit.displayName) },
+                    supportingContent = { Text("${unit.abbreviation} (${unit.type}) • Factor: ${unit.factorToBase}") },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { 
+                                editingUnit = unit
+                                name = unit.displayName
+                                abbr = unit.abbreviation
+                                type = unit.type
+                                factor = unit.factorToBase.toString()
+                            }) {
+                                Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                            IconButton(onClick = { onDelete(unit.id) }) {
+                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                )
+                HorizontalDivider()
+            }
         }
     }
 }

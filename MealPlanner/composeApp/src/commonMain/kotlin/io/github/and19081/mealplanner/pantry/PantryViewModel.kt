@@ -11,17 +11,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
-class PantryViewModel : ViewModel() {
+class PantryViewModel(
+    private val pantryRepository: PantryRepository,
+    private val ingredientRepository: IngredientRepository,
+    private val unitRepository: UnitRepository
+) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
 
     val uiState = combine(
-        PantryRepository.pantryItems,
-        IngredientRepository.ingredients,
-        IngredientRepository.categories,
-        UnitRepository.units,
+        pantryRepository.pantryItems,
+        ingredientRepository.ingredients,
+        ingredientRepository.categories,
+        unitRepository.units,
         _searchQuery
     ) { pantryItems, allIngredients, allCategories, allUnits, query ->
         
@@ -60,7 +65,9 @@ class PantryViewModel : ViewModel() {
     }
 
     fun updateQuantity(ingredientId: Uuid, newAmount: Double, unitId: Uuid) {
-        PantryRepository.updateQuantity(ingredientId, newAmount, unitId)
+        viewModelScope.launch {
+            pantryRepository.updateQuantity(ingredientId, newAmount, unitId)
+        }
     }
 }
 
