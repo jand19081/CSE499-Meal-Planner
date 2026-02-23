@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SortByAlpha
@@ -37,14 +39,17 @@ import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+import io.github.and19081.mealplanner.settings.Mode
+
 @Composable
 fun MealsView(
-    viewModel: MealsViewModel
+    viewModel: MealsViewModel,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var showEditDialog by remember { mutableStateOf(false) }
     var selectedMeal by remember { mutableStateOf<PrePlannedMeal?>(null) }
+    var showEditDialog by remember { mutableStateOf(false) }
     var creationName by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -56,8 +61,99 @@ fun MealsView(
         }
     }
 
+    BoxWithConstraints {
+        val isExpanded = when (mode) {
+            Mode.AUTO -> maxWidth > 840.dp
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
+        }
+
+        if (isExpanded) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // List Pane
+                Box(modifier = Modifier.weight(0.4f)) {
+                    MealListPane(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onMealClick = { selectedMeal = it },
+                        onAddClick = {
+                            selectedMeal = null
+                            creationName = ""
+                            showEditDialog = true
+                        }
+                    )
+                }
+
+                VerticalDivider(modifier = Modifier.width(1.dp))
+
+                // Detail Pane
+                Box(modifier = Modifier.weight(0.6f)) {
+                    val meal = selectedMeal
+                    if (meal != null) {
+                        MealDetailPane(
+                            meal = meal,
+                            allRecipes = uiState.allRecipes,
+                            allIngredients = uiState.allIngredients,
+                            allUnits = uiState.allUnits,
+                            warnings = uiState.mealWarnings[meal.id] ?: emptyList(),
+                            onSave = { 
+                                viewModel.saveMeal(it)
+                                selectedMeal = it
+                            },
+                            onDelete = { 
+                                viewModel.deleteMeal(meal)
+                                selectedMeal = null
+                            }
+                        )
+                    } else {
+                        EmptyDetailPlaceholder()
+                    }
+                }
+            }
+        } else {
+            // Mobile View
+            MealListPane(
+                uiState = uiState,
+                viewModel = viewModel,
+                onMealClick = { 
+                    selectedMeal = it
+                    showEditDialog = true 
+                },
+                onAddClick = {
+                    selectedMeal = null
+                    creationName = ""
+                    showEditDialog = true
+                }
+            )
+        }
+    }
+
+    if (showEditDialog) {
+        MealEditDialog(
+            meal = selectedMeal,
+            initialName = creationName,
+            allRecipes = uiState.allRecipes,
+            allIngredients = uiState.allIngredients,
+            allUnits = uiState.allUnits,
+            warnings = selectedMeal?.let { uiState.mealWarnings[it.id] } ?: emptyList(),
+            onDismiss = { showEditDialog = false },
+            onSave = { meal ->
+                viewModel.saveMeal(meal)
+                showEditDialog = false
+            },
+            onDelete = if (selectedMeal != null) { { viewModel.deleteMeal(selectedMeal!!) } } else null
+        )
+    }
+}
+
+@Composable
+fun MealListPane(
+    uiState: MealsUiState,
+    viewModel: MealsViewModel,
+    onMealClick: (PrePlannedMeal) -> Unit,
+    onAddClick: () -> Unit
+) {
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ListControlToolbar(
                 searchQuery = uiState.searchQuery,
@@ -66,11 +162,7 @@ fun MealsView(
                 isSortByPrimary = true,
                 primarySortIcon = Icons.Default.SortByAlpha,
                 onToggleSort = { /* No-op */ },
-                onAddClick = {
-                    selectedMeal = null
-                    creationName = ""
-                    showEditDialog = true
-                }
+                onAddClick = onAddClick
             )
         }
     ) { innerPadding ->
@@ -83,11 +175,7 @@ fun MealsView(
                 item {
                     CreateNewItemRow(
                         searchQuery = uiState.searchQuery,
-                        onClick = {
-                            selectedMeal = null
-                            creationName = uiState.searchQuery
-                            showEditDialog = true
-                        }
+                        onClick = onAddClick
                     )
                     HorizontalDivider()
                 }
@@ -107,32 +195,93 @@ fun MealsView(
                         allBridges = uiState.allBridges,
                         allUnits = uiState.allUnits,
                         warnings = uiState.mealWarnings[meal.id] ?: emptyList(),
-                        onEditClick = {
-                            selectedMeal = meal
-                            showEditDialog = true
-                        }
+                        onEditClick = { onMealClick(meal) }
                     )
                     HorizontalDivider()
                 }
             }
         }
     }
+}
 
-    if (showEditDialog) {
-        MealEditDialog(
-            meal = selectedMeal,
-            initialName = creationName,
-            allRecipes = uiState.allRecipes,
-            allIngredients = uiState.allIngredients,
-            allUnits = uiState.allUnits,
-            warnings = selectedMeal?.let { uiState.mealWarnings[it.id] } ?: emptyList(),
-            onDismiss = { showEditDialog = false },
-            onSave = { meal ->
-                viewModel.saveMeal(meal)
-                showEditDialog = false
-            },
-            onDelete = if (selectedMeal != null) { { viewModel.deleteMeal(selectedMeal!!) } } else null
-        )
+@Composable
+fun MealDetailPane(
+    meal: PrePlannedMeal,
+    allRecipes: List<Recipe>,
+    allIngredients: List<Ingredient>,
+    allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
+    onSave: (PrePlannedMeal) -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(meal.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Close, "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            
+            MpValidationWarning(warnings = warnings)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var name by remember(meal) { mutableStateOf(meal.name) }
+            var recipes by remember(meal) { mutableStateOf(meal.recipes) }
+            var independentIngredients by remember(meal) { mutableStateOf(meal.independentIngredients) }
+
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                MpOutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Contents", style = MaterialTheme.typography.titleMedium)
+                MealContentsEditor(
+                    currentRecipes = recipes,
+                    currentIngredients = independentIngredients,
+                    allRecipes = allRecipes,
+                    allIngredients = allIngredients,
+                    allUnits = allUnits,
+                    onUpdateRecipes = { recipes = it },
+                    onUpdateIngredients = { independentIngredients = it }
+                )
+
+                Button(
+                    onClick = {
+                        onSave(meal.copy(
+                            name = name,
+                            recipes = recipes,
+                            independentIngredients = independentIngredients
+                        ))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = name.isNotBlank()
+                ) {
+                    Text("Save Changes")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyDetailPlaceholder() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.SortByAlpha, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Select a meal to view details", color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 

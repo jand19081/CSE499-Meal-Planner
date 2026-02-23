@@ -25,6 +25,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -60,10 +62,13 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.TimeZone as KTimeZone
 import kotlin.uuid.Uuid
 
+import io.github.and19081.mealplanner.settings.Mode
+
 @Composable
 fun CalendarView(
     viewModel: CalendarViewModel,
     calendarViewMode: CalendarViewMode,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -89,11 +94,11 @@ fun CalendarView(
 
     val handleConsume = { id: Uuid ->
         val entry = uiState.allEntries.find { it.id == id }
-        if (entry?.restaurantId != null) {
+        if (entry?.restaurantId != null && !entry.isConsumed) {
             entryToConsumeId = id
             showConsumeRestaurantDialog = true
         } else {
-            viewModel.consumeMeal(id)
+            viewModel.toggleMealConsumption(id)
         }
     }
 
@@ -102,9 +107,10 @@ fun CalendarView(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    val date = selectedDateForDialog ?: today
                     if (selectedDateForDialog == null) {
-                        viewModel.selectDate(today)
-                        selectedDateForDialog = today
+                        viewModel.selectDate(date)
+                        selectedDateForDialog = date
                     }
                     selectedEntryId = null
                     showEditDialog = true
@@ -114,48 +120,106 @@ fun CalendarView(
             }
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(4.dp)) {
-            when (calendarViewMode) {
-                CalendarViewMode.MONTH -> {
-                    DaysOfWeekHeader()
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CalendarGrid(
-                        dates = uiState.dates,
-                        onDateClick = { dateModel ->
-                            viewModel.selectDate(dateModel.date)
-                            selectedDateForDialog = dateModel.date
-                            showDayOverviewDialog = true
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(4.dp)) {
+            val isExpanded = when (mode) {
+                Mode.AUTO -> maxWidth > 840.dp
+                Mode.DESKTOP -> true
+                Mode.MOBILE -> false
+            }
+
+            if (isExpanded && calendarViewMode == CalendarViewMode.MONTH) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.weight(0.6f)) {
+                        DaysOfWeekHeader()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        CalendarGrid(
+                            dates = uiState.dates,
+                            onDateClick = { dateModel ->
+                                viewModel.selectDate(dateModel.date)
+                                selectedDateForDialog = dateModel.date
+                            }
+                        )
+                    }
+
+                    VerticalDivider(modifier = Modifier.width(1.dp).padding(horizontal = 8.dp))
+
+                    Column(modifier = Modifier.weight(0.4f)) {
+                        val date = selectedDateForDialog ?: today
+                        val dateUiModel = uiState.dates.find { it.date == date }
+                        val events = dateUiModel?.events ?: emptyList()
+                        val allWarnings = events.flatMap { it.warnings }.distinctBy { it.message }
+
+                        Text(
+                            text = "Meals for $date",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                        
+                        MpValidationWarning(warnings = allWarnings, modifier = Modifier.padding(8.dp))
+
+                        if (events.isEmpty()) {
+                            EmptyListMessage(
+                                message = "No meals planned for this day.",
+                                modifier = Modifier.fillMaxWidth().height(200.dp)
+                            )
+                        } else {
+                            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                items(events) { event ->
+                                    MealEventCard(event, handleConsume, { id ->
+                                        selectedEntryId = id
+                                        showEditDialog = true
+                                    })
+                                }
+                            }
                         }
-                    )
+                    }
                 }
-                CalendarViewMode.WEEK -> {
-                    WeekView(
-                        dates = uiState.weekDates,
-                        onDateClick = { dateModel ->
-                            viewModel.selectDate(dateModel.date)
-                            selectedDateForDialog = dateModel.date
-                            showDayOverviewDialog = true
-                        },
-                        onConsume = handleConsume,
-                        onEditPlan = { id -> 
-                            selectedEntryId = id
-                            showEditDialog = true
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    when (calendarViewMode) {
+                        CalendarViewMode.MONTH -> {
+                            DaysOfWeekHeader()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CalendarGrid(
+                                dates = uiState.dates,
+                                onDateClick = { dateModel ->
+                                    viewModel.selectDate(dateModel.date)
+                                    selectedDateForDialog = dateModel.date
+                                    showDayOverviewDialog = true
+                                }
+                            )
                         }
-                    )
-                }
-                CalendarViewMode.DAY -> {
-                    DayView(
-                        events = uiState.dates.find { it.date == uiState.currentMonth }?.events ?: emptyList(),
-                        onAddClick = {
-                            selectedEntryId = null
-                            showEditDialog = true
-                        },
-                        onConsume = handleConsume,
-                        onEditPlan = { id -> 
-                            selectedEntryId = id
-                            showEditDialog = true
+                        CalendarViewMode.WEEK -> {
+                            WeekView(
+                                dates = uiState.weekDates,
+                                onDateClick = { dateModel ->
+                                    viewModel.selectDate(dateModel.date)
+                                    selectedDateForDialog = dateModel.date
+                                    showDayOverviewDialog = true
+                                },
+                                onConsume = handleConsume,
+                                onEditPlan = { id -> 
+                                    selectedEntryId = id
+                                    showEditDialog = true
+                                }
+                            )
                         }
-                    )
+                        CalendarViewMode.DAY -> {
+                            DayView(
+                                events = uiState.dates.find { it.date == uiState.currentMonth }?.events ?: emptyList(),
+                                onAddClick = {
+                                    selectedEntryId = null
+                                    showEditDialog = true
+                                },
+                                onConsume = handleConsume,
+                                onEditPlan = { id -> 
+                                    selectedEntryId = id
+                                    showEditDialog = true
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -175,52 +239,57 @@ fun CalendarView(
         )
     }
 
-    if (showEditDialog && selectedDateForDialog != null) {
-        val entry = selectedEntryId?.let { id -> 
-            uiState.allEntries.find { it.id == id }
-        }
+    if (showEditDialog) {
+        val date = selectedDateForDialog
+        val entryId = selectedEntryId
+        if (date != null) {
+            val entry = entryId?.let { id -> 
+                uiState.allEntries.find { it.id == id }
+            }
 
-        ScheduledMealEditDialog(
-            initialDate = selectedDateForDialog!!,
-            entryId = selectedEntryId,
-            availableMeals = uiState.availableMeals,
-            allRecipes = uiState.allRecipes,
-            allIngredients = uiState.allIngredients,
-            allUnits = uiState.allUnits,
-            allRestaurants = uiState.allRestaurants,
-            existingEntry = entry,
-            onDismiss = { showEditDialog = false },
-            onConfirm = { date, time, meal, restaurant, mealType, count, cost ->
-                if (selectedEntryId == null) {
-                    viewModel.addPlan(date, time, meal, restaurant, mealType, count, cost)
-                } else {
-                    viewModel.updatePlan(ScheduledMeal(
-                        id = selectedEntryId!!, 
-                        date = date, 
-                        time = time,
-                        mealType = mealType, 
-                        prePlannedMealId = meal?.id, 
-                        restaurantId = restaurant?.id, 
-                        peopleCount = count,
-                        anticipatedCostCents = cost
-                    ))
-                }
-                showEditDialog = false
-            },
-            onDelete = selectedEntryId?.let { id -> { 
-                viewModel.removePlan(id)
-                showEditDialog = false
-            } }
-        )
+            ScheduledMealEditDialog(
+                initialDate = date,
+                entryId = entryId,
+                availableMeals = uiState.availableMeals,
+                allRecipes = uiState.allRecipes,
+                allIngredients = uiState.allIngredients,
+                allUnits = uiState.allUnits,
+                allRestaurants = uiState.allRestaurants,
+                existingEntry = entry,
+                onDismiss = { showEditDialog = false },
+                onConfirm = { confirmDate, time, meal, restaurant, mealType, count, cost ->
+                    if (entryId == null) {
+                        viewModel.addPlan(confirmDate, time, meal, restaurant, mealType, count, cost)
+                    } else {
+                        viewModel.updatePlan(ScheduledMeal(
+                            id = entryId, 
+                            date = confirmDate, 
+                            time = time,
+                            mealType = mealType, 
+                            prePlannedMealId = meal?.id, 
+                            restaurantId = restaurant?.id, 
+                            peopleCount = count,
+                            anticipatedCostCents = cost
+                        ))
+                    }
+                    showEditDialog = false
+                },
+                onDelete = entryId?.let { id -> { 
+                    viewModel.removePlan(id)
+                    showEditDialog = false
+                } }
+            )
+        }
     }
 
-    if (showDayOverviewDialog && selectedDateForDialog != null) {
-        val dateUiModel = uiState.dates.find { it.date == selectedDateForDialog }
+    val dateForOverview = selectedDateForDialog
+    if (showDayOverviewDialog && dateForOverview != null) {
+        val dateUiModel = uiState.dates.find { it.date == dateForOverview }
         val events = dateUiModel?.events ?: emptyList()
         val allWarnings = events.flatMap { it.warnings }.distinctBy { it.message }
 
         DayOverviewDialog(
-            date = selectedDateForDialog!!,
+            date = dateForOverview,
             events = events,
             allWarnings = allWarnings,
             onDismiss = { showDayOverviewDialog = false },
@@ -286,7 +355,12 @@ fun WeekView(
 @Composable
 fun MealEventCard(event: CalendarEvent, onConsume: (Uuid) -> Unit, onEditPlan: (Uuid) -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onEditPlan(event.entryId) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .defaultMinSize(minHeight = 48.dp)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable { onEditPlan(event.entryId) },
         colors = CardDefaults.cardColors(
             containerColor = if (event.isConsumed) 
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) 
@@ -348,12 +422,12 @@ fun MealEventCard(event: CalendarEvent, onConsume: (Uuid) -> Unit, onEditPlan: (
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (!event.isConsumed) {
-                    IconButton(onClick = { onConsume(event.entryId) }) {
-                        Icon(Icons.Default.CheckCircle, "Consume", tint = MaterialTheme.colorScheme.primary)
+                IconButton(onClick = { onConsume(event.entryId) }) {
+                    if (event.isConsumed) {
+                        Icon(Icons.Default.CheckCircle, "Undo Consumption", tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Icon(Icons.Default.CheckCircle, "Mark as Consumed", tint = Color.Gray)
                     }
-                } else {
-                     Icon(Icons.Default.CheckCircle, "Consumed", tint = Color.Gray)
                 }
             }
         }

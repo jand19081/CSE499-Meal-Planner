@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -43,7 +45,10 @@ fun ListControlToolbar(
         )
 
         // Sort Toggle
-        IconButton(onClick = onToggleSort) {
+        IconButton(
+            onClick = onToggleSort,
+            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
+        ) {
             Icon(
                 if (isSortByPrimary) primarySortIcon else secondarySortIcon,
                 contentDescription = "Toggle Sort"
@@ -55,7 +60,9 @@ fun ListControlToolbar(
             onClick = onAddClick,
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier
+                .size(48.dp)
+                .pointerHoverIcon(PointerIcon.Hand)
         ) {
             Icon(Icons.Default.Add, "Add Item")
         }

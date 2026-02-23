@@ -5,6 +5,7 @@ package io.github.and19081.mealplanner.analytics
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,221 +26,71 @@ import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
+import io.github.and19081.mealplanner.settings.Mode
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.TimeZone
 
 @Composable
 fun AnalyticsView(
-    viewModel: AnalyticsViewModel
+    viewModel: AnalyticsViewModel,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
     var selectedTrip by remember { mutableStateOf<ReceiptHistory?>(null) }
     var showCustomDatePicker by remember { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 80.dp)
-    ) {
-        item {
-            Text("Financial Overview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+    BoxWithConstraints {
+        val isExpanded = when (mode) {
+            Mode.AUTO -> maxWidth > 840.dp
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
         }
 
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Date Range Selector
-                ScrollableTabRow(
-                    selectedTabIndex = uiState.currentDateRange.ordinal,
-                    edgePadding = 0.dp,
-                    containerColor = Color.Transparent,
-                    divider = {}
+        Scaffold { innerPadding ->
+            if (isExpanded) {
+                Row(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
+                    // Left Column: Summary & Location Breakdown
+                    Column(
+                        modifier = Modifier.weight(0.4f).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AnalyticsHeader(uiState, onDateRangeClick = { showCustomDatePicker = true }, viewModel)
+                        AnalyticsSummaryCards(uiState)
+                        AnalyticsLocationBreakdown(uiState)
+                    }
+
+                    VerticalDivider(modifier = Modifier.width(1.dp).padding(horizontal = 16.dp))
+
+                    // Right Column: Lists
+                    LazyColumn(
+                        modifier = Modifier.weight(0.6f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 80.dp)
+                    ) {
+                        analyticsListContent(uiState, onTripClick = { selectedTrip = it })
+                    }
+                }
+            } else {
+                // Mobile View
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    AnalyticsDateRange.entries.forEach { range ->
-                        Tab(
-                            selected = uiState.currentDateRange == range,
-                            onClick = { 
-                                if (range == AnalyticsDateRange.CUSTOM) showCustomDatePicker = true
-                                else viewModel.setDateRange(range) 
-                            },
-                            text = { Text(range.name.lowercase().replaceFirstChar { it.uppercase() }) }
-                        )
-                    }
-                }
-
-                // Filter Selector
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    AnalyticsFilter.entries.forEachIndexed { index, filter ->
-                        SegmentedButton(
-                            selected = uiState.currentFilter == filter,
-                            onClick = { viewModel.setFilter(filter) },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = AnalyticsFilter.entries.size)
-                        ) { Text(filter.name.lowercase().replaceFirstChar { it.uppercase() }) }
-                    }
-                }
-                
-                Text(
-                    text = "${uiState.startDate} - ${uiState.endDate}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            }
-        }
-
-        item {
-            MpValidationWarning(warnings = uiState.warnings)
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Actual Spending", style = MaterialTheme.typography.titleMedium)
-                    Text("$${String.format("%.2f", uiState.actualTotalCents / 100.0)}", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text("Projected Spending (Future)", style = MaterialTheme.typography.titleMedium)
-                    Text("$${String.format("%.2f", uiState.projectedTotalCents / 100.0)}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
-                }
-            }
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Avg / Meal", style = MaterialTheme.typography.titleSmall)
-                        Text("$${String.format("%.2f", uiState.avgMealCostCents / 100.0)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Card(
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Avg / Person", style = MaterialTheme.typography.titleSmall)
-                        Text("$${String.format("%.2f", uiState.avgCostPerPersonCents / 100.0)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        item {
-            Text("Spending by Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column {
-                    uiState.spendingByLocation.forEach { (location, amount) ->
-                        ListItem(
-                            headlineContent = { Text(location) },
-                            trailingContent = { Text("$${String.format("%.2f", amount / 100.0)}", fontWeight = FontWeight.Bold) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-                        HorizontalDivider()
-                    }
-                    if (uiState.spendingByLocation.isEmpty()) {
-                        Text("No data for this range.", modifier = Modifier.padding(16.dp))
-                    }
-                }
-            }
-        }
-
-        if (uiState.currentFilter != AnalyticsFilter.RESTAURANTS) {
-            item {
-                Text("Grocery Trips", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column {
-                        uiState.recentShoppingTrips.forEach { trip ->
-                            val storeName = uiState.allStores.find { it.id == trip.storeId }?.name ?: "Unknown Store"
-                            ListItem(
-                                modifier = Modifier.clickable { selectedTrip = trip },
-                                headlineContent = { Text(storeName) },
-                                supportingContent = { Text(trip.date.toString()) },
-                                trailingContent = { Text("$${String.format("%.2f", trip.actualTotalCents / 100.0)}", fontWeight = FontWeight.Bold) },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                            HorizontalDivider()
-                        }
-                        if (uiState.recentShoppingTrips.isEmpty()) {
-                            Text("No trips for this range.", modifier = Modifier.padding(16.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        if (uiState.currentFilter != AnalyticsFilter.STORES) {
-            item {
-                Text("Restaurant Meals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column {
-                        uiState.recentRestaurantMeals.forEach { trip ->
-                            val restName = uiState.allRestaurants.find { it.id == trip.restaurantId }?.name ?: "Unknown Restaurant"
-                            ListItem(
-                                modifier = Modifier.clickable { selectedTrip = trip },
-                                headlineContent = { Text(restName) },
-                                supportingContent = { Text(trip.date.toString()) },
-                                trailingContent = { Text("$${String.format("%.2f", trip.actualTotalCents / 100.0)}", fontWeight = FontWeight.Bold) },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                            HorizontalDivider()
-                        }
-                        if (uiState.recentRestaurantMeals.isEmpty()) {
-                            Text("No restaurant meals for this range.", modifier = Modifier.padding(16.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-            Text("Most Expensive Home Meals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column {
-                    uiState.mostExpensiveMeals.forEachIndexed { index, (name, cost) ->
-                        ListItem(
-                            headlineContent = { Text(name) },
-                            trailingContent = { Text("$${String.format("%.2f", cost / 100.0)}", fontWeight = FontWeight.Bold) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-                        if (index < uiState.mostExpensiveMeals.lastIndex) HorizontalDivider()
-                    }
-                    if (uiState.mostExpensiveMeals.isEmpty()) {
-                        Text("No meal data available.", modifier = Modifier.padding(16.dp))
-                    }
+                    item { AnalyticsHeader(uiState, onDateRangeClick = { showCustomDatePicker = true }, viewModel) }
+                    item { AnalyticsSummaryCards(uiState) }
+                    item { AnalyticsLocationBreakdown(uiState) }
+                    analyticsListContent(uiState, onTripClick = { selectedTrip = it })
                 }
             }
         }
     }
     
-    val scope = rememberCoroutineScope()
     selectedTrip?.let { trip ->
         val locName = if (trip.restaurantId != null) {
             uiState.allRestaurants.find { it.id == trip.restaurantId }?.name ?: "Unknown Restaurant"
@@ -247,7 +98,7 @@ fun AnalyticsView(
             uiState.allStores.find { it.id == trip.storeId }?.name ?: "Unknown Store"
         }
         
-        var fullTrip by remember { mutableStateOf<ReceiptHistory?>(null) }
+        var fullTrip by remember(trip.id) { mutableStateOf<ReceiptHistory?>(null) }
         LaunchedEffect(trip.id) {
             fullTrip = viewModel.getTripDetails(trip.id)
         }
@@ -271,8 +122,8 @@ fun AnalyticsView(
         } ?: AlertDialog(
             onDismissRequest = { selectedTrip = null },
             title = { Text("Loading...") },
-            text = { CircularProgressIndicator() },
-            confirmButton = {}
+            text = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
+            confirmButton = { TextButton(onClick = { selectedTrip = null }) { Text("Cancel") } }
         )
     }
 
@@ -284,6 +135,199 @@ fun AnalyticsView(
                 showCustomDatePicker = false
             }
         )
+    }
+}
+
+@Composable
+fun AnalyticsHeader(uiState: AnalyticsUiState, onDateRangeClick: () -> Unit, viewModel: AnalyticsViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Financial Overview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        
+        // Date Range Selector
+        ScrollableTabRow(
+            selectedTabIndex = uiState.currentDateRange.ordinal,
+            edgePadding = 0.dp,
+            containerColor = Color.Transparent,
+            divider = {}
+        ) {
+            AnalyticsDateRange.entries.forEach { range ->
+                Tab(
+                    selected = uiState.currentDateRange == range,
+                    onClick = { 
+                        if (range == AnalyticsDateRange.CUSTOM) onDateRangeClick()
+                        else viewModel.setDateRange(range) 
+                    },
+                    text = { Text(range.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                )
+            }
+        }
+
+        // Filter Selector
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            AnalyticsFilter.entries.forEachIndexed { index, filter ->
+                SegmentedButton(
+                    selected = uiState.currentFilter == filter,
+                    onClick = { viewModel.setFilter(filter) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = AnalyticsFilter.entries.size)
+                ) { Text(filter.name.lowercase().replaceFirstChar { it.uppercase() }) }
+            }
+        }
+        
+        Text(
+            text = "${uiState.startDate} - ${uiState.endDate}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        
+        MpValidationWarning(warnings = uiState.warnings)
+    }
+}
+
+@Composable
+fun AnalyticsSummaryCards(uiState: AnalyticsUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Actual Spending", style = MaterialTheme.typography.titleMedium)
+                Text("$${String.format("%.2f", uiState.actualTotalCents / 100.0)}", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Projected Spending (Future)", style = MaterialTheme.typography.titleMedium)
+                Text("$${String.format("%.2f", uiState.projectedTotalCents / 100.0)}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.secondary)
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Card(
+                modifier = Modifier.weight(1f),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Avg / Meal", style = MaterialTheme.typography.titleSmall)
+                    Text("$${String.format("%.2f", uiState.avgMealCostCents / 100.0)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Avg / Person", style = MaterialTheme.typography.titleSmall)
+                    Text("$${String.format("%.2f", uiState.avgCostPerPersonCents / 100.0)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalyticsLocationBreakdown(uiState: AnalyticsUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Spending by Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                uiState.spendingByLocation.forEach { (location, amount) ->
+                    ListItem(
+                        headlineContent = { Text(location) },
+                        trailingContent = { Text("$${String.format("%.2f", amount / 100.0)}", fontWeight = FontWeight.Bold) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    HorizontalDivider()
+                }
+                if (uiState.spendingByLocation.isEmpty()) {
+                    Text("No data for this range.", modifier = Modifier.padding(16.dp))
+                }
+            }
+        }
+    }
+}
+
+fun LazyListScope.analyticsListContent(uiState: AnalyticsUiState, onTripClick: (ReceiptHistory) -> Unit) {
+    if (uiState.currentFilter != AnalyticsFilter.RESTAURANTS) {
+        item {
+            Text("Grocery Trips", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    uiState.recentShoppingTrips.forEach { trip ->
+                        val storeName = uiState.allStores.find { it.id == trip.storeId }?.name ?: "Unknown Store"
+                        ListItem(
+                            modifier = Modifier.clickable { onTripClick(trip) },
+                            headlineContent = { Text(storeName) },
+                            supportingContent = { Text(trip.date.toString()) },
+                            trailingContent = { Text("$${String.format("%.2f", trip.actualTotalCents / 100.0)}", fontWeight = FontWeight.Bold) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        HorizontalDivider()
+                    }
+                    if (uiState.recentShoppingTrips.isEmpty()) {
+                        Text("No trips for this range.", modifier = Modifier.padding(16.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    if (uiState.currentFilter != AnalyticsFilter.STORES) {
+        item {
+            Text("Restaurant Meals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    uiState.recentRestaurantMeals.forEach { trip ->
+                        val restName = uiState.allRestaurants.find { it.id == trip.restaurantId }?.name ?: "Unknown Restaurant"
+                        ListItem(
+                            modifier = Modifier.clickable { onTripClick(trip) },
+                            headlineContent = { Text(restName) },
+                            supportingContent = { Text(trip.date.toString()) },
+                            trailingContent = { Text("$${String.format("%.2f", trip.actualTotalCents / 100.0)}", fontWeight = FontWeight.Bold) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        HorizontalDivider()
+                    }
+                    if (uiState.recentRestaurantMeals.isEmpty()) {
+                        Text("No restaurant meals for this range.", modifier = Modifier.padding(16.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    item {
+        Text("Most Expensive Home Meals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+
+    item {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                uiState.mostExpensiveMeals.forEachIndexed { index, (name, cost) ->
+                    ListItem(
+                        headlineContent = { Text(name) },
+                        trailingContent = { Text("$${String.format("%.2f", cost / 100.0)}", fontWeight = FontWeight.Bold) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    if (index < uiState.mostExpensiveMeals.lastIndex) HorizontalDivider()
+                }
+                if (uiState.mostExpensiveMeals.isEmpty()) {
+                    Text("No meal data available.", modifier = Modifier.padding(16.dp))
+                }
+            }
+        }
     }
 }
 
@@ -429,10 +473,10 @@ fun CustomDateRangePicker(
             TextButton(
                 onClick = {
                     val start = dateRangePickerState.selectedStartDateMillis?.let {
-                        Instant.fromEpochMilliseconds(it).toLocalDateTime(kotlinx.datetime.TimeZone.UTC).date
+                        Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date
                     }
                     val end = dateRangePickerState.selectedEndDateMillis?.let {
-                        Instant.fromEpochMilliseconds(it).toLocalDateTime(kotlinx.datetime.TimeZone.UTC).date
+                        Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date
                     }
                     if (start != null && end != null) {
                         onConfirm(start, end)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,35 +23,112 @@ import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField // Added import
+import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField 
+import io.github.and19081.mealplanner.uicomponents.MpNumericStepper 
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+import io.github.and19081.mealplanner.settings.Mode
+
 @Composable
 fun PantryView(
-    viewModel: PantryViewModel
+    viewModel: PantryViewModel,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<PantryItemUi?>(null) }
     
-    // For adding new
-    var isAddingNew by remember { mutableStateOf(false) }
+    BoxWithConstraints {
+        val isExpanded = when (mode) {
+            Mode.AUTO -> maxWidth > 840.dp
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
+        }
 
+        if (isExpanded) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // List Pane
+                Box(modifier = Modifier.weight(0.4f)) {
+                    PantryListPane(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onItemClick = { selectedItem = it },
+                        onAddClick = {
+                            selectedItem = null
+                            showEditDialog = true
+                        }
+                    )
+                }
+
+                VerticalDivider(modifier = Modifier.width(1.dp))
+
+                // Detail Pane
+                Box(modifier = Modifier.weight(0.6f)) {
+                    val item = selectedItem
+                    if (item != null) {
+                        PantryDetailPane(
+                            item = item,
+                            allIngredients = uiState.allIngredients,
+                            allUnits = uiState.allUnits,
+                            onSave = { ingId, qty, unitId ->
+                                viewModel.updateQuantity(ingId, qty, unitId)
+                                // We don't need to update selectedItem here as the UI state will refresh
+                            }
+                        )
+                    } else {
+                        EmptyDetailPlaceholder()
+                    }
+                }
+            }
+        } else {
+            // Mobile View
+            PantryListPane(
+                uiState = uiState,
+                viewModel = viewModel,
+                onItemClick = { 
+                    selectedItem = it
+                    showEditDialog = true 
+                },
+                onAddClick = {
+                    selectedItem = null
+                    showEditDialog = true
+                }
+            )
+        }
+    }
+
+    if (showEditDialog) {
+        PantryEditDialog(
+            item = selectedItem,
+            allIngredients = uiState.allIngredients,
+            allUnits = uiState.allUnits,
+            onDismiss = { showEditDialog = false },
+            onSave = { ingId, qty, unitId ->
+                viewModel.updateQuantity(ingId, qty, unitId)
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun PantryListPane(
+    uiState: PantryUiState,
+    viewModel: PantryViewModel,
+    onItemClick: (PantryItemUi) -> Unit,
+    onAddClick: () -> Unit
+) {
     Scaffold(
         topBar = {
             ListControlToolbar(
-                searchQuery = "", // TODO: Bind to uiState.searchQuery when available
+                searchQuery = "", 
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
                 searchPlaceholder = "Search Pantry...",
                 isSortByPrimary = true,
                 onToggleSort = { },
-                onAddClick = {
-                    selectedItem = null
-                    isAddingNew = true
-                    showEditDialog = true
-                }
+                onAddClick = onAddClick
             )
         }
     ) { innerPadding ->
@@ -69,29 +147,84 @@ fun PantryView(
                 items(uiState.items) { item ->
                     PantryItemRow(
                         item = item,
-                        onEditClick = {
-                            selectedItem = item
-                            isAddingNew = false
-                            showEditDialog = true
-                        }
+                        onEditClick = { onItemClick(item) }
                     )
                     HorizontalDivider()
                 }
             }
         }
     }
+}
 
-    if (showEditDialog) {
-        PantryEditDialog(
-            item = selectedItem,
-            allIngredients = uiState.allIngredients,
-            allUnits = uiState.allUnits,
-            onDismiss = { showEditDialog = false },
-            onSave = { ingId, qty, unitId ->
-                viewModel.updateQuantity(ingId, qty, unitId)
-                showEditDialog = false
+@Composable
+fun PantryDetailPane(
+    item: PantryItemUi,
+    allIngredients: List<Ingredient>,
+    allUnits: List<UnitModel>,
+    onSave: (Uuid, Double, Uuid) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(item.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(item.category, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+
+            var quantityStr by remember(item) { mutableStateOf(item.quantity.toString()) }
+            var selectedUnitName by remember(item) { mutableStateOf(item.unit.abbreviation) }
+
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MpNumericStepper(
+                        value = quantityStr.toDoubleOrNull() ?: 0.0,
+                        onValueChange = { quantityStr = it.toString() },
+                        label = "Quantity",
+                        modifier = Modifier.weight(1f),
+                        step = 1.0
+                    )
+                    
+                    Box(modifier = Modifier.weight(1f)) {
+                        SearchableDropdown(
+                            label = "Unit",
+                            options = allUnits.map { it.abbreviation },
+                            selectedOption = selectedUnitName,
+                            onOptionSelected = { selectedUnitName = it },
+                            onAddOption = {},
+                            onDeleteOption = {},
+                            deleteWarningMessage = ""
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        val qty = quantityStr.toDoubleOrNull()
+                        val unit = allUnits.find { it.abbreviation == selectedUnitName }
+                        if (qty != null && unit != null) {
+                            onSave(item.id, qty, unit.id)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = quantityStr.toDoubleOrNull() != null && selectedUnitName.isNotBlank()
+                ) {
+                    Text("Update Quantity")
+                }
             }
-        )
+        }
+    }
+}
+
+@Composable
+fun EmptyDetailPlaceholder() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(androidx.compose.material.icons.Icons.Default.Inventory, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Select a pantry item to view details", color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 

@@ -177,7 +177,7 @@ fun MpNav(
                                     diContainer.restaurantRepository
                                 ) 
                             }
-                            DashboardView(vm) 
+                            DashboardView(vm, mode = mode) 
                         }
                         composable<CalendarRoute> {
                             val vm = viewModel {
@@ -194,7 +194,8 @@ fun MpNav(
                             }
                             CalendarView(
                                 viewModel = vm,
-                                calendarViewMode = viewModel.calendarViewMode.value
+                                calendarViewMode = viewModel.calendarViewMode.value,
+                                mode = mode
                             )
                         }
                         composable<IngredientsRoute> { 
@@ -205,7 +206,7 @@ fun MpNav(
                                     diContainer.unitRepository
                                 )
                             }
-                            IngredientsView(vm) 
+                            IngredientsView(vm, mode = mode) 
                         }
                         composable<MealsRoute> { 
                             val vm = viewModel {
@@ -216,7 +217,7 @@ fun MpNav(
                                     diContainer.unitRepository
                                 )
                             }
-                            MealsView(vm) 
+                            MealsView(vm, mode = mode) 
                         }
                         composable<RecipesRoute> { 
                             val vm = viewModel {
@@ -227,7 +228,7 @@ fun MpNav(
                                     diContainer.unitRepository
                                 )
                             }
-                            RecipesView(vm) 
+                            RecipesView(vm, mode = mode) 
                         }
                         composable<ShoppingListRoute> { 
                             val vm = viewModel {
@@ -255,7 +256,7 @@ fun MpNav(
                                     diContainer.unitRepository
                                 )
                             }
-                            PantryView(vm) 
+                            PantryView(vm, mode = mode) 
                         }
                         composable<AnalyticsRoute> { 
                             val vm = viewModel {
@@ -270,7 +271,7 @@ fun MpNav(
                                     diContainer.restaurantRepository
                                 )
                             }
-                            AnalyticsView(vm) 
+                            AnalyticsView(vm, mode = mode) 
                         }
                         composable<SettingsRoute> { 
                             val vm = viewModel {

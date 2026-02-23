@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
@@ -30,6 +32,7 @@ import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
 import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
 import io.github.and19081.mealplanner.uicomponents.MpEditDialogScaffold
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
+import io.github.and19081.mealplanner.uicomponents.MpNumericStepper
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.domain.PriceCalculator
@@ -39,14 +42,17 @@ import io.github.and19081.mealplanner.ingredients.Package
 import io.github.and19081.mealplanner.ingredients.BridgeConversion
 import kotlin.uuid.Uuid
 
+import io.github.and19081.mealplanner.settings.Mode
+
 @Composable
 fun RecipesView(
-    viewModel: RecipesViewModel
+    viewModel: RecipesViewModel,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var showEditDialog by remember { mutableStateOf(false) }
     var selectedRecipe by remember { mutableStateOf<Recipe?>(null) }
+    var showEditDialog by remember { mutableStateOf(false) }
     var creationName by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -58,8 +64,102 @@ fun RecipesView(
         }
     }
 
+    BoxWithConstraints {
+        val isExpanded = when (mode) {
+            Mode.AUTO -> maxWidth > 840.dp
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
+        }
+
+        if (isExpanded) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // List Pane
+                Box(modifier = Modifier.weight(0.4f)) {
+                    RecipeListPane(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onRecipeClick = { selectedRecipe = it },
+                        onAddClick = {
+                            selectedRecipe = null
+                            creationName = ""
+                            showEditDialog = true
+                        }
+                    )
+                }
+
+                VerticalDivider(modifier = Modifier.width(1.dp))
+
+                // Detail Pane
+                Box(modifier = Modifier.weight(0.6f)) {
+                    val recipe = selectedRecipe
+                    if (recipe != null) {
+                        RecipeDetailPane(
+                            recipe = recipe,
+                            allIngredients = uiState.allIngredients,
+                            allRecipes = uiState.groupedRecipes.values.flatten(),
+                            allUnits = uiState.allUnits,
+                            warnings = uiState.recipeWarnings[recipe.id] ?: emptyList(),
+                            onSave = { 
+                                viewModel.saveRecipe(it)
+                                selectedRecipe = it
+                            },
+                            onDelete = { 
+                                viewModel.deleteRecipe(recipe.id)
+                                selectedRecipe = null
+                            },
+                            onAddIngredient = { viewModel.addIngredient(it) }
+                        )
+                    } else {
+                        EmptyDetailPlaceholder()
+                    }
+                }
+            }
+        } else {
+            // Mobile View (Single Column)
+            RecipeListPane(
+                uiState = uiState,
+                viewModel = viewModel,
+                onRecipeClick = { 
+                    selectedRecipe = it
+                    showEditDialog = true 
+                },
+                onAddClick = {
+                    selectedRecipe = null
+                    creationName = ""
+                    showEditDialog = true
+                }
+            )
+        }
+    }
+
+    val recipeForDialog = selectedRecipe
+    if (showEditDialog) {
+        RecipeEditDialog(
+            recipe = recipeForDialog,
+            initialName = creationName,
+            allIngredients = uiState.allIngredients,
+            allRecipes = uiState.groupedRecipes.values.flatten(),
+            allUnits = uiState.allUnits,
+            warnings = recipeForDialog?.let { uiState.recipeWarnings[it.id] } ?: emptyList(),
+            onDismiss = { showEditDialog = false },
+            onSave = { recipe ->
+                viewModel.saveRecipe(recipe)
+                showEditDialog = false
+            },
+            onDelete = if (recipeForDialog != null) { { viewModel.deleteRecipe(recipeForDialog.id) } } else null,
+            onAddIngredient = { viewModel.addIngredient(it) }
+        )
+    }
+}
+
+@Composable
+fun RecipeListPane(
+    uiState: RecipesUiState,
+    viewModel: RecipesViewModel,
+    onRecipeClick: (Recipe) -> Unit,
+    onAddClick: () -> Unit
+) {
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 ListControlToolbar(
@@ -69,11 +169,7 @@ fun RecipesView(
                     isSortByPrimary = true,
                     primarySortIcon = Icons.Default.SortByAlpha,
                     onToggleSort = { /* No-op */ },
-                    onAddClick = {
-                        selectedRecipe = null
-                        creationName = ""
-                        showEditDialog = true
-                    }
+                    onAddClick = onAddClick
                 )
                 
                 Row(
@@ -101,11 +197,7 @@ fun RecipesView(
                 item {
                     CreateNewItemRow(
                         searchQuery = uiState.searchQuery,
-                        onClick = {
-                            selectedRecipe = null
-                            creationName = uiState.searchQuery
-                            showEditDialog = true
-                        }
+                        onClick = onAddClick
                     )
                     HorizontalDivider()
                 }
@@ -126,10 +218,7 @@ fun RecipesView(
                         allBridges = uiState.allBridges,
                         allUnits = uiState.allUnits,
                         warnings = uiState.recipeWarnings[recipe.id] ?: emptyList(),
-                        onEditClick = {
-                            selectedRecipe = recipe
-                            showEditDialog = true
-                        }
+                        onEditClick = { onRecipeClick(recipe) }
                     )
                     HorizontalDivider()
                 }
@@ -145,23 +234,139 @@ fun RecipesView(
             }
         }
     }
+}
 
-    if (showEditDialog) {
-        RecipeEditDialog(
-            recipe = selectedRecipe,
-            initialName = creationName,
-            allIngredients = uiState.allIngredients,
-            allRecipes = uiState.groupedRecipes.values.flatten(), // All recipes from UI state
-            allUnits = uiState.allUnits,
-            warnings = selectedRecipe?.let { uiState.recipeWarnings[it.id] } ?: emptyList(),
-            onDismiss = { showEditDialog = false },
-            onSave = { recipe ->
-                viewModel.saveRecipe(recipe)
-                showEditDialog = false
-            },
-            onDelete = if (selectedRecipe != null) { { viewModel.deleteRecipe(selectedRecipe!!.id) } } else null,
-            onAddIngredient = { viewModel.addIngredient(it) }
-        )
+@Composable
+fun RecipeDetailPane(
+    recipe: Recipe,
+    allIngredients: List<Ingredient>,
+    allRecipes: List<Recipe>,
+    allUnits: List<UnitModel>,
+    warnings: List<DataWarning>,
+    onSave: (Recipe) -> Unit,
+    onDelete: () -> Unit,
+    onAddIngredient: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(recipe.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Close, "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            
+            MpValidationWarning(warnings = warnings)
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // For now, we reuse the Edit Dialog's content structure but without the dialog scaffold
+            var name by remember(recipe) { mutableStateOf(recipe.name) }
+            var servingsStr by remember(recipe) { mutableStateOf(recipe.servings.toString()) }
+            var description by remember(recipe) { mutableStateOf(recipe.description ?: "") }
+            var prepTimeStr by remember(recipe) { mutableStateOf(recipe.prepTimeMinutes.toString()) }
+            var cookTimeStr by remember(recipe) { mutableStateOf(recipe.cookTimeMinutes.toString()) }
+            var mealType by remember(recipe) { mutableStateOf(recipe.mealType) }
+            var currentIngredients by remember(recipe) { mutableStateOf(recipe.ingredients) }
+            var instructions by remember(recipe) { mutableStateOf(recipe.instructions) }
+
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                MpOutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MpNumericStepper(
+                        value = servingsStr.toDoubleOrNull() ?: 4.0,
+                        onValueChange = { servingsStr = it.toString() },
+                        label = "Servings",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
+                        Text("Type: ${mealType.name}")
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MpNumericStepper(
+                        value = prepTimeStr.toDoubleOrNull() ?: 0.0,
+                        onValueChange = { prepTimeStr = it.toInt().toString() },
+                        label = "Prep (min)",
+                        modifier = Modifier.weight(1f),
+                        step = 5.0
+                    )
+                    MpNumericStepper(
+                        value = cookTimeStr.toDoubleOrNull() ?: 0.0,
+                        onValueChange = { cookTimeStr = it.toInt().toString() },
+                        label = "Cook (min)",
+                        modifier = Modifier.weight(1f),
+                        step = 5.0
+                    )
+                }
+
+                MpOutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Ingredients", style = MaterialTheme.typography.titleMedium)
+                RecipeIngredientsEditor(
+                    currentIngredients = currentIngredients,
+                    allIngredients = allIngredients,
+                    allRecipes = allRecipes,
+                    allUnits = allUnits,
+                    onUpdate = { currentIngredients = it },
+                    onAddIngredient = onAddIngredient
+                )
+
+                Text("Instructions", style = MaterialTheme.typography.titleMedium)
+                RecipeInstructionsEditor(
+                    instructions = instructions,
+                    onUpdate = { instructions = it }
+                )
+
+                Button(
+                    onClick = {
+                        onSave(recipe.copy(
+                            name = name,
+                            description = description.ifBlank { null },
+                            servings = servingsStr.toDoubleOrNull() ?: 4.0,
+                            instructions = instructions.filter { it.isNotBlank() },
+                            mealType = mealType,
+                            prepTimeMinutes = prepTimeStr.toIntOrNull() ?: 0,
+                            cookTimeMinutes = cookTimeStr.toIntOrNull() ?: 0,
+                            ingredients = currentIngredients
+                        ))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = name.isNotBlank()
+                ) {
+                    Text("Save Changes")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyDetailPlaceholder() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.FilterList, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Select a recipe to view details", color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 
@@ -301,11 +506,10 @@ fun RecipeEditDialog(
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MpOutlinedTextField(
-                                value = servingsStr,
-                                onValueChange = { servingsStr = it },
-                                label = { Text("Servings") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            MpNumericStepper(
+                                value = servingsStr.toDoubleOrNull() ?: 4.0,
+                                onValueChange = { servingsStr = it.toString() },
+                                label = "Servings",
                                 modifier = Modifier.weight(1f)
                             )
                             // Meal Type - Simplified selector
@@ -315,19 +519,19 @@ fun RecipeEditDialog(
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MpOutlinedTextField(
-                                value = prepTimeStr,
-                                onValueChange = { prepTimeStr = it },
-                                label = { Text("Prep (min)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f)
+                            MpNumericStepper(
+                                value = prepTimeStr.toDoubleOrNull() ?: 0.0,
+                                onValueChange = { prepTimeStr = it.toInt().toString() },
+                                label = "Prep (min)",
+                                modifier = Modifier.weight(1f),
+                                step = 5.0
                             )
-                            MpOutlinedTextField(
-                                value = cookTimeStr,
-                                onValueChange = { cookTimeStr = it },
-                                label = { Text("Cook (min)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f)
+                            MpNumericStepper(
+                                value = cookTimeStr.toDoubleOrNull() ?: 0.0,
+                                onValueChange = { cookTimeStr = it.toInt().toString() },
+                                label = "Cook (min)",
+                                modifier = Modifier.weight(1f),
+                                step = 5.0
                             )
                         }
 

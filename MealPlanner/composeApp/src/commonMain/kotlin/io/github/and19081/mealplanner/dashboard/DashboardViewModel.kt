@@ -124,9 +124,9 @@ class DashboardViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState(emptyList(), 0, 0, null, DashboardConfig()))
     
-    fun consumeMeal(entryId: Uuid) {
+    fun toggleMealConsumption(entryId: Uuid, currentStatus: Boolean) {
         viewModelScope.launch {
-            mealPlanRepository.markConsumed(entryId)
+            mealPlanRepository.setConsumedStatus(entryId, !currentStatus)
         }
     }
 }

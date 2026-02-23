@@ -258,78 +258,79 @@ class CalendarViewModel(
         }
     }
 
-    fun consumeMeal(entryId: Uuid) {
+    fun toggleMealConsumption(entryId: Uuid) {
         val entry = mealPlanRepository.entries.value.find { it.id == entryId } ?: return
-        if (entry.isConsumed) return
+        val newStatus = !entry.isConsumed
 
-        if (entry.restaurantId != null) {
-            // For restaurants we should show a dialog, but this method is called directly.
-            // I'll leave this to be handled by the UI check.
+        if (entry.restaurantId != null && newStatus) {
+            // For restaurants we should show a dialog, handled by UI.
             return
         }
 
         viewModelScope.launch {
-            // Mark as consumed
-            mealPlanRepository.markConsumed(entryId)
+            // Update status
+            mealPlanRepository.setConsumedStatus(entryId, newStatus)
 
-            // Decrement Pantry Logic
-            val meal = mealRepository.meals.value.find { it.id == entry.prePlannedMealId } ?: return@launch
-            
-            val allRecipes = recipeRepository.recipes.value
-            val allIngredients = ingredientRepository.ingredients.value
-            val allBridges = ingredientRepository.bridges.value
-            val allUnits = unitRepository.units.value
-            
-            // Helper to decrement
-            suspend fun decrement(ingId: Uuid, qtyUsed: Double, unitId: Uuid) {
-                // Get Current Pantry
-                val currentPantryItem = pantryRepository.pantryItems.value.find { it.ingredientId == ingId }
-                if (currentPantryItem == null) return
-
-                val ingredient = allIngredients.find { it.id == ingId }
-                val bridges = allBridges.filter { it.ingredientId == ingId }
-
-                // Convert used qty to pantry unit
-                val usedInPantryUnit = UnitConverter.convert(
-                    amount = qtyUsed,
-                    fromUnitId = unitId,
-                    toUnitId = currentPantryItem.unitId,
-                    allUnits = allUnits,
-                    bridges = bridges
-                )
+            // Decrement Pantry Logic only if we are marking as consumed
+            if (newStatus) {
+                val meal = mealRepository.meals.value.find { it.id == entry.prePlannedMealId } ?: return@launch
                 
-                val newQty = max(0.0, currentPantryItem.quantity - usedInPantryUnit)
+                val allRecipes = recipeRepository.recipes.value
+                val allIngredients = ingredientRepository.ingredients.value
+                val allBridges = ingredientRepository.bridges.value
+                val allUnits = unitRepository.units.value
                 
-                pantryRepository.updateQuantity(ingId, newQty, currentPantryItem.unitId)
-            }
+                // Helper to decrement
+                suspend fun decrement(ingId: Uuid, qtyUsed: Double, unitId: Uuid) {
+                    // Get Current Pantry
+                    val currentPantryItem = pantryRepository.pantryItems.value.find { it.ingredientId == ingId }
+                    if (currentPantryItem == null) return
 
-            // Recursive Recipe Decrementer
-            suspend fun decrementRecipe(recipe: Recipe, scale: Double) {
-                recipe.ingredients.forEach { ri ->
-                    if (ri.subRecipeId != null) {
-                        val subRecipe = allRecipes.find { it.id == ri.subRecipeId }
-                        if (subRecipe != null) {
-                            decrementRecipe(subRecipe, scale * ri.quantity)
+                    val ingredient = allIngredients.find { it.id == ingId }
+                    val bridges = allBridges.filter { it.ingredientId == ingId }
+
+                    // Convert used qty to pantry unit
+                    val usedInPantryUnit = UnitConverter.convert(
+                        amount = qtyUsed,
+                        fromUnitId = unitId,
+                        toUnitId = currentPantryItem.unitId,
+                        allUnits = allUnits,
+                        bridges = bridges
+                    )
+                    
+                    val newQty = max(0.0, currentPantryItem.quantity - usedInPantryUnit)
+                    
+                    pantryRepository.updateQuantity(ingId, newQty, currentPantryItem.unitId)
+                }
+
+                // Recursive Recipe Decrementer
+                suspend fun decrementRecipe(recipe: Recipe, scale: Double) {
+                    recipe.ingredients.forEach { ri ->
+                        if (ri.subRecipeId != null) {
+                            val subRecipe = allRecipes.find { it.id == ri.subRecipeId }
+                            if (subRecipe != null) {
+                                decrementRecipe(subRecipe, scale * ri.quantity)
+                            }
+                        } else if (ri.ingredientId != null) {
+                            decrement(ri.ingredientId, ri.quantity * scale, ri.unitId)
                         }
-                    } else if (ri.ingredientId != null) {
-                        decrement(ri.ingredientId, ri.quantity * scale, ri.unitId)
                     }
                 }
-            }
 
-            // Recipes
-            meal.recipes.forEach { rId ->
-                val recipe = allRecipes.find { it.id == rId }
-                if (recipe != null) {
-                    val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
-                    decrementRecipe(recipe, scale)
+                // Recipes
+                meal.recipes.forEach { rId ->
+                    val recipe = allRecipes.find { it.id == rId }
+                    if (recipe != null) {
+                        val scale = if (recipe.servings > 0) entry.peopleCount / recipe.servings else 1.0
+                        decrementRecipe(recipe, scale)
+                    }
                 }
-            }
-            
-            // Independent Ingredients
-            meal.independentIngredients.forEach { item ->
-                val totalQty = item.quantity * entry.peopleCount
-                decrement(item.ingredientId, totalQty, item.unitId)
+                
+                // Independent Ingredients
+                meal.independentIngredients.forEach { item ->
+                    val totalQty = item.quantity * entry.peopleCount
+                    decrement(item.ingredientId, totalQty, item.unitId)
+                }
             }
         }
     }

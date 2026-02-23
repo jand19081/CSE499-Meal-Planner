@@ -8,7 +8,7 @@ interface MealPlanRepository {
     val entries: StateFlow<List<ScheduledMeal>>
     suspend fun addPlan(entry: ScheduledMeal)
     suspend fun removePlan(entryId: Uuid)
-    suspend fun markConsumed(entryId: Uuid)
+    suspend fun setConsumedStatus(entryId: Uuid, consumed: Boolean)
     suspend fun addReceipt(
         mealId: Uuid,
         actualTotalCents: Int,

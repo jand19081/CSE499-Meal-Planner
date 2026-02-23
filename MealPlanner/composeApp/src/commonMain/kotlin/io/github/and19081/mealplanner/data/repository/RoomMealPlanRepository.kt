@@ -41,8 +41,12 @@ class RoomMealPlanRepository(
         if (entity != null) scheduledMealDao.delete(entity)
     }
 
-    override suspend fun markConsumed(entryId: Uuid) {
-        scheduledMealDao.setConsumed(entryId.toString(), true)
+    override suspend fun setConsumedStatus(entryId: Uuid, consumed: Boolean) {
+        scheduledMealDao.setConsumed(entryId.toString(), consumed)
+    }
+
+    private suspend fun markConsumed(entryId: Uuid) {
+        setConsumedStatus(entryId, true)
     }
 
     override suspend fun addReceipt(

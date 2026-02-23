@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,14 +33,17 @@ import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+import io.github.and19081.mealplanner.settings.Mode
+
 @Composable
 fun IngredientsView(
-    viewModel: IngredientsViewModel
+    viewModel: IngredientsViewModel,
+    mode: Mode
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    var showEditDialog by remember { mutableStateOf(false) }
     var selectedIngredient by remember { mutableStateOf<Ingredient?>(null) }
+    var showEditDialog by remember { mutableStateOf(false) }
     var creationName by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -49,63 +55,91 @@ fun IngredientsView(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            ListControlToolbar(
-                searchQuery = uiState.searchQuery,
-                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-                searchPlaceholder = "Search Ingredients...",
-                isSortByPrimary = uiState.isSortByCategory,
-                onToggleSort = { viewModel.toggleSortMode() },
+    BoxWithConstraints {
+        val isExpanded = when (mode) {
+            Mode.AUTO -> maxWidth > 840.dp
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
+        }
+
+        if (isExpanded) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // List Pane
+                Box(modifier = Modifier.weight(0.4f)) {
+                    IngredientListPane(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onIngredientClick = { selectedIngredient = it },
+                        onAddClick = {
+                            selectedIngredient = null
+                            creationName = ""
+                            showEditDialog = true
+                        }
+                    )
+                }
+
+                VerticalDivider(modifier = Modifier.width(1.dp))
+
+                // Detail Pane
+                Box(modifier = Modifier.weight(0.6f)) {
+                    val ingredient = selectedIngredient
+                    if (ingredient != null) {
+                        IngredientDetailPane(
+                            ingredient = ingredient,
+                            allPackages = uiState.allPackages,
+                            allBridges = uiState.allBridges,
+                            allStores = uiState.allStores,
+                            allCategories = uiState.allCategories,
+                            allUnits = uiState.allUnits,
+                            onSave = { updatedIngredient, newPackages, newBridges ->
+                                viewModel.saveIngredient(updatedIngredient)
+                                
+                                val originalPackages = uiState.allPackages.filter { it.ingredientId == ingredient.id }
+                                val originalPackageIds = originalPackages.map { it.id }.toSet()
+                                val newPackageIds = newPackages.map { it.id }.toSet()
+                                val deletedPackageIds = originalPackageIds - newPackageIds
+                                
+                                deletedPackageIds.forEach { viewModel.deletePackage(it) }
+                                newPackages.forEach { viewModel.savePackage(it) }
+                                newBridges.forEach { viewModel.saveBridge(it) }
+
+                                selectedIngredient = updatedIngredient
+                            },
+                            onDelete = { 
+                                viewModel.deleteIngredient(ingredient.id)
+                                selectedIngredient = null
+                            },
+                            onAddStore = { viewModel.addStore(it) },
+                            onDeleteStore = { storeName ->
+                                val store = uiState.allStores.find { it.name == storeName }
+                                if (store != null) viewModel.deleteStore(store.id)
+                            },
+                            onAddCategory = { viewModel.addCategory(it) },
+                            onDeleteCategory = { catName ->
+                                val cat = uiState.allCategories.find { it.name == catName }
+                                if (cat != null) viewModel.deleteCategory(cat.id)
+                            }
+                        )
+                    } else {
+                        EmptyDetailPlaceholder()
+                    }
+                }
+            }
+        } else {
+            // Mobile View
+            IngredientListPane(
+                uiState = uiState,
+                viewModel = viewModel,
+                onIngredientClick = { 
+                    selectedIngredient = it
+                    showEditDialog = true 
+                },
                 onAddClick = {
                     selectedIngredient = null
                     creationName = ""
                     showEditDialog = true
                 }
             )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            // Create New Option
-            if (uiState.searchQuery.isNotBlank() && !uiState.doesExactMatchExist) {
-                item {
-                    CreateNewItemRow(
-                        searchQuery = uiState.searchQuery,
-                        onClick = {
-                            selectedIngredient = null
-                            creationName = uiState.searchQuery
-                            showEditDialog = true
-                        }
-                    )
-                    HorizontalDivider()
-                }
-            }
-
-            uiState.groupedIngredients.forEach { (header, ingredients) ->
-                stickyHeader {
-                    ListSectionHeader(text = header)
-                }
-
-                items(ingredients) { ingredient ->
-                    IngredientRow(
-                        ingredient = ingredient,
-                        categoryName = header,
-                        packages = uiState.allPackages.filter { it.ingredientId == ingredient.id },
-                        allStores = uiState.allStores,
-                        allUnits = uiState.allUnits,
-                        onEditClick = {
-                            selectedIngredient = ingredient
-                            creationName = ""
-                            showEditDialog = true
-                        }
-                    )
-                    HorizontalDivider()
-                }
-            }
         }
     }
 
@@ -130,15 +164,12 @@ fun IngredientsView(
             onSave = { updatedIngredient, newPackages, newBridges ->
                 viewModel.saveIngredient(updatedIngredient)
                 
-                // Handling Packages
                 val originalPackageIds = ingredientPackages.map { it.id }.toSet()
                 val newPackageIds = newPackages.map { it.id }.toSet()
                 val deletedPackageIds = originalPackageIds - newPackageIds
                 
                 deletedPackageIds.forEach { viewModel.deletePackage(it) }
                 newPackages.forEach { viewModel.savePackage(it) }
-                
-                // Handling Bridges (Simplified: just save new, no delete logic exposed properly yet in VM for bridges specifically by ID diff, but we can do additive for now or implement full diff)
                 newBridges.forEach { viewModel.saveBridge(it) }
 
                 showEditDialog = false
@@ -155,6 +186,168 @@ fun IngredientsView(
                 if (cat != null) viewModel.deleteCategory(cat.id)
             }
         )
+    }
+}
+
+@Composable
+fun IngredientListPane(
+    uiState: IngredientsUiState,
+    viewModel: IngredientsViewModel,
+    onIngredientClick: (Ingredient) -> Unit,
+    onAddClick: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            ListControlToolbar(
+                searchQuery = uiState.searchQuery,
+                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                searchPlaceholder = "Search Ingredients...",
+                isSortByPrimary = uiState.isSortByCategory,
+                onToggleSort = { viewModel.toggleSortMode() },
+                onAddClick = onAddClick
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            // Create New Option
+            if (uiState.searchQuery.isNotBlank() && !uiState.doesExactMatchExist) {
+                item {
+                    CreateNewItemRow(
+                        searchQuery = uiState.searchQuery,
+                        onClick = onAddClick
+                    )
+                    HorizontalDivider()
+                }
+            }
+
+            uiState.groupedIngredients.forEach { (header, ingredients) ->
+                stickyHeader {
+                    ListSectionHeader(text = header)
+                }
+
+                items(ingredients) { ingredient ->
+                    IngredientRow(
+                        ingredient = ingredient,
+                        categoryName = header,
+                        packages = uiState.allPackages.filter { it.ingredientId == ingredient.id },
+                        allStores = uiState.allStores,
+                        allUnits = uiState.allUnits,
+                        onEditClick = { onIngredientClick(ingredient) }
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun IngredientDetailPane(
+    ingredient: Ingredient,
+    allPackages: List<Package>,
+    allBridges: List<BridgeConversion>,
+    allStores: List<Store>,
+    allCategories: List<Category>,
+    allUnits: List<UnitModel>,
+    onSave: (Ingredient, List<Package>, List<BridgeConversion>) -> Unit,
+    onDelete: () -> Unit,
+    onAddStore: (String) -> Unit,
+    onDeleteStore: (String) -> Unit,
+    onAddCategory: (String) -> Unit,
+    onDeleteCategory: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(ingredient.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Close, "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            var name by remember(ingredient) { mutableStateOf(ingredient.name) }
+            val initialCatName = allCategories.find { it.id == ingredient.categoryId }?.name ?: ""
+            var categoryName by remember(ingredient) { mutableStateOf(initialCatName) }
+            
+            var packages by remember(ingredient) { 
+                mutableStateOf(allPackages.filter { it.ingredientId == ingredient.id }) 
+            }
+            var bridges by remember(ingredient) { 
+                mutableStateOf(allBridges.filter { it.ingredientId == ingredient.id }) 
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                MpOutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                SearchableDropdown(
+                    label = "Category",
+                    options = allCategories.map { it.name },
+                    selectedOption = categoryName,
+                    onOptionSelected = { categoryName = it },
+                    onAddOption = onAddCategory,
+                    onDeleteOption = onDeleteStore,
+                    deleteWarningMessage = "Deleting this category will remove ALL ingredients in it."
+                )
+
+                Text("Purchase Options", style = MaterialTheme.typography.titleMedium)
+                PurchaseOptionsEditor(
+                    ingredientId = ingredient.id,
+                    options = packages,
+                    allStores = allStores,
+                    allUnits = allUnits,
+                    onUpdateOptions = { packages = it },
+                    onAddStore = onAddStore,
+                    onDeleteStore = onDeleteStore
+                )
+
+                Text("Conversions", style = MaterialTheme.typography.titleMedium)
+                ConversionBridgesEditor(
+                    ingredientId = ingredient.id,
+                    currentBridges = bridges,
+                    allUnits = allUnits,
+                    onUpdate = { bridges = it }
+                )
+
+                Button(
+                    onClick = {
+                        val catId = allCategories.find { it.name == categoryName }?.id ?: ingredient.categoryId
+                        onSave(ingredient.copy(name = name, categoryId = catId), packages, bridges)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = name.isNotBlank() && categoryName.isNotBlank()
+                ) {
+                    Text("Save Changes")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyDetailPlaceholder() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Select an ingredient to view details", color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 
