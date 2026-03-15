@@ -1,29 +1,20 @@
 package io.github.and19081.mealplanner.ingredients
 
-import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
+import kotlinx.serialization.Serializable
 
-@Serializable
-data class Category(
-    val id: Uuid = Uuid.random(),
-    val name: String
-)
+@Serializable data class Category(val id: Uuid = Uuid.random(), val name: String)
 
-@Serializable
-data class Store(
-    val id: Uuid = Uuid.random(),
-    val name: String
-)
+@Serializable data class Store(val id: Uuid = Uuid.random(), val name: String)
 
 @Serializable
 data class Package(
     val id: Uuid = Uuid.random(),
     val ingredientId: Uuid,
     val storeId: Uuid,
-
     val priceCents: Int,
     val quantity: Double,
-    val unitId: Uuid
+    val unitId: Uuid,
 )
 
 @Serializable
@@ -33,12 +24,13 @@ data class BridgeConversion(
     val fromUnitId: Uuid,
     val fromQuantity: Double,
     val toUnitId: Uuid,
-    val toQuantity: Double
+    val toQuantity: Double,
 )
 
 @Serializable
 data class Ingredient(
-    val id : Uuid = Uuid.random(),
+    val id: Uuid = Uuid.random(),
     val name: String,
-    val categoryId: Uuid
+    val categoryId: Uuid,
+    val preferredUnitId: Uuid? = null,
 )

@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -38,61 +39,72 @@ fun ExpandableListItem(
     title: String,
     subtitle: String? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
+    actionIcon: @Composable (() -> Unit)? = null,
+    onActionClick: (() -> Unit)? = null,
     onEditClick: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f)
+  var expanded by remember { mutableStateOf(false) }
+  val rotation by animateFloatAsState(if (expanded) 180f else 0f)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable { expanded = !expanded }
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(8.dp)
+  Column(
+      modifier =
+          Modifier.fillMaxWidth()
+              .pointerHoverIcon(PointerIcon.Hand)
+              .clip(MaterialTheme.shapes.medium)
+              .clickable { expanded = !expanded }
+              .background(MaterialTheme.colorScheme.surface)
+              .padding(8.dp)
+  ) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(IntrinsicSize.Min),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.height(IntrinsicSize.Min)
-        ) {
-            Icon(
-                Icons.Default.ArrowDropDown,
-                contentDescription = "Expand",
-                modifier = Modifier.rotate(rotation)
-            )
+      Icon(
+          Icons.Default.ArrowDropDown,
+          contentDescription = "Expand",
+          modifier = Modifier.rotate(rotation),
+      )
 
-            Spacer(modifier = Modifier.width(8.dp))
+      Spacer(modifier = Modifier.width(8.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                if (!expanded && subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (trailingIcon != null) {
-                trailingIcon()
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-
-            IconButton(onClick = onEditClick) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
-            }
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+        )
+        if (!expanded && subtitle != null) {
+          Text(
+              text = subtitle,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
         }
+      }
 
-        AnimatedVisibility(visible = expanded) {
-            Column(modifier = Modifier.padding(start = 32.dp, top = 8.dp)) {
-                content()
-            }
+      if (trailingIcon != null) {
+        trailingIcon()
+        Spacer(modifier = Modifier.width(4.dp))
+      }
+
+      if (actionIcon != null && onActionClick != null) {
+        IconButton(onClick = onActionClick) {
+          actionIcon()
         }
+      }
+
+      IconButton(onClick = onEditClick) {
+        Icon(
+            Icons.Default.Edit,
+            contentDescription = "Edit",
+            tint = MaterialTheme.colorScheme.primary,
+        )
+      }
     }
+
+    AnimatedVisibility(visible = expanded) {
+      Column(modifier = Modifier.padding(start = 32.dp, top = 8.dp)) { content() }
+    }
+  }
 }

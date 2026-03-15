@@ -7,23 +7,21 @@ import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import java.io.File
 
 fun main() = application {
-    val userHome = System.getProperty("user.home")
-    val appDataDir = File(userHome, ".mealplanner")
-    
-    if (!appDataDir.exists()) {
-        appDataDir.mkdirs()
-    }
+  val userHome = System.getProperty("user.home")
+  val appDataDir = File(userHome, ".mealplanner")
 
-    val dbFile = File(appDataDir, "meal_planner.db")
-    
-    val builder = Room.databaseBuilder<MealPlannerDatabase>(
-        name = dbFile.absolutePath
-    )
+  if (!appDataDir.exists()) {
+    appDataDir.mkdirs()
+  }
 
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "MealPlanner",
-    ) {
-        App(builder)
-    }
+  val dbFile = File(appDataDir, "meal_planner.db")
+
+  val builder = Room.databaseBuilder<MealPlannerDatabase>(name = dbFile.absolutePath)
+
+  Window(
+      onCloseRequest = ::exitApplication,
+      title = "MealPlanner",
+  ) {
+    App(builder)
+  }
 }

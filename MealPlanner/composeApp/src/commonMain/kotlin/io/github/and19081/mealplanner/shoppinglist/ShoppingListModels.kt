@@ -1,35 +1,22 @@
 package io.github.and19081.mealplanner.shoppinglist
 
+import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
-
-
 
 @Serializable
-
 data class ShoppingListItem(
-
     val id: Uuid = Uuid.random(),
-
     val ingredientId: Uuid? = null,
-
     val customName: String? = null,
-
     val storeId: Uuid,
-
     val neededQuantity: Double? = null,
-
     val unitId: Uuid? = null,
-
     val packageId: Uuid? = null,
-
-    val isPurchased: Boolean = false
-
+    val isPurchased: Boolean = false,
+    val isPantryItem: Boolean = true,
 )
-
-
 
 @Serializable
 data class ReceiptHistory(
@@ -41,26 +28,18 @@ data class ReceiptHistory(
     val projectedTotalCents: Int,
     val actualTotalCents: Int,
     val taxPaidCents: Int,
-    val lineItems: List<ReceiptLineItem> = emptyList()
+    val lineItems: List<ReceiptLineItem> = emptyList(),
 )
 
 @Serializable
 data class ReceiptLineItem(
-    val id: Long = 0,
+    val id: Uuid = Uuid.random(),
     val receiptId: Uuid,
     val ingredientId: Uuid? = null,
     val unitId: Uuid? = null,
     val customName: String? = null,
     val quantityBought: Double,
-    val pricePaidCents: Int
+    val pricePaidCents: Int,
 )
 
-@Serializable
-
-data class PriceUpdate(
-
-    val ingredientId: Uuid,
-
-    val newPriceCents: Int
-
-)
+@Serializable data class PriceUpdate(val ingredientId: Uuid, val newPriceCents: Int)

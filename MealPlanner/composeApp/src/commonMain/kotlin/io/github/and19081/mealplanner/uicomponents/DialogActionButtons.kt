@@ -16,28 +16,25 @@ fun DialogActionButtons(
     saveEnabled: Boolean = true,
     saveLabel: String = "Save",
     onDelete: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (onDelete != null) Arrangement.SpaceBetween else Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (onDelete != null) {
-            TextButton(
-                onClick = onDelete,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Text("Delete")
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onCancel) { Text("Cancel") }
-            Button(
-                onClick = onSave,
-                enabled = saveEnabled
-            ) { Text(saveLabel) }
-        }
+  Row(
+      modifier = modifier.fillMaxWidth(),
+      horizontalArrangement = if (onDelete != null) Arrangement.SpaceBetween else Arrangement.End,
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    if (onDelete != null) {
+      TextButton(
+          onClick = onDelete,
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+      ) {
+        Text("Delete")
+      }
     }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      TextButton(onClick = onCancel) { Text("Cancel") }
+      Button(onClick = onSave, enabled = saveEnabled) { Text(saveLabel) }
+    }
+  }
 }

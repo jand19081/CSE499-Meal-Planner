@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "6d4cda9ba1dcb4072a8d28e9d82b13f5",
+    "identityHash": "09684ff11ed14759436fd6d8e7d8a7a1",
     "entities": [
       {
         "tableName": "units",
@@ -173,7 +173,7 @@
       },
       {
         "tableName": "ingredients",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `preferred_unit_id` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`preferred_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -186,6 +186,11 @@
             "columnName": "name",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "preferredUnitId",
+            "columnName": "preferred_unit_id",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "createdAt",
@@ -214,6 +219,28 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_name` ON `${TABLE_NAME}` (`name`)"
+          },
+          {
+            "name": "index_ingredients_preferred_unit_id",
+            "unique": false,
+            "columnNames": [
+              "preferred_unit_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_preferred_unit_id` ON `${TABLE_NAME}` (`preferred_unit_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "units",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "preferred_unit_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
           }
         ]
       },
@@ -254,7 +281,7 @@
       },
       {
         "tableName": "recipes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `servings` REAL, `meal_type` TEXT, `prep_time_minutes` INTEGER, `cook_time_minutes` INTEGER, `created_at` INTEGER NOT NULL, `updated_at` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `servings` REAL, `meal_type` TEXT, `prep_time_minutes` INTEGER, `cook_time_minutes` INTEGER, `produces_ingredient_id` TEXT, `yield_quantity` REAL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`produces_ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -294,6 +321,16 @@
             "affinity": "INTEGER"
           },
           {
+            "fieldPath": "producesIngredientId",
+            "columnName": "produces_ingredient_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "amountPerServing",
+            "columnName": "yield_quantity",
+            "affinity": "REAL"
+          },
+          {
             "fieldPath": "createdAt",
             "columnName": "created_at",
             "affinity": "INTEGER",
@@ -329,17 +366,39 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_recipes_description` ON `${TABLE_NAME}` (`description`)"
+          },
+          {
+            "name": "index_recipes_produces_ingredient_id",
+            "unique": false,
+            "columnNames": [
+              "produces_ingredient_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipes_produces_ingredient_id` ON `${TABLE_NAME}` (`produces_ingredient_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "produces_ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
           }
         ]
       },
       {
         "tableName": "recipe_instructions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recipe_id` TEXT NOT NULL, `step_order` INTEGER NOT NULL, `instruction` TEXT NOT NULL, FOREIGN KEY(`recipe_id`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `recipe_id` TEXT NOT NULL, `step_order` INTEGER NOT NULL, `instruction` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`recipe_id`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -362,7 +421,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
@@ -394,7 +453,7 @@
       },
       {
         "tableName": "pre_planned_meals",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `meal_type` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -407,6 +466,11 @@
             "columnName": "name",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "mealType",
+            "columnName": "meal_type",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -732,12 +796,12 @@
       },
       {
         "tableName": "unit_conversion_bridges",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ingredient_id` TEXT NOT NULL, `from_unit_id` TEXT NOT NULL, `to_unit_id` TEXT NOT NULL, `from_quantity` REAL NOT NULL, `to_quantity` REAL NOT NULL, FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`from_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`to_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `from_unit_id` TEXT NOT NULL, `to_unit_id` TEXT NOT NULL, `from_quantity` REAL NOT NULL, `to_quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`from_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`to_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -772,7 +836,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
@@ -1024,18 +1088,72 @@
         ]
       },
       {
-        "tableName": "recipe_requirements",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recipe_id` TEXT NOT NULL, `ingredient_id` TEXT, `sub_recipe_id` TEXT, `unit_id` TEXT NOT NULL, `quantity` REAL NOT NULL, `sort_order` INTEGER NOT NULL, FOREIGN KEY(`recipe_id`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "tableName": "recipe_requirement_groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `recipe_id` TEXT NOT NULL, `sort_order` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`recipe_id`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
             "fieldPath": "recipeId",
             "columnName": "recipe_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sort_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recipe_requirement_groups_recipe_id",
+            "unique": false,
+            "columnNames": [
+              "recipe_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_requirement_groups_recipe_id` ON `${TABLE_NAME}` (`recipe_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recipes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "recipe_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "recipe_requirements",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `group_id` TEXT NOT NULL, `ingredient_id` TEXT, `sub_recipe_id` TEXT, `unit_id` TEXT, `quantity` REAL NOT NULL, `is_primary` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`group_id`) REFERENCES `recipe_requirement_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "group_id",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -1052,8 +1170,7 @@
           {
             "fieldPath": "unitId",
             "columnName": "unit_id",
-            "affinity": "TEXT",
-            "notNull": true
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "quantity",
@@ -1062,27 +1179,27 @@
             "notNull": true
           },
           {
-            "fieldPath": "sortOrder",
-            "columnName": "sort_order",
+            "fieldPath": "isPrimary",
+            "columnName": "is_primary",
             "affinity": "INTEGER",
             "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
         },
         "indices": [
           {
-            "name": "index_recipe_requirements_recipe_id",
+            "name": "index_recipe_requirements_group_id",
             "unique": false,
             "columnNames": [
-              "recipe_id"
+              "group_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_requirements_recipe_id` ON `${TABLE_NAME}` (`recipe_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_requirements_group_id` ON `${TABLE_NAME}` (`group_id`)"
           },
           {
             "name": "index_recipe_requirements_ingredient_id",
@@ -1105,11 +1222,11 @@
         ],
         "foreignKeys": [
           {
-            "table": "recipes",
+            "table": "recipe_requirement_groups",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
-              "recipe_id"
+              "group_id"
             ],
             "referencedColumns": [
               "id"
@@ -1117,7 +1234,7 @@
           },
           {
             "table": "ingredients",
-            "onDelete": "RESTRICT",
+            "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
               "ingredient_id"
@@ -1201,12 +1318,12 @@
       },
       {
         "tableName": "meal_independent_ingredients",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `pre_planned_meal_id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `quantity` REAL NOT NULL, FOREIGN KEY(`pre_planned_meal_id`) REFERENCES `pre_planned_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pre_planned_meal_id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`pre_planned_meal_id`) REFERENCES `pre_planned_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -1235,7 +1352,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
@@ -1283,7 +1400,7 @@
           },
           {
             "table": "ingredients",
-            "onDelete": "RESTRICT",
+            "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
               "ingredient_id"
@@ -1307,8 +1424,14 @@
       },
       {
         "tableName": "pantry_inventory",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredient_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `quantity` REAL NOT NULL, PRIMARY KEY(`ingredient_id`, `unit_id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `ingredient_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
           {
             "fieldPath": "ingredientId",
             "columnName": "ingredient_id",
@@ -1331,11 +1454,19 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "ingredient_id",
-            "unit_id"
+            "id"
           ]
         },
         "indices": [
+          {
+            "name": "index_pantry_inventory_ingredient_id",
+            "unique": false,
+            "columnNames": [
+              "ingredient_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pantry_inventory_ingredient_id` ON `${TABLE_NAME}` (`ingredient_id`)"
+          },
           {
             "name": "index_pantry_inventory_unit_id",
             "unique": false,
@@ -1372,8 +1503,73 @@
         ]
       },
       {
+        "tableName": "leftover_inventory",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `recipe_id` TEXT NOT NULL, `remaining_servings` REAL NOT NULL, `date_added` TEXT NOT NULL, `expiration_date` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`recipe_id`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recipeId",
+            "columnName": "recipe_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remainingServings",
+            "columnName": "remaining_servings",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateAdded",
+            "columnName": "date_added",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expirationDate",
+            "columnName": "expiration_date",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_leftover_inventory_recipe_id",
+            "unique": false,
+            "columnNames": [
+              "recipe_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_leftover_inventory_recipe_id` ON `${TABLE_NAME}` (`recipe_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recipes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "recipe_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
         "tableName": "shopping_cart_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `ingredient_id` TEXT, `custom_shopping_item_id` TEXT, `store_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `package_option_id` TEXT, `custom_name` TEXT, `needed_quantity` REAL NOT NULL, `is_purchased` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`custom_shopping_item_id`) REFERENCES `custom_shopping_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`store_id`) REFERENCES `stores`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`package_option_id`) REFERENCES `package_options`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `ingredient_id` TEXT, `custom_shopping_item_id` TEXT, `store_id` TEXT, `unit_id` TEXT NOT NULL, `package_option_id` TEXT, `custom_name` TEXT, `needed_quantity` REAL NOT NULL, `is_purchased` INTEGER NOT NULL, `is_pantry_item` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`custom_shopping_item_id`) REFERENCES `custom_shopping_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`store_id`) REFERENCES `stores`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`package_option_id`) REFERENCES `package_options`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1394,8 +1590,7 @@
           {
             "fieldPath": "storeId",
             "columnName": "store_id",
-            "affinity": "TEXT",
-            "notNull": true
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "unitId",
@@ -1422,6 +1617,12 @@
           {
             "fieldPath": "isPurchased",
             "columnName": "is_purchased",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPantryItem",
+            "columnName": "is_pantry_item",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1504,7 +1705,7 @@
           },
           {
             "table": "stores",
-            "onDelete": "RESTRICT",
+            "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
               "store_id"
@@ -1539,12 +1740,12 @@
       },
       {
         "tableName": "receipt_line_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `receipt_id` TEXT NOT NULL, `ingredient_id` TEXT, `unit_id` TEXT, `custom_name` TEXT, `quantity_bought` REAL NOT NULL, `price_paid_cents` INTEGER NOT NULL, FOREIGN KEY(`receipt_id`) REFERENCES `store_receipts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `receipt_id` TEXT NOT NULL, `ingredient_id` TEXT, `unit_id` TEXT, `custom_name` TEXT, `quantity_bought` REAL NOT NULL, `price_paid_cents` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`receipt_id`) REFERENCES `store_receipts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -1582,7 +1783,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
@@ -1630,7 +1831,7 @@
           },
           {
             "table": "ingredients",
-            "onDelete": "RESTRICT",
+            "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
               "ingredient_id"
@@ -1655,7 +1856,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6d4cda9ba1dcb4072a8d28e9d82b13f5')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '09684ff11ed14759436fd6d8e7d8a7a1')"
     ]
   }
 }

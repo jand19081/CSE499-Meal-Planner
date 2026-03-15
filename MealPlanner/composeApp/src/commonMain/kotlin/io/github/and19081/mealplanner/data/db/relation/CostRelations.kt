@@ -5,10 +5,10 @@ import kotlin.uuid.Uuid
 
 data class RecipeCost(
     @ColumnInfo(name = "recipe_id") val recipeId: Uuid,
-    @ColumnInfo(name = "total_cost_cents") val totalCostCents: Long
+    @ColumnInfo(name = "total_cost_cents") val totalCostCents: Long,
 )
 
 data class MealCost(
     @ColumnInfo(name = "meal_id") val mealId: Uuid,
-    @ColumnInfo(name = "total_cost_cents") val totalCostCents: Long
+    @ColumnInfo(name = "total_cost_cents") val totalCostCents: Long,
 )

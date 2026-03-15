@@ -3,9 +3,7 @@ package io.github.and19081.mealplanner.data.db.relation
 import androidx.room.*
 import io.github.and19081.mealplanner.data.db.entity.*
 
-/**
- * Room relation data classes.
- */
+/** Room relation data classes. */
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ingredient relations
@@ -13,22 +11,21 @@ import io.github.and19081.mealplanner.data.db.entity.*
 
 data class IngredientWithCategories(
     @Embedded val ingredient: IngredientEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "id",
-        associateBy = Junction(
-            value = IngredientCategoryEntity::class,
-            parentColumn = "ingredient_id",
-            entityColumn = "category_id"
-        ),
+        associateBy =
+            Junction(
+                value = IngredientCategoryEntity::class,
+                parentColumn = "ingredient_id",
+                entityColumn = "category_id",
+            ),
     )
     val categories: List<CategoryEntity>,
 )
 
 data class IngredientWithConversions(
     @Embedded val ingredient: IngredientEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "ingredient_id",
@@ -40,20 +37,28 @@ data class IngredientWithConversions(
 // Recipe relations
 // ─────────────────────────────────────────────────────────────────────────────
 
+data class RecipeRequirementGroupWithRequirements(
+    @Embedded val group: RecipeRequirementGroupEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "group_id",
+    )
+    val requirements: List<RecipeRequirementEntity>,
+)
+
 data class RecipeWithDetails(
     @Embedded val recipe: RecipeEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "recipe_id",
     )
     val instructions: List<RecipeInstructionEntity>,
-
     @Relation(
+        entity = RecipeRequirementGroupEntity::class,
         parentColumn = "id",
         entityColumn = "recipe_id",
     )
-    val requirements: List<RecipeRequirementEntity>,
+    val requirementGroups: List<RecipeRequirementGroupWithRequirements>,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,18 +67,17 @@ data class RecipeWithDetails(
 
 data class PrePlannedMealWithRecipes(
     @Embedded val meal: PrePlannedMealEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "id",
-        associateBy = Junction(
-            value = MealRecipeEntity::class,
-            parentColumn = "pre_planned_meal_id",
-            entityColumn = "recipe_id",
-        ),
+        associateBy =
+            Junction(
+                value = MealRecipeEntity::class,
+                parentColumn = "pre_planned_meal_id",
+                entityColumn = "recipe_id",
+            ),
     )
     val recipes: List<RecipeEntity>,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "pre_planned_meal_id",
@@ -87,13 +91,11 @@ data class PrePlannedMealWithRecipes(
 
 data class ScheduledMealWithSource(
     @Embedded val scheduledMeal: ScheduledMealEntity,
-
     @Relation(
         parentColumn = "pre_planned_meal_id",
         entityColumn = "id",
     )
     val prePlannedMeal: List<PrePlannedMealEntity>,
-
     @Relation(
         parentColumn = "restaurant_id",
         entityColumn = "id",
@@ -107,20 +109,13 @@ data class ScheduledMealWithSource(
 
 data class ShoppingCartItemWithDetails(
     @Embedded val cartItem: ShoppingCartItemEntity,
-
-    @Relation(parentColumn = "ingredient_id",           entityColumn = "id")
+    @Relation(parentColumn = "ingredient_id", entityColumn = "id")
     val ingredient: List<IngredientEntity>,
-
     @Relation(parentColumn = "custom_shopping_item_id", entityColumn = "id")
     val customItem: List<CustomShoppingItemEntity>,
-
-    @Relation(parentColumn = "store_id",                entityColumn = "id")
-    val store: List<StoreEntity>,
-
-    @Relation(parentColumn = "unit_id",                 entityColumn = "id")
-    val unit: List<UnitEntity>,
-
-    @Relation(parentColumn = "package_option_id",       entityColumn = "id")
+    @Relation(parentColumn = "store_id", entityColumn = "id") val store: List<StoreEntity>,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: List<UnitEntity>,
+    @Relation(parentColumn = "package_option_id", entityColumn = "id")
     val packageOption: List<PackageOptionEntity>,
 )
 
@@ -130,12 +125,9 @@ data class ShoppingCartItemWithDetails(
 
 data class PantryInventoryWithDetails(
     @Embedded val pantryItem: PantryInventoryEntity,
-
     @Relation(parentColumn = "ingredient_id", entityColumn = "id")
     val ingredient: List<IngredientEntity>,
-
-    @Relation(parentColumn = "unit_id", entityColumn = "id")
-    val unit: List<UnitEntity>,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: List<UnitEntity>,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,17 +136,13 @@ data class PantryInventoryWithDetails(
 
 data class ReceiptLineItemWithDetails(
     @Embedded val lineItem: ReceiptLineItemEntity,
-
     @Relation(parentColumn = "ingredient_id", entityColumn = "id")
     val ingredient: List<IngredientEntity>,
-
-    @Relation(parentColumn = "unit_id", entityColumn = "id")
-    val unit: List<UnitEntity>,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: List<UnitEntity>,
 )
 
 data class StoreReceiptWithLineItems(
     @Embedded val receipt: StoreReceiptEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "receipt_id",
@@ -164,7 +152,6 @@ data class StoreReceiptWithLineItems(
 
 data class StoreWithReceipts(
     @Embedded val store: StoreEntity,
-
     @Relation(
         parentColumn = "id",
         entityColumn = "store_id",
@@ -178,8 +165,8 @@ data class StoreWithReceipts(
 
 data class PackageOptionWithDetails(
     @Embedded val packageOption: PackageOptionEntity,
-
-    @Relation(parentColumn = "store_id",      entityColumn = "id") val store: List<StoreEntity>,
-    @Relation(parentColumn = "ingredient_id", entityColumn = "id") val ingredient: List<IngredientEntity>,
-    @Relation(parentColumn = "unit_id",       entityColumn = "id") val unit: List<UnitEntity>,
+    @Relation(parentColumn = "store_id", entityColumn = "id") val store: List<StoreEntity>,
+    @Relation(parentColumn = "ingredient_id", entityColumn = "id")
+    val ingredient: List<IngredientEntity>,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: List<UnitEntity>,
 )

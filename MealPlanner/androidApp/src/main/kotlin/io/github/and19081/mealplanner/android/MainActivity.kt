@@ -9,18 +9,17 @@ import io.github.and19081.mealplanner.App
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
-        super.onCreate(savedInstanceState)
+  override fun onCreate(savedInstanceState: Bundle?) {
+    enableEdgeToEdge()
+    super.onCreate(savedInstanceState)
 
-        val dbFile = applicationContext.getDatabasePath("meal_planner.db")
-        val builder = Room.databaseBuilder<MealPlannerDatabase>(
+    val dbFile = applicationContext.getDatabasePath("meal_planner.db")
+    val builder =
+        Room.databaseBuilder<MealPlannerDatabase>(
             context = applicationContext,
-            name = dbFile.absolutePath
+            name = dbFile.absolutePath,
         )
 
-        setContent {
-            App(builder)
-        }
-    }
+    setContent { App(builder) }
+  }
 }

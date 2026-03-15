@@ -1,56 +1,23 @@
 package io.github.and19081.mealplanner
 
+import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
-
 import kotlinx.datetime.LocalTime
-
 import kotlinx.serialization.Serializable
 
-import kotlin.uuid.Uuid
-
-
+@Serializable data class Restaurant(val id: Uuid, val name: String)
 
 @Serializable
-
-data class Restaurant(
-
-    val id: Uuid,
-
-    val name: String
-
-)
-
-
+data class MealIngredient(val ingredientId: Uuid, val quantity: Double, val unitId: Uuid)
 
 @Serializable
-
-data class MealIngredient(
-
-    val ingredientId: Uuid,
-
-    val quantity: Double,
-
-    val unitId: Uuid
-
-)
-
-
-
-@Serializable
-
 data class PrePlannedMeal(
-
     val id: Uuid,
-
     val name: String,
-
+    val mealType: RecipeMealType? = null,
     val recipes: List<Uuid> = emptyList(),
-
-    val independentIngredients: List<MealIngredient> = emptyList()
-
+    val independentIngredients: List<MealIngredient> = emptyList(),
 )
-
-
 
 @Serializable
 data class ScheduledMeal(
@@ -62,21 +29,22 @@ data class ScheduledMeal(
     val restaurantId: Uuid? = null,
     val peopleCount: Int,
     val isConsumed: Boolean = false,
-    val anticipatedCostCents: Int? = null
+    val anticipatedCostCents: Int? = null,
 )
 
-
+@Serializable
+data class PantryItem(
+    val id: Uuid,
+    val ingredientId: Uuid,
+    val quantity: Double,
+    val unitId: Uuid,
+)
 
 @Serializable
-
-data class PantryItem(
-
+data class LeftoverItem(
     val id: Uuid,
-
-    val ingredientId: Uuid,
-
-    val quantity: Double,
-
-    val unitId: Uuid
-
+    val recipeId: Uuid,
+    val remainingServings: Double,
+    val dateAdded: String,
+    val expirationDate: String? = null,
 )
