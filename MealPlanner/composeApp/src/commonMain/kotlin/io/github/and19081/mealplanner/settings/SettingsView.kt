@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.ingredients.*
+import io.github.and19081.mealplanner.uicomponents.HorizontalNumericUpDownControl
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 
@@ -198,29 +199,38 @@ fun SettingsContent(
       )
     }
 
-    // Financials Section
-    Column {
-      HorizontalDivider()
-      SectionHeader("Financials")
+      // Financials Section
+      Column {
+          HorizontalDivider()
+          SectionHeader("Financials")
 
-      MpOutlinedTextField(
-          value = (uiState.taxRate * 100).toString(),
-          onValueChange = {
-            val doubleVal = it.toDoubleOrNull()
-            if (doubleVal != null) {
-              viewModel.updateTaxRate(doubleVal / 100.0)
-            }
-          },
-          label = { Text("Sales Tax Rate (%)") },
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          modifier = Modifier.fillMaxWidth(),
-      )
-      Text(
-          "Enter tax as percentage (e.g., 8.0 for 8%)",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
+          Text(
+              text = "Enter tax as percentage (e.g., 8.0 for 8%)",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(vertical = 8.dp)
+          )
+
+          Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+              Text(text = "Sales Tax:")
+
+              HorizontalNumericUpDownControl(
+                  value = uiState.taxRate * 100.0,
+                  onValueChange = { newPercentage ->
+                      // Convert the 0-100 scale back to the 0.0-1.0 scale
+                      viewModel.updateTaxRate(newPercentage / 100.0)
+                  },
+                  min = 0.0,
+                  max = 100.0,
+                  step = 0.25 // +/- 0.25%
+              )
+
+              Text("%")
+          }
+      }
 
     Spacer(modifier = Modifier.height(80.dp))
   }

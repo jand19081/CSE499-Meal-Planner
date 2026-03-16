@@ -17,6 +17,7 @@ class SettingsViewModel(
     private val restaurantRepository: RestaurantRepository,
     private val unitRepository: UnitRepository,
 ) : ViewModel() {
+    // val
 
   val uiState =
       combine(
