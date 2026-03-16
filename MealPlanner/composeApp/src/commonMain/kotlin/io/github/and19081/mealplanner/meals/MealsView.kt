@@ -41,6 +41,7 @@ import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlin.uuid.Uuid
 
 @Composable
@@ -52,57 +53,51 @@ fun MealsView(
     onAddRecipe: (String, (Recipe) -> Unit) -> Unit,
     onMakeMeal: (PrePlannedMeal, Double, Uuid?, Double?, Uuid?) -> Unit = { _, _, _, _, _ -> },
 ) {
-  val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
-  var selectedMealId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-  var isAdding by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-  val selectedMeal = uiState.groupedMeals.values.flatten().find { it.id.toString() == selectedMealId }
+    // 1. Use rememberSaveable with IDs to survive screen rotation
+    var selectedMealId by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAdding by rememberSaveable { mutableStateOf(false) }
+    val selectedMeal = uiState.groupedMeals.values.flatten().find { it.id.toString() == selectedMealId }
 
-  var mealToMake by remember { mutableStateOf<PrePlannedMeal?>(null) }
+    // 2. State for the new Make Meal dialog
+    var mealToMake by remember { mutableStateOf<PrePlannedMeal?>(null) }
 
-  val snackbarHostState = remember { SnackbarHostState() }
-
-  LaunchedEffect(uiState.errorMessage) {
-    uiState.errorMessage?.let {
-      snackbarHostState.showSnackbar(it)
-      viewModel.clearError()
+    // ... Same logic as RecipesView:
+    val onMealClick: (PrePlannedMeal) -> Unit = {
+        selectedMealId = it.id.toString()
+        isAdding = false
     }
-  }
 
-  val actualIsExpanded =
-      when (mode) {
-        Mode.AUTO -> isExpanded
-        Mode.DESKTOP -> true
-        Mode.MOBILE -> false
-      }
+    val onAddClick: () -> Unit = {
+        selectedMealId = null
+        isAdding = true
+    }
 
-  val onMealClick: (PrePlannedMeal) -> Unit = {
-    selectedMealId = it.id.toString()
-    isAdding = false
-  }
+    val onDismissDetail: () -> Unit = {
+        selectedMealId = null
+        isAdding = false
+    }
 
-  val onAddClick: () -> Unit = {
-    selectedMealId = null
-    isAdding = true
-  }
-
-  val onDismissDetail: () -> Unit = {
-    selectedMealId = null
-    isAdding = false
-  }
-
-  if (mealToMake != null) {
-    PrepareBatchDialog(
-        itemName = mealToMake!!.name,
-        allIngredients = uiState.allIngredients,
-        allUnits = uiState.allUnits,
-        onDismiss = { mealToMake = null },
-        onConfirm = { multiplier, yieldIngId, yieldQty, yieldUnitId ->
-            onMakeMeal(mealToMake!!, multiplier, yieldIngId, yieldQty, yieldUnitId)
-            mealToMake = null
+    val actualIsExpanded =
+        when (mode) {
+            Mode.AUTO -> isExpanded
+            Mode.DESKTOP -> true
+            Mode.MOBILE -> false
         }
-    )
-  }
+
+    if (mealToMake != null) {
+        PrepareBatchDialog(
+            itemName = mealToMake!!.name,
+            allIngredients = uiState.allIngredients,
+            allUnits = uiState.allUnits,
+            onDismiss = { mealToMake = null },
+            onConfirm = { multiplier, yieldIngId, yieldQty, yieldUnitId ->
+                onMakeMeal(mealToMake!!, multiplier, yieldIngId, yieldQty, yieldUnitId)
+                mealToMake = null
+            }
+        )
+    }
 
   if (actualIsExpanded) {
     Row(modifier = Modifier.fillMaxSize()) {

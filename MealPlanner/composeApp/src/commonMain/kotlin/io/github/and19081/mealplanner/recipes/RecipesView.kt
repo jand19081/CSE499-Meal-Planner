@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +41,7 @@ import io.github.and19081.mealplanner.uicomponents.MpNumericStepper
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import kotlin.uuid.Uuid
 
 @Composable
 fun RecipesView(
@@ -48,49 +50,52 @@ fun RecipesView(
     isExpanded: Boolean,
     onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
     onAddSubRecipe: (String, (Recipe) -> Unit) -> Unit,
-    onMakeRecipe: (Recipe, Double, kotlin.uuid.Uuid?, Double?, kotlin.uuid.Uuid?) -> Unit = { _, _, _, _, _ -> },
+    onMakeRecipe: (Recipe, Double, Uuid?, Double?, Uuid?) -> Unit = { _, _, _, _, _ -> },
 ) {
-  val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
-  var selectedRecipeId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-  var isAdding by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-  val selectedRecipe = uiState.allRecipes.find { it.id.toString() == selectedRecipeId }
-  var recipeToMake by remember { mutableStateOf<Recipe?>(null) }
+    // 1. Use rememberSaveable with IDs to survive screen rotation
+    var selectedRecipeId by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAdding by rememberSaveable { mutableStateOf(false) }
+    val selectedRecipe = uiState.allRecipes.find { it.id.toString() == selectedRecipeId }
 
-  val actualIsExpanded =
-      when (mode) {
-        io.github.and19081.mealplanner.settings.Mode.AUTO -> isExpanded
-        io.github.and19081.mealplanner.settings.Mode.DESKTOP -> true
-        io.github.and19081.mealplanner.settings.Mode.MOBILE -> false
-      }
+    // 2. State for the new Make Recipe dialog
+    var recipeToMake by remember { mutableStateOf<Recipe?>(null) }
 
-  val onRecipeClick: (Recipe) -> Unit = {
-    selectedRecipeId = it.id.toString()
-    isAdding = false
-  }
-
-  val onAddClick: () -> Unit = {
-    selectedRecipeId = null
-    isAdding = true
-  }
-
-  val onDismissDetail: () -> Unit = {
-    selectedRecipeId = null
-    isAdding = false
-  }
-
-  if (recipeToMake != null) {
-    PrepareBatchDialog(
-        itemName = recipeToMake!!.name,
-        allIngredients = uiState.allIngredients,
-        allUnits = uiState.allUnits,
-        onDismiss = { recipeToMake = null },
-        onConfirm = { multiplier, yieldIngId, yieldQty, yieldUnitId ->
-            onMakeRecipe(recipeToMake!!, multiplier, yieldIngId, yieldQty, yieldUnitId)
-            recipeToMake = null
+    val actualIsExpanded =
+        when (mode) {
+            io.github.and19081.mealplanner.settings.Mode.AUTO -> isExpanded
+            io.github.and19081.mealplanner.settings.Mode.DESKTOP -> true
+            io.github.and19081.mealplanner.settings.Mode.MOBILE -> false
         }
-    )
-  }
+
+    val onRecipeClick: (Recipe) -> Unit = {
+        selectedRecipeId = it.id.toString()
+        isAdding = false
+    }
+
+    val onAddClick: () -> Unit = {
+        selectedRecipeId = null
+        isAdding = true
+    }
+
+    val onDismissDetail: () -> Unit = {
+        selectedRecipeId = null
+        isAdding = false
+    }
+
+    if (recipeToMake != null) {
+        PrepareBatchDialog(
+            itemName = recipeToMake!!.name,
+            allIngredients = uiState.allIngredients,
+            allUnits = uiState.allUnits,
+            onDismiss = { recipeToMake = null },
+            onConfirm = { multiplier, yieldIngId, yieldQty, yieldUnitId ->
+                onMakeRecipe(recipeToMake!!, multiplier, yieldIngId, yieldQty, yieldUnitId)
+                recipeToMake = null
+            }
+        )
+    }
 
   if (actualIsExpanded) {
     Row(modifier = Modifier.fillMaxSize()) {

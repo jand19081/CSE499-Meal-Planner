@@ -34,49 +34,35 @@ import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.ExperimentalUuidApi
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlin.uuid.Uuid
 
 @Composable
 fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boolean) {
-  val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
-  var selectedIngredientId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-  var isAdding by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-  var creationName by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
-  
-  val selectedIngredient = uiState.groupedIngredients.values.flatten().find { it.id.toString() == selectedIngredientId }
+    // Use rememberSaveable
+    var selectedIngredientId by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAdding by rememberSaveable { mutableStateOf(false) }
+    var creationName by rememberSaveable { mutableStateOf("") }
 
-  val snackbarHostState = remember { SnackbarHostState() }
+    val selectedIngredient = uiState.groupedIngredients.values.flatten().find { it.id.toString() == selectedIngredientId }
 
-  LaunchedEffect(uiState.errorMessage) {
-    uiState.errorMessage?.let {
-      snackbarHostState.showSnackbar(it)
-      viewModel.clearError()
+    val onIngredientClick: (Ingredient) -> Unit = {
+        selectedIngredientId = it.id.toString()
+        isAdding = false
     }
-  }
 
-  val actualIsExpanded =
-      when (mode) {
-        Mode.AUTO -> isExpanded
-        Mode.DESKTOP -> true
-        Mode.MOBILE -> false
-      }
+    val onAddClick: () -> Unit = {
+        selectedIngredientId = null
+        creationName = ""
+        isAdding = true
+    }
 
-  val onIngredientClick: (Ingredient) -> Unit = {
-    selectedIngredientId = it.id.toString()
-    isAdding = false
-  }
-
-  val onAddClick: () -> Unit = {
-    selectedIngredientId = null
-    creationName = ""
-    isAdding = true
-  }
-
-  val onDismissDetail: () -> Unit = {
-    selectedIngredientId = null
-    isAdding = false
-  }
+    val onDismissDetail: () -> Unit = {
+        selectedIngredientId = null
+        isAdding = false
+    }
 
   var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
   var deleteConfirmationMessage by remember { mutableStateOf("") }
@@ -105,6 +91,13 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
       { updatedIngredient, newPackages, newBridges ->
         viewModel.saveIngredient(updatedIngredient, newPackages, newBridges)
         onDismissDetail()
+      }
+
+  val actualIsExpanded =
+      when (mode) {
+        Mode.AUTO -> isExpanded
+        Mode.DESKTOP -> true
+        Mode.MOBILE -> false
       }
 
   if (actualIsExpanded) {
