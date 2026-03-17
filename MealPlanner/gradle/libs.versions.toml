@@ -58,6 +58,7 @@ ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "ui
 ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "uiTooling" }
 kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization"}
 materialKolor = "com.materialkolor:material-kolor:5.0.0-alpha06"
+androidx-work = { module = "androidx.work:work-runtime-ktx", version = "2.9.0" }
 androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }

@@ -1,19 +1,35 @@
 package io.github.and19081.mealplanner.notifications
 
-import android.util.Log
-import io.github.and19081.mealplanner.ScheduledMeal
+import android.content.Context
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 import kotlin.uuid.Uuid
 
-class AndroidMealNotificationScheduler : MealNotificationScheduler {
-    override fun scheduleMealNotification(meal: ScheduledMeal, mealName: String) {
-        // In a full production app, this would enqueue a WorkManager task
-        // or set an AlarmManager intent based on meal.date and meal.time
-        Log.d("MealNotification", "Scheduled notification for meal: \$mealName at \${meal.date}")
+class AndroidMealNotificationScheduler(private val context: Context) : MealNotificationScheduler {
+
+    override fun scheduleVerificationNotification(mealId: Uuid, mealName: String, delayMinutes: Long) {
+        val workData = Data.Builder()
+            .putString("MEAL_ID", mealId.toString())
+            .putString("MEAL_NAME", mealName)
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<MealNotificationWorker>()
+            .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
+            .setInputData(workData)
+            .addTag(mealId.toString())
+            .build()
+
+        WorkManager.getInstance(context).enqueue(workRequest)
     }
 
-    override fun cancelMealNotification(mealId: Uuid) {
-        Log.d("MealNotification", "Cancelled notification for mealId: \$mealId")
+    override fun cancelNotification(mealId: Uuid) {
+        WorkManager.getInstance(context).cancelAllWorkByTag(mealId.toString())
     }
 }
 
-actual fun createNotificationScheduler(): MealNotificationScheduler = AndroidMealNotificationScheduler()
+actual fun createNotificationScheduler(platformContext: Any?): MealNotificationScheduler {
+    val context = platformContext as? Context ?: throw IllegalArgumentException("AndroidMealNotificationScheduler requires a Context")
+    return AndroidMealNotificationScheduler(context)
+}

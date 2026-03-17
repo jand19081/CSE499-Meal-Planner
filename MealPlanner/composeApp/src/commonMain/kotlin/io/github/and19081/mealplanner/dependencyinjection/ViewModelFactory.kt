@@ -30,6 +30,7 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
         pantryRepository = di.pantryRepository,
         unitRepository = di.unitRepository,
         restaurantRepository = di.restaurantRepository,
+        settingsRepository = di.settingsRepository,
         notificationScheduler = di.notificationScheduler,
     )
 

@@ -128,6 +128,18 @@ class DashboardViewModel(
           )
 
   fun toggleMealConsumption(entryId: Uuid, currentStatus: Boolean) {
-    viewModelScope.launch { mealPlanRepository.setConsumedStatus(entryId, !currentStatus) }
+    viewModelScope.launch {
+        if (!currentStatus) {
+            val consumeMealUseCase = ConsumeMealUseCase(
+                mealPlanRepository,
+                foodItemRepository,
+                pantryRepository,
+                unitRepository
+            )
+            consumeMealUseCase(entryId)
+        } else {
+            mealPlanRepository.setConsumedStatus(entryId, false)
+        }
+    }
   }
 }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 class DependencyInjectionContainer(
     private val db: MealPlannerDatabase,
     private val scope: CoroutineScope,
+    private val platformContext: Any? = null,
 ) {
   val settingsRepository: SettingsRepository = RoomSettingsRepository(db, scope)
   val unitRepository: UnitRepository = RoomUnitRepository(db, scope)
@@ -30,7 +31,7 @@ class DependencyInjectionContainer(
       RoomShoppingListItemRepository(db, scope)
   val receiptHistoryRepository: ReceiptHistoryRepository = RoomReceiptHistoryRepository(db, scope)
   val notificationScheduler: io.github.and19081.mealplanner.notifications.MealNotificationScheduler =
-      io.github.and19081.mealplanner.notifications.createNotificationScheduler()
+      io.github.and19081.mealplanner.notifications.createNotificationScheduler(platformContext)
 
   val viewModelFactory = ViewModelFactory(this)
 

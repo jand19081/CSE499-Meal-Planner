@@ -1,11 +1,17 @@
 package io.github.and19081.mealplanner.notifications
 
-import io.github.and19081.mealplanner.ScheduledMeal
 import kotlin.uuid.Uuid
 
 interface MealNotificationScheduler {
-    fun scheduleMealNotification(meal: ScheduledMeal, mealName: String)
-    fun cancelMealNotification(mealId: Uuid)
+    /**
+     * Schedules a verification notification for a specific meal.
+     * @param mealId The ID of the ScheduledMeal.
+     * @param mealName The name of the meal for the notification text.
+     * @param delayMinutes The user-configured delay (e.g., 30 minutes) after the scheduled time.
+     */
+    fun scheduleVerificationNotification(mealId: Uuid, mealName: String, delayMinutes: Long)
+    
+    fun cancelNotification(mealId: Uuid)
 }
 
-expect fun createNotificationScheduler(): MealNotificationScheduler
+expect fun createNotificationScheduler(platformContext: Any? = null): MealNotificationScheduler
