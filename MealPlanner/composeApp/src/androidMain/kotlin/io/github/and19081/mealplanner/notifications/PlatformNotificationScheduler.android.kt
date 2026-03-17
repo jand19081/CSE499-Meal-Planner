@@ -13,19 +13,42 @@ class AndroidMealNotificationScheduler(private val context: Context) : MealNotif
         val workData = Data.Builder()
             .putString("MEAL_ID", mealId.toString())
             .putString("MEAL_NAME", mealName)
+            .putString("NOTIFICATION_TYPE", "VERIFICATION")
             .build()
 
         val workRequest = OneTimeWorkRequestBuilder<MealNotificationWorker>()
             .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
             .setInputData(workData)
-            .addTag(mealId.toString())
+            .addTag("verify_${mealId}")
+            .build()
+
+        WorkManager.getInstance(context).enqueue(workRequest)
+    }
+
+    override fun scheduleStartCookingNotification(mealId: Uuid, mealName: String, triggerTimeMillis: Long) {
+        val currentTimeMillis = System.currentTimeMillis()
+        val delayMillis = triggerTimeMillis - currentTimeMillis
+        
+        if (delayMillis <= 0) return
+
+        val workData = Data.Builder()
+            .putString("MEAL_ID", mealId.toString())
+            .putString("MEAL_NAME", mealName)
+            .putString("NOTIFICATION_TYPE", "START_COOKING")
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<MealNotificationWorker>()
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setInputData(workData)
+            .addTag("start_cooking_${mealId}")
             .build()
 
         WorkManager.getInstance(context).enqueue(workRequest)
     }
 
     override fun cancelNotification(mealId: Uuid) {
-        WorkManager.getInstance(context).cancelAllWorkByTag(mealId.toString())
+        WorkManager.getInstance(context).cancelAllWorkByTag("verify_${mealId}")
+        WorkManager.getInstance(context).cancelAllWorkByTag("start_cooking_${mealId}")
     }
 }
 

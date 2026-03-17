@@ -229,6 +229,20 @@ class CalendarViewModel(
         val title = meal?.name ?: restaurant?.name ?: "Unknown Meal"
         val delay = settingsRepository.appSettings.value.mealConsumedNotificationDelayMinutes.toLong()
         notificationScheduler.scheduleVerificationNotification(newEntry.id, title, delay)
+
+        // Schedule Start Cooking Reminder if it's a recipe
+        if (meal != null && meal.isRecipe) {
+            val recipeInfo = meal.recipeInfo
+            if (recipeInfo != null) {
+                val startMillis = CookingTimeCalculator.calculateStartCookingTimestampMillis(
+                    scheduledDate = date,
+                    scheduledTime = time,
+                    prepTimeMinutes = recipeInfo.prepTimeMinutes,
+                    cookTimeMinutes = recipeInfo.cookTimeMinutes
+                )
+                notificationScheduler.scheduleStartCookingNotification(newEntry.id, title, startMillis)
+            }
+        }
     }
   }
 

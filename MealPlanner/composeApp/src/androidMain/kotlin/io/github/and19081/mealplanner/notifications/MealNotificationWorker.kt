@@ -18,27 +18,27 @@ class MealNotificationWorker(
     override suspend fun doWork(): Result {
         val mealId = inputData.getString("MEAL_ID") ?: return Result.failure()
         val mealName = inputData.getString("MEAL_NAME") ?: "your meal"
+        val notificationType = inputData.getString("NOTIFICATION_TYPE") ?: "VERIFICATION"
 
-        showNotification(mealId, mealName)
+        showNotification(mealId, mealName, notificationType)
         return Result.success()
     }
 
-    private fun showNotification(mealId: String, mealName: String) {
+    private fun showNotification(mealId: String, mealName: String, notificationType: String) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "meal_verification_channel"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Meal Verification",
+                "Meal Reminders",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Reminders to verify if you ate your scheduled meals."
+                description = "Reminders for scheduled meals."
             }
             notificationManager.createNotificationChannel(channel)
         }
 
-        // Use package manager to get the launch intent for the app
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("VERIFY_MEAL_ID", mealId)
@@ -47,16 +47,28 @@ class MealNotificationWorker(
         val pendingIntent = if (intent != null) {
             PendingIntent.getActivity(
                 context,
-                mealId.hashCode(),
+                mealId.hashCode() + notificationType.hashCode(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         } else null
 
+        val title = if (notificationType == "START_COOKING") {
+            "Time to start cooking $mealName!"
+        } else {
+            "Did you eat $mealName?"
+        }
+
+        val content = if (notificationType == "START_COOKING") {
+            "Tap to view the recipe and instructions."
+        } else {
+            "Tap to confirm consumption and update your pantry."
+        }
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info) 
-            .setContentTitle("Did you eat $mealName?")
-            .setContentText("Tap to confirm consumption and update your pantry.")
+            .setContentTitle(title)
+            .setContentText(content)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .apply {
                 if (pendingIntent != null) {
@@ -66,6 +78,6 @@ class MealNotificationWorker(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(mealId.hashCode(), notification)
+        notificationManager.notify(mealId.hashCode() + notificationType.hashCode(), notification)
     }
 }

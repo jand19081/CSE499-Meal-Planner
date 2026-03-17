@@ -11,6 +11,14 @@ interface MealNotificationScheduler {
      */
     fun scheduleVerificationNotification(mealId: Uuid, mealName: String, delayMinutes: Long)
     
+    /**
+     * Schedules a notification reminding the user to start cooking.
+     * @param mealId The ID of the ScheduledMeal.
+     * @param mealName The name of the meal.
+     * @param triggerTimeMillis The exact epoch timestamp (in milliseconds) when the user should start cooking.
+     */
+    fun scheduleStartCookingNotification(mealId: Uuid, mealName: String, triggerTimeMillis: Long)
+    
     fun cancelNotification(mealId: Uuid)
 }
 
