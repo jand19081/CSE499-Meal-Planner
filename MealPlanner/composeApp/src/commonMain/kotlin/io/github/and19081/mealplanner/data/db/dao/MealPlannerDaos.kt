@@ -1,8 +1,30 @@
 package io.github.and19081.mealplanner.data.db.dao
 
 import androidx.room.*
-import io.github.and19081.mealplanner.data.db.entity.*
-import io.github.and19081.mealplanner.data.db.relation.*
+import io.github.and19081.mealplanner.data.db.entity.AppSettingsEntity
+import io.github.and19081.mealplanner.data.db.entity.CategoryEntity
+import io.github.and19081.mealplanner.data.db.relation.ComposedFoodItemRelation
+import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
+import io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
+import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
+import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeInstructionEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity
+import io.github.and19081.mealplanner.data.db.entity.RestaurantEntity
+import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
+import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
+import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
+import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
+import io.github.and19081.mealplanner.data.db.entity.StoreEntity
+import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
+import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
+import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
+import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
 
@@ -243,9 +265,9 @@ interface ReceiptDao {
 
 @Dao
 interface AppSettingsDao {
-  @Query("SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.SINGLETON_ID}' LIMIT 1")
+  @Query("SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1")
   fun observe(): Flow<AppSettingsEntity?>
-  @Query("SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.SINGLETON_ID}' LIMIT 1")
+  @Query("SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1")
   suspend fun get(): AppSettingsEntity?
   @Upsert suspend fun upsert(settings: AppSettingsEntity)
 }

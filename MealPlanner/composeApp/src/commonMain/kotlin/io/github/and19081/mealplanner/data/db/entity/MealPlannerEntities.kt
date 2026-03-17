@@ -3,10 +3,10 @@
 package io.github.and19081.mealplanner.data.db.entity
 
 import androidx.room.*
-import io.github.and19081.mealplanner.RecipeMealType
-import io.github.and19081.mealplanner.UnitType
-import io.github.and19081.mealplanner.settings.AppTheme
-import io.github.and19081.mealplanner.settings.Mode
+import io.github.and19081.mealplanner.feature.settings.Mode
+import io.github.and19081.mealplanner.core.theme.AppTheme
+import io.github.and19081.mealplanner.core.util.RecipeMealType
+import io.github.and19081.mealplanner.core.util.UnitType
 import kotlin.uuid.Uuid
 
 // ─────────────────────────────────────────────────────────────────────────────

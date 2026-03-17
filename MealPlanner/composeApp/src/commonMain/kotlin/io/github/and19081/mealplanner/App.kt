@@ -3,12 +3,11 @@ package io.github.and19081.mealplanner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.room.RoomDatabase
+import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
+import io.github.and19081.mealplanner.core.theme.MealPlannerTheme
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
-import io.github.and19081.mealplanner.dependencyinjection.DependencyInjectionContainer
-import io.github.and19081.mealplanner.main.MainView
-import io.github.and19081.mealplanner.settings.MealPlannerTheme
+import io.github.and19081.mealplanner.feature.main.MainView
 import kotlin.uuid.ExperimentalUuidApi
 
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +19,13 @@ import kotlinx.coroutines.SupervisorJob
 fun App(dbBuilder: RoomDatabase.Builder<MealPlannerDatabase>, platformContext: Any? = null) {
   val appScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
   val db = remember { MealPlannerDatabase.getDatabase(dbBuilder) }
-  val dependencyInjectionContainer = remember { DependencyInjectionContainer(db, appScope, platformContext) }
+  val dependencyInjectionContainer = remember {
+    DependencyInjectionContainer(
+      db,
+      appScope,
+      platformContext
+    )
+  }
 
   LaunchedEffect(Unit) {
     try {

@@ -1,11 +1,10 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.UnitRepository
+import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
+import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
+import io.github.and19081.mealplanner.core.util.toModel
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
-import io.github.and19081.mealplanner.data.*
-import io.github.and19081.mealplanner.shoppinglist.ShoppingListItem
-import io.github.and19081.mealplanner.ShoppingListItemRepository
 import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope

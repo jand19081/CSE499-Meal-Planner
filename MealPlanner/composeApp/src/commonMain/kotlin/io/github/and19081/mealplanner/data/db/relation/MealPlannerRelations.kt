@@ -1,7 +1,23 @@
 package io.github.and19081.mealplanner.data.db.relation
 
 import androidx.room.*
-import io.github.and19081.mealplanner.data.db.entity.*
+import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
+import io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
+import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
+import io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeInstructionEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity
+import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity
+import io.github.and19081.mealplanner.data.db.entity.RestaurantEntity
+import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
+import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
+import io.github.and19081.mealplanner.data.db.entity.StoreEntity
+import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
+import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
+import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 
 /** Room relation data classes for ECS Food Items. */
 

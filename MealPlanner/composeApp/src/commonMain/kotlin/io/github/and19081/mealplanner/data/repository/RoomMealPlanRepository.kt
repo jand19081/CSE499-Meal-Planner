@@ -1,7 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.ScheduledMeal
-import io.github.and19081.mealplanner.calendar.MealPlanRepository
+import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
+import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
@@ -80,8 +80,16 @@ class RoomMealPlanRepository(
   private fun ScheduledMealWithSource.toDomain(): ScheduledMeal =
       ScheduledMeal(
           id = scheduledMeal.id,
-          date = try { LocalDate.parse(scheduledMeal.date) } catch (e: Exception) { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
-          time = try { LocalTime.parse(scheduledMeal.time) } catch (e: Exception) { LocalTime(12, 0) },
+          date = try {
+              LocalDate.parse(scheduledMeal.date)
+          } catch (e: Exception) {
+              Clock.System.todayIn(TimeZone.currentSystemDefault())
+          },
+          time = try {
+              LocalTime.parse(scheduledMeal.time)
+          } catch (e: Exception) {
+              LocalTime(12, 0)
+          },
           mealType = scheduledMeal.mealType,
           prePlannedMealId = scheduledMeal.foodItemId,
           restaurantId = scheduledMeal.restaurantId,

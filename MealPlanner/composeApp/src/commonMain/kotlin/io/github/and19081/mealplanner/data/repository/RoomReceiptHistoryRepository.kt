@@ -1,12 +1,12 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.ReceiptHistoryRepository
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
+import io.github.and19081.mealplanner.domain.repository.ReceiptHistoryRepository
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptLineItem
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
-import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
+import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
-import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
-import io.github.and19081.mealplanner.shoppinglist.ReceiptLineItem
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -59,8 +59,16 @@ class RoomReceiptHistoryRepository(
   private fun StoreReceiptEntity.toDomain(): ReceiptHistory =
       ReceiptHistory(
           id = id,
-          date = try { LocalDate.parse(date) } catch (e: Exception) { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
-          time = try { LocalTime.parse(time) } catch (e: Exception) { LocalTime(12, 0) },
+          date = try {
+              LocalDate.parse(date)
+          } catch (e: Exception) {
+              Clock.System.todayIn(TimeZone.currentSystemDefault())
+          },
+          time = try {
+              LocalTime.parse(time)
+          } catch (e: Exception) {
+              LocalTime(12, 0)
+          },
           storeId = storeId,
           restaurantId = restaurantId,
           projectedTotalCents = projectedTotalCents ?: 0,

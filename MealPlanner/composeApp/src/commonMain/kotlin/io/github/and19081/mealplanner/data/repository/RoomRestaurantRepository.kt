@@ -1,7 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.Restaurant
-import io.github.and19081.mealplanner.RestaurantRepository
+import io.github.and19081.mealplanner.feature.meals.Restaurant
+import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.RestaurantEntity
 import kotlin.uuid.Uuid

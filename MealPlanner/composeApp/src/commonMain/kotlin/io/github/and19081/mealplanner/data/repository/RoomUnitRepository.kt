@@ -1,11 +1,11 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.SystemUnits
-import io.github.and19081.mealplanner.UnitModel
-import io.github.and19081.mealplanner.UnitRepository
+import io.github.and19081.mealplanner.core.util.SystemUnits
+import io.github.and19081.mealplanner.core.util.UnitModel
+import io.github.and19081.mealplanner.core.util.UnitRepository
+import io.github.and19081.mealplanner.core.util.toEntity
+import io.github.and19081.mealplanner.core.util.toModel
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
-import io.github.and19081.mealplanner.data.toEntity
-import io.github.and19081.mealplanner.data.toModel
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*

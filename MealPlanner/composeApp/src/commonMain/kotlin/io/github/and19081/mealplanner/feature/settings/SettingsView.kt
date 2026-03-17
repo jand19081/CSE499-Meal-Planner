@@ -1,0 +1,565 @@
+package io.github.and19081.mealplanner.feature.settings
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import io.github.and19081.mealplanner.core.theme.AccentColor
+import io.github.and19081.mealplanner.core.theme.AppTheme
+import io.github.and19081.mealplanner.core.theme.CornerStyle
+import io.github.and19081.mealplanner.core.util.UnitModel
+import io.github.and19081.mealplanner.core.util.UnitType
+import io.github.and19081.mealplanner.domain.model.Category
+import io.github.and19081.mealplanner.domain.model.Store
+import io.github.and19081.mealplanner.feature.meals.Restaurant
+import io.github.and19081.mealplanner.ui.components.HorizontalNumericUpDownControl
+import io.github.and19081.mealplanner.ui.components.MpDetailScaffold
+import io.github.and19081.mealplanner.ui.components.MpOutlinedTextField
+import io.github.and19081.mealplanner.ui.components.SearchableDropdown
+import kotlin.uuid.Uuid
+
+@Composable
+fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
+  val uiState by viewModel.uiState.collectAsState()
+  var showManager by remember { mutableStateOf<String?>(null) }
+
+  val actualIsExpanded =
+      when (uiState.appMode) {
+        Mode.AUTO -> isExpanded
+        Mode.DESKTOP -> true
+        Mode.MOBILE -> false
+      }
+
+  Scaffold { innerPadding ->
+    if (actualIsExpanded) {
+      Row(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
+        // Settings List
+        LazyColumn(
+            modifier = Modifier.weight(0.4f),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+          item { SettingsContent(uiState, viewModel, onShowManager = { showManager = it }) }
+        }
+
+        VerticalDivider(modifier = Modifier.width(1.dp).padding(horizontal = 16.dp))
+
+        // Detail Side Panel
+        Box(modifier = Modifier.weight(0.6f)) {
+          if (showManager == "Data") {
+            SystemDataManagerForm(viewModel = viewModel, onClose = { showManager = null })
+          } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+              Text("Select an administrative task", color = MaterialTheme.colorScheme.outline)
+            }
+          }
+        }
+      }
+    } else {
+      // Mobile View
+      if (showManager == "Data") {
+        SystemDataManagerForm(viewModel = viewModel, onClose = { showManager = null })
+      } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+          item { SettingsContent(uiState, viewModel, onShowManager = { showManager = it }) }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun SettingsContent(
+    uiState: SettingsUiState,
+    viewModel: SettingsViewModel,
+    onShowManager: (String) -> Unit,
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    // Appearance Section
+    Column {
+      SectionHeader("Appearance")
+
+      Text("Theme", style = MaterialTheme.typography.titleSmall)
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AppTheme.entries.forEach { theme ->
+          FilterChip(
+              selected = uiState.appTheme == theme,
+              onClick = { viewModel.setTheme(theme) },
+              label = { Text(theme.name.lowercase().replaceFirstChar { it.uppercase() }) },
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      Text("App Mode", style = MaterialTheme.typography.titleSmall)
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Mode.entries.forEach { mode ->
+          FilterChip(
+              selected = uiState.appMode == mode,
+              onClick = { viewModel.setAppMode(mode) },
+              label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      Text("Corner Style", style = MaterialTheme.typography.titleSmall)
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CornerStyle.entries.forEach { style ->
+          FilterChip(
+              selected = uiState.cornerStyle == style,
+              onClick = { viewModel.setCornerStyle(style) },
+              label = { Text(style.name.lowercase().replaceFirstChar { it.uppercase() }) },
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      Text("Accent Color", style = MaterialTheme.typography.titleSmall)
+      Spacer(modifier = Modifier.height(8.dp))
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        AccentColor.entries.forEach { accent ->
+          ColorOption(
+              color = accent.color,
+              isSelected = uiState.accentColor == accent,
+              onClick = { viewModel.setAccentColor(accent) },
+          )
+        }
+      }
+    }
+
+    // Dashboard Section
+    Column {
+      HorizontalDivider()
+      SectionHeader("Dashboard")
+
+      SettingsSwitchRow(
+          label = "Show Weekly Cost Widget",
+          checked = uiState.dashboardConfig.showWeeklyCost,
+          onCheckedChange = { viewModel.toggleShowWeeklyCost(it) },
+      )
+
+      SettingsSwitchRow(
+          label = "Show Meal Plan (Today/Next)",
+          checked = uiState.dashboardConfig.showMealPlan,
+          onCheckedChange = { viewModel.toggleShowMealPlan(it) },
+      )
+
+      SettingsSwitchRow(
+          label = "Show Shopping List Summary",
+          checked = uiState.dashboardConfig.showShoppingListSummary,
+          onCheckedChange = { viewModel.toggleShowShoppingList(it) },
+      )
+    }
+
+    // Data Management Section
+    Column {
+      HorizontalDivider()
+      SectionHeader("Administrative")
+
+      Button(onClick = { onShowManager("Data") }, modifier = Modifier.fillMaxWidth()) {
+        Text("Manage System Data (Stores, Categories, etc.)")
+      }
+    }
+
+    // Notifications Section
+    Column {
+      HorizontalDivider()
+      SectionHeader("Notifications")
+
+      var sliderValue by remember(uiState.notificationDelayMinutes) {
+          mutableFloatStateOf(uiState.notificationDelayMinutes.toFloat())
+      }
+
+      Text(
+          "Meal Consumed Check Delay: ${sliderValue.toInt()} min",
+          style = MaterialTheme.typography.titleSmall,
+      )
+      Slider(
+          value = sliderValue,
+          onValueChange = { sliderValue = it },
+          onValueChangeFinished = { viewModel.setNotificationDelay(sliderValue.toInt()) },
+          valueRange = 5f..120f,
+          steps = 22,
+      )
+    }
+
+      // Financials Section
+      Column {
+          HorizontalDivider()
+          SectionHeader("Financials")
+
+          Text(
+              text = "Enter tax as percentage (e.g., 8.0 for 8%)",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(vertical = 8.dp)
+          )
+
+          Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+              Text(text = "Sales Tax:")
+
+              HorizontalNumericUpDownControl(
+                  value = uiState.taxRate * 100.0,
+                  onValueChange = { newPercentage ->
+                      // Convert the 0-100 scale back to the 0.0-1.0 scale
+                      viewModel.updateTaxRate(newPercentage / 100.0)
+                  },
+                  min = 0.0,
+                  max = 100.0,
+                  step = 0.25 // +/- 0.25%
+              )
+
+              Text("%")
+          }
+      }
+
+    Spacer(modifier = Modifier.height(80.dp))
+  }
+}
+
+@Composable
+fun SystemDataManagerForm(viewModel: SettingsViewModel, onClose: () -> Unit) {
+  val uiState by viewModel.uiState.collectAsState()
+  var selectedTabIndex by remember { mutableIntStateOf(0) }
+  val tabs = listOf("Stores", "Categories", "Restaurants", "Units")
+
+    MpDetailScaffold(
+        title = "Manage System Data",
+        onClose = onClose,
+        onSave = onClose,
+        tabs = tabs,
+        selectedTabIndex = selectedTabIndex,
+        onTabSelected = { selectedTabIndex = it },
+        isScrollable = false,
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        when (selectedTabIndex) {
+          0 ->
+              GenericDataManager(
+                  items = uiState.allStores.map { it.id to it.name },
+                  onSave = { id, name ->
+                    viewModel.saveStore(
+                        Store(
+                            id ?: Uuid.random(),
+                            name,
+                        )
+                    )
+                  },
+                  onDelete = { viewModel.deleteStore(it) },
+                  label = "Store",
+              )
+          1 ->
+              GenericDataManager(
+                  items = uiState.allCategories.map { it.id to it.name },
+                  onSave = { id, name ->
+                    viewModel.saveCategory(
+                        Category(
+                            id ?: Uuid.random(),
+                            name,
+                        )
+                    )
+                  },
+                  onDelete = { viewModel.deleteCategory(it) },
+                  label = "Category",
+              )
+          2 ->
+              GenericDataManager(
+                  items = uiState.allRestaurants.map { it.id to it.name },
+                  onSave = { id, name ->
+                    viewModel.saveRestaurant(
+                        Restaurant(
+                            id ?: Uuid.random(),
+                            name,
+                        )
+                    )
+                  },
+                  onDelete = { viewModel.deleteRestaurant(it) },
+                  label = "Restaurant",
+              )
+          3 ->
+              UnitDataManager(
+                  units = uiState.allUnits,
+                  onSave = { viewModel.saveUnit(it) },
+                  onDelete = { viewModel.deleteUnit(it) },
+              )
+        }
+      }
+    }
+}
+
+@Composable
+fun GenericDataManager(
+    items: List<Pair<Uuid, String>>,
+    onSave: (Uuid?, String) -> Unit,
+    onDelete: (Uuid) -> Unit,
+    label: String,
+) {
+  var editingId by remember { mutableStateOf<Uuid?>(null) }
+  var textValue by remember { mutableStateOf("") }
+
+  Column(modifier = Modifier.fillMaxSize()) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      MpOutlinedTextField(
+          value = textValue,
+          onValueChange = { textValue = it },
+          label = { Text(if (editingId == null) "Add New $label" else "Rename $label") },
+          modifier = Modifier.weight(1f),
+      )
+      Button(
+          onClick = {
+            onSave(editingId, textValue)
+            textValue = ""
+            editingId = null
+          },
+          enabled = textValue.isNotBlank(),
+      ) {
+        Text(if (editingId == null) "Add" else "Save")
+      }
+      if (editingId != null) {
+        IconButton(
+            onClick = {
+              editingId = null
+              textValue = ""
+            }
+        ) {
+          Icon(Icons.Default.Close, null)
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    LazyColumn(modifier = Modifier.weight(1f)) {
+      items(items.sortedBy { it.second }) { (id, name) ->
+        ListItem(
+            headlineContent = { Text(name) },
+            trailingContent = {
+              Row {
+                IconButton(
+                    onClick = {
+                      editingId = id
+                      textValue = name
+                    }
+                ) {
+                  Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = { onDelete(id) }) {
+                  Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                }
+              }
+            },
+        )
+        HorizontalDivider()
+      }
+    }
+  }
+}
+
+@Composable
+fun UnitDataManager(
+    units: List<UnitModel>,
+    onSave: (UnitModel) -> Unit,
+    onDelete: (Uuid) -> Unit,
+) {
+  var editingUnit by remember { mutableStateOf<UnitModel?>(null) }
+
+  var name by remember { mutableStateOf("") }
+  var abbr by remember { mutableStateOf("") }
+  var type by remember { mutableStateOf(UnitType.Mass) }
+  var factor by remember { mutableStateOf("1.0") }
+
+  fun reset() {
+    editingUnit = null
+    name = ""
+    abbr = ""
+    type = UnitType.Mass
+    factor = "1.0"
+  }
+
+  Column(modifier = Modifier.fillMaxSize()) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+      Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            if (editingUnit == null) "Add Custom Unit" else "Edit Unit",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          MpOutlinedTextField(
+              value = name,
+              onValueChange = { name = it },
+              label = { Text("Name") },
+              modifier = Modifier.weight(1f),
+          )
+          MpOutlinedTextField(
+              value = abbr,
+              onValueChange = { abbr = it },
+              label = { Text("Abbr") },
+              modifier = Modifier.weight(0.5f),
+          )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(modifier = Modifier.weight(1f)) {
+            SearchableDropdown(
+                label = "Type",
+                options = UnitType.entries.map { it.name },
+                selectedOption = type.name,
+                onOptionSelected = { type = UnitType.valueOf(it) },
+                onAddOption = {},
+                onDeleteOption = {},
+                deleteWarningMessage = "",
+            )
+          }
+          MpOutlinedTextField(
+              value = factor,
+              onValueChange = { factor = it },
+              label = { Text("Factor to Base") },
+              modifier = Modifier.weight(1f),
+          )
+        }
+        Button(
+            onClick = {
+              val f = factor.toDoubleOrNull() ?: 1.0
+              onSave(
+                  UnitModel(
+                      editingUnit?.id ?: Uuid.random(),
+                      type,
+                      abbr,
+                      name,
+                      false,
+                      f,
+                  )
+              )
+              reset()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = name.isNotBlank() && abbr.isNotBlank(),
+        ) {
+          Text(if (editingUnit == null) "Add Unit" else "Save Changes")
+        }
+        if (editingUnit != null) {
+          TextButton(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Cancel Edit")
+          }
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    LazyColumn(modifier = Modifier.weight(1f)) {
+      items(units.filter { !it.isSystemUnit }) { unit ->
+        ListItem(
+            headlineContent = { Text(unit.displayName) },
+            supportingContent = {
+              Text("${unit.abbreviation} (${unit.type}) • Factor: ${unit.factorToBase}")
+            },
+            trailingContent = {
+              Row {
+                IconButton(
+                    onClick = {
+                      editingUnit = unit
+                      name = unit.displayName
+                      abbr = unit.abbreviation
+                      type = unit.type
+                      factor = unit.factorToBase.toString()
+                    }
+                ) {
+                  Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = { onDelete(unit.id) }) {
+                  Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                }
+              }
+            },
+        )
+        HorizontalDivider()
+      }
+    }
+  }
+}
+
+@Composable
+fun SectionHeader(title: String) {
+  Text(
+      text = title,
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.primary,
+      modifier = Modifier.padding(bottom = 8.dp),
+  )
+}
+
+@Composable
+fun SettingsSwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+  Row(
+      modifier =
+          Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(vertical = 8.dp),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(label, style = MaterialTheme.typography.bodyMedium)
+    Switch(checked = checked, onCheckedChange = onCheckedChange)
+  }
+}
+
+@Composable
+fun ColorOption(color: Color, isSelected: Boolean, onClick: () -> Unit) {
+  Box(
+      modifier =
+          Modifier.size(40.dp)
+              .clip(MaterialTheme.shapes.extraLarge)
+              .background(color)
+              .clickable(onClick = onClick)
+              .then(
+                  if (isSelected)
+                      Modifier.border(
+                          2.dp,
+                          MaterialTheme.colorScheme.onSurface,
+                          MaterialTheme.shapes.extraLarge,
+                      )
+                  else Modifier
+              ),
+      contentAlignment = Alignment.Center,
+  ) {
+    if (isSelected) {
+      Icon(
+          Icons.Default.Check,
+          contentDescription = null,
+          tint = Color.White,
+          modifier = Modifier.size(24.dp),
+      )
+    }
+  }
+}

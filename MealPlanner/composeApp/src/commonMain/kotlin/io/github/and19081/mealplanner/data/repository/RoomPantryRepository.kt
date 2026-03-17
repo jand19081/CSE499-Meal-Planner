@@ -1,7 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.PantryItem
-import io.github.and19081.mealplanner.PantryRepository
+import io.github.and19081.mealplanner.feature.meals.PantryItem
+import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails

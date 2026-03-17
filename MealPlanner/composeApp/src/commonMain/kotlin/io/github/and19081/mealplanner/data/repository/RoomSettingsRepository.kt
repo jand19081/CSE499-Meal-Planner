@@ -1,10 +1,15 @@
 package io.github.and19081.mealplanner.data.repository
 
+import io.github.and19081.mealplanner.feature.settings.AppSettings
+import io.github.and19081.mealplanner.domain.repository.SettingsRepository
+import io.github.and19081.mealplanner.data.db.entity.DashboardConfig
+import io.github.and19081.mealplanner.core.theme.AccentColor
+import io.github.and19081.mealplanner.core.theme.AppTheme
+import io.github.and19081.mealplanner.core.theme.CornerStyle
+import io.github.and19081.mealplanner.core.util.toModel
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.AppSettingsEntity
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as DbDashboardConfig
-import io.github.and19081.mealplanner.data.toModel
-import io.github.and19081.mealplanner.settings.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -53,7 +58,7 @@ class RoomSettingsRepository(
           }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), AccentColor.GREEN)
 
-  override val dashboardConfig: StateFlow<DashboardConfig> =
+  override val dashboardConfig: StateFlow<DbDashboardConfig> =
       settingsFlow
           .map { it.dashboard.toModel() }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), DashboardConfig())
@@ -93,7 +98,7 @@ class RoomSettingsRepository(
     }
   }
 
-  override fun updateDashboardConfig(update: (DashboardConfig) -> DashboardConfig) {
+  override fun updateDashboardConfig(update: (DbDashboardConfig) -> DbDashboardConfig) {
     scope.launch {
       val current = settingsFlow.value
       val model = update(current.dashboard.toModel())
