@@ -24,23 +24,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
-import io.github.and19081.mealplanner.PantryItem
-import io.github.and19081.mealplanner.domain.DataWarning
-import io.github.and19081.mealplanner.domain.PriceCalculator
-import io.github.and19081.mealplanner.domain.UnitConverter
-import io.github.and19081.mealplanner.ingredients.BridgeConversion
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.uicomponents.CreateNewItemRow
-import io.github.and19081.mealplanner.uicomponents.EmptyListMessage
-import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
-import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
-import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpNumericStepper
-import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
-import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import io.github.and19081.mealplanner.domain.*
+import io.github.and19081.mealplanner.uicomponents.*
 import kotlin.uuid.Uuid
 
 @Composable
@@ -48,19 +34,17 @@ fun RecipesView(
     viewModel: RecipesViewModel,
     mode: io.github.and19081.mealplanner.settings.Mode,
     isExpanded: Boolean,
-    onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
-    onAddSubRecipe: (String, (Recipe) -> Unit) -> Unit,
-    onMakeRecipe: (Recipe, Double, Uuid?, Double?, Uuid?) -> Unit = { _, _, _, _, _ -> },
+    onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
+    onAddSubRecipe: (String, (FoodItem) -> Unit) -> Unit,
+    onMakeRecipe: (FoodItem, Double, Uuid?, Double?, Uuid?) -> Unit = { _, _, _, _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // 1. Use rememberSaveable with IDs to survive screen rotation
     var selectedRecipeId by rememberSaveable { mutableStateOf<String?>(null) }
     var isAdding by rememberSaveable { mutableStateOf(false) }
     val selectedRecipe = uiState.allRecipes.find { it.id.toString() == selectedRecipeId }
 
-    // 2. State for the new Make Recipe dialog
-    var recipeToMake by remember { mutableStateOf<Recipe?>(null) }
+    var recipeToMake by remember { mutableStateOf<FoodItem?>(null) }
 
     val actualIsExpanded =
         when (mode) {
@@ -69,7 +53,7 @@ fun RecipesView(
             io.github.and19081.mealplanner.settings.Mode.MOBILE -> false
         }
 
-    val onRecipeClick: (Recipe) -> Unit = {
+    val onRecipeClick: (FoodItem) -> Unit = {
         selectedRecipeId = it.id.toString()
         isAdding = false
     }
@@ -87,7 +71,7 @@ fun RecipesView(
     if (recipeToMake != null) {
         PrepareBatchDialog(
             itemName = recipeToMake!!.name,
-            allIngredients = uiState.allIngredients,
+            allItems = uiState.allItems,
             allUnits = uiState.allUnits,
             onDismiss = { recipeToMake = null },
             onConfirm = { multiplier, yieldIngId, yieldQty, yieldUnitId ->
@@ -99,7 +83,6 @@ fun RecipesView(
 
   if (actualIsExpanded) {
     Row(modifier = Modifier.fillMaxSize()) {
-      // List Pane
       Box(modifier = Modifier.weight(0.4f)) {
         RecipeListPane(
             uiState = uiState,
@@ -112,18 +95,12 @@ fun RecipesView(
 
       VerticalDivider(modifier = Modifier.width(1.dp))
 
-      // Detail Pane
       Box(modifier = Modifier.weight(0.6f)) {
         if (selectedRecipe != null || isAdding) {
           RecipeForm(
               recipe = selectedRecipe,
               initialName = if (isAdding) uiState.searchQuery else "",
               uiState = uiState,
-              allIngredients = uiState.allIngredients,
-              allRecipes = uiState.allRecipes,
-              allPackages = uiState.allPackages,
-              allBridges = uiState.allBridges,
-              allUnits = uiState.allUnits,
               onDismiss = onDismissDetail,
               onSave = {
                 viewModel.saveRecipe(it)
@@ -132,7 +109,6 @@ fun RecipesView(
               onDelete = selectedRecipe?.let { r -> { viewModel.deleteRecipe(r.id) } },
               onAddIngredient = onAddIngredient,
               onAddSubRecipe = onAddSubRecipe,
-              warnings = selectedRecipe?.let { uiState.recipeWarnings[it.id] } ?: emptyList(),
           )
         } else {
           EmptyDetailPlaceholder()
@@ -140,17 +116,11 @@ fun RecipesView(
       }
     }
   } else {
-    // Mobile View
     if (selectedRecipe != null || isAdding) {
       RecipeForm(
           recipe = selectedRecipe,
           initialName = if (isAdding) uiState.searchQuery else "",
           uiState = uiState,
-          allIngredients = uiState.allIngredients,
-          allRecipes = uiState.allRecipes,
-          allPackages = uiState.allPackages,
-          allBridges = uiState.allBridges,
-          allUnits = uiState.allUnits,
           onDismiss = onDismissDetail,
           onSave = {
             viewModel.saveRecipe(it)
@@ -159,7 +129,6 @@ fun RecipesView(
           onDelete = selectedRecipe?.let { r -> { viewModel.deleteRecipe(r.id) } },
           onAddIngredient = onAddIngredient,
           onAddSubRecipe = onAddSubRecipe,
-          warnings = selectedRecipe?.let { uiState.recipeWarnings[it.id] } ?: emptyList(),
       )
     } else {
       RecipeListPane(
@@ -174,12 +143,28 @@ fun RecipesView(
 }
 
 @Composable
+fun EmptyDetailPlaceholder() {
+  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Icon(
+          Icons.Default.FilterList,
+          null,
+          modifier = Modifier.size(48.dp),
+          tint = MaterialTheme.colorScheme.outline,
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+      Text("Select a recipe to view details", color = MaterialTheme.colorScheme.outline)
+    }
+  }
+}
+
+@Composable
 fun RecipeListPane(
     uiState: RecipesUiState,
     viewModel: RecipesViewModel,
-    onRecipeClick: (Recipe) -> Unit,
+    onRecipeClick: (FoodItem) -> Unit,
     onAddClick: () -> Unit,
-    onMakeRecipe: (Recipe) -> Unit = {},
+    onMakeRecipe: (FoodItem) -> Unit = {},
 ) {
   Scaffold(
       topBar = {
@@ -230,21 +215,22 @@ fun RecipeListPane(
 
 @Composable
 fun RecipeItemRow(
-    recipe: Recipe,
+    recipe: FoodItem,
     warnings: List<DataWarning>,
     onEditClick: () -> Unit,
     onMakeClick: () -> Unit,
 ) {
-  val ingredientCount = recipe.requirementGroups.size
+  val recipeInfo = recipe.recipeInfo
+  val ingredientCount = recipeInfo?.requirements?.size ?: 0
   val costCents = 0L // Placeholder
   val costStr = if (costCents > 0) "$${String.format("%.2f", costCents / 100.0)}" else "---"
   val perPersonStr =
-      if (recipe.servings > 0.1 && costCents > 0) {
-        val perPerson = (costCents / recipe.servings) / 100.0
+      if (recipeInfo != null && recipeInfo.servings > 0.1 && costCents > 0) {
+        val perPerson = (costCents / recipeInfo.servings) / 100.0
         if (perPerson.isFinite()) " ($${String.format("%.2f", perPerson)}/p)" else ""
       } else ""
   val subtitle =
-      "Serves ${recipe.servings} • $ingredientCount requirements • Total: $costStr$perPersonStr"
+      "Serves ${recipeInfo?.servings ?: 0} • $ingredientCount requirements • Total: $costStr$perPersonStr"
 
   ExpandableListItem(
       title = recipe.name,
@@ -263,19 +249,19 @@ fun RecipeItemRow(
       onActionClick = onMakeClick,
       onEditClick = onEditClick,
   ) {
-    if (recipe.description != null) {
+    if (recipeInfo?.description != null) {
       Text(
-          recipe.description,
+          recipeInfo.description,
           style = MaterialTheme.typography.bodySmall,
           modifier = Modifier.padding(bottom = 8.dp),
       )
     }
 
     Text("Instructions:", style = MaterialTheme.typography.labelMedium)
-    if (recipe.instructions.isEmpty()) {
+    if (recipeInfo?.instructions.isNullOrEmpty()) {
       Text("No instructions.", style = MaterialTheme.typography.bodySmall)
     } else {
-      recipe.instructions.forEachIndexed { idx, line ->
+      recipeInfo!!.instructions.forEachIndexed { idx, line ->
         Text("${idx + 1}. $line", style = MaterialTheme.typography.bodySmall)
       }
     }
@@ -283,72 +269,38 @@ fun RecipeItemRow(
 }
 
 @Composable
-fun EmptyDetailPlaceholder() {
-  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      Icon(
-          Icons.Default.FilterList,
-          null,
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.outline,
-      )
-      Spacer(modifier = Modifier.height(8.dp))
-      Text("Select a recipe to view details", color = MaterialTheme.colorScheme.outline)
-    }
-  }
-}
-
-@Composable
 fun RecipeForm(
-    recipe: Recipe?,
+    recipe: FoodItem?,
     initialName: String,
     uiState: RecipesUiState,
-    allIngredients: List<Ingredient>,
-    allRecipes: List<Recipe>,
-    allPackages: List<io.github.and19081.mealplanner.ingredients.Package>,
-    allBridges: List<io.github.and19081.mealplanner.ingredients.BridgeConversion>,
-    allUnits: List<UnitModel>,
-    warnings: List<DataWarning>,
     onDismiss: () -> Unit,
-    onSave: (Recipe) -> Unit,
+    onSave: (FoodItem) -> Unit,
     onDelete: (() -> Unit)? = null,
-    onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
-    onAddSubRecipe: (String, (Recipe) -> Unit) -> Unit,
+    onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
+    onAddSubRecipe: (String, (FoodItem) -> Unit) -> Unit,
 ) {
-  var name by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.name ?: initialName)
-      }
-  var servingsStr by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.servings?.toString() ?: "4.0")
-      }
-  var description by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.description ?: "")
-      }
+  val allUnits = uiState.allUnits
+  val allItems = uiState.allItems
+  val allBridges = uiState.allBridges
+  
+  var name by rememberSaveable(recipe) { mutableStateOf(recipe?.name ?: initialName) }
+  var servingsStr by rememberSaveable(recipe) { mutableStateOf(recipe?.recipeInfo?.servings?.toString() ?: "4.0") }
+  var description by rememberSaveable(recipe) { mutableStateOf(recipe?.recipeInfo?.description ?: "") }
+  var prepTimeStr by rememberSaveable(recipe) { mutableStateOf(recipe?.recipeInfo?.prepTimeMinutes?.toString() ?: "0") }
+  var cookTimeStr by rememberSaveable(recipe) { mutableStateOf(recipe?.recipeInfo?.cookTimeMinutes?.toString() ?: "0") }
+  var mealType by rememberSaveable(recipe) { mutableStateOf(recipe?.recipeInfo?.mealType ?: RecipeMealType.Dinner) }
 
-  var prepTimeStr by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.prepTimeMinutes?.toString() ?: "0")
-      }
-  var cookTimeStr by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.cookTimeMinutes?.toString() ?: "0")
-      }
+  val recipeId = remember(recipe) { recipe?.id ?: Uuid.random() }
+  var requirementGroups by remember(recipe) { 
+      mutableStateOf(
+          recipe?.recipeInfo?.requirements?.let { 
+              listOf(FoodItemRequirementGroup(requirements = it)) 
+          } ?: emptyList()
+      )
+  }
+  var instructions by remember(recipe) { mutableStateOf(recipe?.recipeInfo?.instructions ?: emptyList()) }
 
-  var mealType by
-      androidx.compose.runtime.saveable.rememberSaveable(recipe) {
-        mutableStateOf(recipe?.mealType ?: RecipeMealType.Dinner)
-      }
-
-  val recipeId = remember(recipe) { recipe?.id ?: kotlin.uuid.Uuid.random() }
-  var requirementGroups by
-      remember(recipe) { mutableStateOf(recipe?.requirementGroups ?: emptyList()) }
-  var instructions by remember(recipe) { mutableStateOf(recipe?.instructions ?: emptyList()) }
-
-  var selectedTabIndex by
-      androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
+  var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
   val tabs = listOf("General", "Ingredients", "Instructions")
 
   io.github.and19081.mealplanner.uicomponents.MpDetailScaffold(
@@ -356,34 +308,28 @@ fun RecipeForm(
       onClose = onDismiss,
       onSave = {
         val finalRecipe =
-            Recipe(
+            FoodItem(
                 id = recipeId,
                 name = name,
-                description = description.ifBlank { null },
-                servings = servingsStr.toDoubleOrNull() ?: 4.0,
-                instructions = instructions.filter { it.isNotBlank() },
-                mealType = mealType,
-                prepTimeMinutes = prepTimeStr.toIntOrNull() ?: 0,
-                cookTimeMinutes = cookTimeStr.toIntOrNull() ?: 0,
-                producesIngredientId = null,
-                amountPerServing = null,
-                requirementGroups = requirementGroups,
+                recipeInfo = RecipeInfo(
+                    description = description.ifBlank { null },
+                    servings = servingsStr.toDoubleOrNull() ?: 4.0,
+                    instructions = instructions.filter { it.isNotBlank() },
+                    mealType = mealType,
+                    prepTimeMinutes = prepTimeStr.toIntOrNull() ?: 0,
+                    cookTimeMinutes = cookTimeStr.toIntOrNull() ?: 0,
+                    requirements = requirementGroups.flatMap { it.requirements }
+                )
             )
         onSave(finalRecipe)
       },
       saveEnabled = name.isNotBlank(),
-      onDelete =
-          if (onDelete != null) {
-            {
-              onDelete()
-              onDismiss()
-            }
-          } else null,
+      onDelete = onDelete,
       tabs = tabs,
       selectedTabIndex = selectedTabIndex,
       onTabSelected = { selectedTabIndex = it },
   ) {
-    MpValidationWarning(warnings = warnings)
+    MpValidationWarning(warnings = uiState.recipeWarnings[recipeId] ?: emptyList())
 
     when (selectedTabIndex) {
       0 -> { // General
@@ -447,67 +393,40 @@ fun RecipeForm(
 
           // Stock Check
           Text("Stock Check", style = MaterialTheme.typography.titleMedium)
-          val pantryByIngredient =
-              remember(uiState.pantryItems) {
-                (uiState.pantryItems as List<PantryItem>).groupBy { it.ingredientId }
-              }
+          val pantryByItem = remember(uiState.pantryItems) {
+              uiState.pantryItems.groupBy { it.foodItemId }
+          }
           Card(
-              colors =
-                  CardDefaults.cardColors(
-                      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                  ),
+              colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
               modifier = Modifier.fillMaxWidth(),
           ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-              requirementGroups
-                  .flatMap { it.requirements }
-                  .forEach { req ->
-                    val itemName =
-                        if (req.subRecipeId != null) {
-                          allRecipes.find { it.id == req.subRecipeId }?.name ?: "Unknown Recipe"
-                        } else {
-                          allIngredients.find { it.id == req.ingredientId }?.name
-                              ?: "Unknown Ingredient"
-                        }
-
-                    val pantryItems =
-                        if (req.ingredientId != null) {
-                          pantryByIngredient[req.ingredientId] ?: emptyList()
-                        } else emptyList()
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+              requirementGroups.flatMap { it.requirements }.forEach { req ->
+                    val item = allItems.find { it.id == req.foodItemId }
+                    val itemName = item?.name ?: "Unknown Item"
+                    val pantryItems = pantryByItem[req.foodItemId] ?: emptyList()
 
                     var totalInStock = 0.0
-                    for (item in pantryItems) {
-                      totalInStock +=
-                          UnitConverter.convert(
-                              amount = item.quantity,
-                              fromUnitId = item.unitId,
-                              toUnitId = req.unitId,
+                    for (pItem in pantryItems) {
+                      totalInStock += UnitConverter.convert(
+                              amount = pItem.quantity,
+                              fromUnitId = pItem.unitId,
+                              toUnitId = req.unitId ?: item?.preferredUnitId ?: Uuid.NIL,
                               allUnits = allUnits.associateBy { it.id },
                               bridges = allBridges,
                           ) ?: 0.0
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                      val statusColor =
-                          when {
+                      val statusColor = when {
                             totalInStock >= req.quantity -> Color(0xFF2E7D32)
                             totalInStock > 0 -> Color(0xFFFBC02D)
                             else -> MaterialTheme.colorScheme.error
                           }
-                      val icon =
-                          when {
-                            totalInStock >= req.quantity -> Icons.Default.CheckCircle
-                            totalInStock > 0 -> Icons.Default.RemoveCircle
-                            else -> Icons.Default.Warning
-                          }
-                      Icon(icon, null, tint = statusColor, modifier = Modifier.size(16.dp))
+                      Icon(if (totalInStock >= req.quantity) Icons.Default.CheckCircle else if (totalInStock > 0) Icons.Default.RemoveCircle else Icons.Default.Warning, null, tint = statusColor, modifier = Modifier.size(16.dp))
                       Spacer(modifier = Modifier.width(8.dp))
                       Text(
-                          text =
-                              "$itemName: ${String.format("%.1f", totalInStock)} / ${req.quantity} ${allUnits.find { it.id == req.unitId }?.abbreviation ?: ""}",
+                          text = "$itemName: ${String.format("%.1f", totalInStock)} / ${req.quantity} ${allUnits.find { it.id == req.unitId }?.abbreviation ?: ""}",
                           style = MaterialTheme.typography.bodySmall,
                           color = statusColor,
                       )
@@ -521,8 +440,7 @@ fun RecipeForm(
       1 -> { // Ingredients
         RecipeIngredientsEditor(
             requirementGroups = requirementGroups,
-            allIngredients = allIngredients,
-            allRecipes = allRecipes,
+            allItems = allItems,
             allUnits = allUnits,
             onUpdate = { requirementGroups = it },
             onAddIngredient = onAddIngredient,
@@ -541,49 +459,24 @@ fun RecipeForm(
 fun RecipeInstructionsEditor(instructions: List<String>, onUpdate: (List<String>) -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (instructions.isEmpty()) {
-      Text(
-          "No instructions added.",
-          style = MaterialTheme.typography.bodySmall,
-          fontStyle = FontStyle.Italic,
-      )
+      Text("No instructions added.", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
     } else {
       instructions.forEachIndexed { index, step ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
           MpOutlinedTextField(
               value = step,
-              onValueChange = { newStep ->
-                val newList = instructions.mapIndexed { i, s -> if (i == index) newStep else s }
-                onUpdate(newList)
-              },
+              onValueChange = { newStep -> onUpdate(instructions.mapIndexed { i, s -> if (i == index) newStep else s }) },
               modifier = Modifier.weight(1f),
               placeholder = { Text("Step ${index + 1}") },
           )
-          IconButton(
-              onClick = {
-                val newList = instructions.toMutableList()
-                newList.removeAt(index)
-                onUpdate(newList)
-              }
-          ) {
-            Icon(
-                Icons.Default.Close,
-                "Remove",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(24.dp),
-            )
+          IconButton(onClick = { onUpdate(instructions.toMutableList().apply { removeAt(index) }) }) {
+            Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
           }
         }
         HorizontalDivider()
       }
     }
-
-    Spacer(modifier = Modifier.height(8.dp))
-
     Button(onClick = { onUpdate(instructions + "") }, modifier = Modifier.fillMaxWidth()) {
       Text("+ Add Step")
     }
@@ -592,125 +485,59 @@ fun RecipeInstructionsEditor(instructions: List<String>, onUpdate: (List<String>
 
 @Composable
 fun RecipeIngredientsEditor(
-    requirementGroups: List<RecipeRequirementGroup>,
-    allIngredients: List<Ingredient>,
-    allRecipes: List<Recipe>,
+    requirementGroups: List<FoodItemRequirementGroup>,
+    allItems: List<FoodItem>,
     allUnits: List<UnitModel>,
-    onUpdate: (List<RecipeRequirementGroup>) -> Unit,
-    onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
-    onAddSubRecipe: (String, (Recipe) -> Unit) -> Unit,
+    onUpdate: (List<FoodItemRequirementGroup>) -> Unit,
+    onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
+    onAddSubRecipe: (String, (FoodItem) -> Unit) -> Unit,
 ) {
-  val combinedOptions =
-      remember(allIngredients, allRecipes) {
-        allIngredients.map { it.name } + allRecipes.map { "[Recipe] ${it.name}" }
-      }
+  val options = remember(allItems) {
+      allItems.map { (if (it.isRecipe) "[Recipe] " else "") + it.name }
+  }
 
   Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
     requirementGroups.forEachIndexed { groupIndex, group ->
-      Card(
-          colors =
-              CardDefaults.cardColors(
-                  containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-              )
-      ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text("Ingredient Slot ${groupIndex + 1}", style = MaterialTheme.typography.titleSmall)
-            IconButton(
-                onClick = { onUpdate(requirementGroups.filterIndexed { i, _ -> i != groupIndex }) }
-            ) {
+      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Slot ${groupIndex + 1}", style = MaterialTheme.typography.titleSmall)
+            IconButton(onClick = { onUpdate(requirementGroups.filterIndexed { i, _ -> i != groupIndex }) }) {
               Icon(Icons.Default.Close, "Remove Slot", modifier = Modifier.size(20.dp))
             }
           }
 
           group.requirements.forEachIndexed { reqIndex, req ->
-            val selectedItemName =
-                if (req.subRecipeId != null) {
-                  val recipeName = allRecipes.find { it.id == req.subRecipeId }?.name ?: ""
-                  if (recipeName.isNotEmpty()) "[Recipe] $recipeName" else ""
-                } else {
-                  allIngredients.find { it.id == req.ingredientId }?.name ?: ""
-                }
-
+            val selectedItem = allItems.find { it.id == req.foodItemId }
+            val selectedItemName = (if (selectedItem?.isRecipe == true) "[Recipe] " else "") + (selectedItem?.name ?: "")
             val selectedUnitName = allUnits.find { it.id == req.unitId }?.abbreviation ?: ""
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-              RadioButton(
-                  selected = req.isPrimary,
-                  onClick = {
-                    val newReqs =
-                        group.requirements.mapIndexed { i, r -> r.copy(isPrimary = i == reqIndex) }
-                    val newGroups =
-                        requirementGroups.mapIndexed { i, g ->
-                          if (i == groupIndex) group.copy(requirements = newReqs) else g
-                        }
-                    onUpdate(newGroups)
-                  },
-              )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+              RadioButton(selected = req.isPrimary, onClick = {
+                    onUpdate(requirementGroups.mapIndexed { i, g ->
+                        if (i == groupIndex) g.copy(requirements = g.requirements.mapIndexed { ri, r -> r.copy(isPrimary = ri == reqIndex) }) else g
+                    })
+              })
 
-              // Use FlowRow for the main fields to prevent squishing on narrow screens
-              FlowRow(
-                  modifier = Modifier.weight(1f),
-                  horizontalArrangement = Arrangement.spacedBy(8.dp),
-                  verticalArrangement = Arrangement.spacedBy(8.dp),
-              ) {
-                // Unified SearchableDropdown for Ingredient/Recipe
+              FlowRow(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(modifier = Modifier.widthIn(min = 120.dp).fillMaxWidth(0.6f)) {
                   SearchableDropdown(
                       label = "Item",
-                      options = combinedOptions,
+                      options = options,
                       selectedOption = selectedItemName,
                       onOptionSelected = { option ->
                         val isRecipe = option.startsWith("[Recipe] ")
                         val cleanName = if (isRecipe) option.removePrefix("[Recipe] ") else option
-
-                        val newReq =
-                            if (isRecipe) {
-                              val recipe = allRecipes.find { it.name == cleanName }
-                              req.copy(subRecipeId = recipe?.id, ingredientId = null)
-                            } else {
-                              val ingredient = allIngredients.find { it.name == cleanName }
-                              req.copy(ingredientId = ingredient?.id, subRecipeId = null)
-                            }
-
-                        val newReqs =
-                            group.requirements.mapIndexed {
-                              i,
-                              r ->
-                              if (i == reqIndex) newReq else r
-                            }
-                        onUpdate(
-                            requirementGroups.mapIndexed { i, g ->
-                              if (i == groupIndex) group.copy(requirements = newReqs) else g
-                            }
-                        )
+                        val found = allItems.find { it.name == cleanName && it.isRecipe == isRecipe }
+                        onUpdate(requirementGroups.mapIndexed { i, g ->
+                            if (i == groupIndex) g.copy(requirements = g.requirements.mapIndexed { ri, r -> if (ri == reqIndex) r.copy(foodItemId = found?.id ?: Uuid.NIL) else r }) else g
+                        })
                       },
                       onAddOption = { name ->
-                        // Default to adding ingredient for now
                         onAddIngredient(name) { newIng ->
-                          val newReq = req.copy(ingredientId = newIng.id, subRecipeId = null)
-                          val newReqs =
-                              group.requirements.mapIndexed {
-                                i,
-                                r ->
-                                if (i == reqIndex) newReq else r
-                              }
-                          onUpdate(
-                              requirementGroups.mapIndexed { i, g ->
-                                if (i == groupIndex) group.copy(requirements = newReqs) else g
-                              }
-                          )
+                          onUpdate(requirementGroups.mapIndexed { i, g ->
+                              if (i == groupIndex) g.copy(requirements = g.requirements.mapIndexed { ri, r -> if (ri == reqIndex) r.copy(foodItemId = newIng.id) else r }) else g
+                          })
                         }
                       },
                       onDeleteOption = {},
@@ -720,20 +547,9 @@ fun RecipeIngredientsEditor(
 
                 MpOutlinedTextField(
                     value = if (req.quantity == 0.0) "" else req.quantity.toString(),
-                    onValueChange = { qtyStr ->
-                      val qty = qtyStr.toDoubleOrNull() ?: 0.0
-                      val newReqs =
-                          group.requirements.mapIndexed {
-                            i,
-                            r ->
-                            if (i == reqIndex) r.copy(quantity = qty) else r
-                          }
-                      onUpdate(
-                          requirementGroups.mapIndexed { i, g ->
-                            if (i == groupIndex) group.copy(requirements = newReqs) else g
-                          }
-                      )
-                    },
+                    onValueChange = { onUpdate(requirementGroups.mapIndexed { i, g ->
+                        if (i == groupIndex) g.copy(requirements = g.requirements.mapIndexed { ri, r -> if (ri == reqIndex) r.copy(quantity = it.toDoubleOrNull() ?: 0.0) else r }) else g
+                    }) },
                     label = { Text("Qty") },
                     modifier = Modifier.width(80.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -744,21 +560,11 @@ fun RecipeIngredientsEditor(
                       label = "Unit",
                       options = allUnits.map { it.abbreviation },
                       selectedOption = selectedUnitName,
-                      onOptionSelected = { unitAbbr ->
-                        val unit = allUnits.find { it.abbreviation == unitAbbr }
-                        if (unit != null) {
-                          val newReqs =
-                              group.requirements.mapIndexed {
-                                i,
-                                r ->
-                                if (i == reqIndex) r.copy(unitId = unit.id) else r
-                              }
-                          onUpdate(
-                              requirementGroups.mapIndexed { i, g ->
-                                if (i == groupIndex) group.copy(requirements = newReqs) else g
-                              }
-                          )
-                        }
+                      onOptionSelected = { abbr ->
+                        val unit = allUnits.find { it.abbreviation == abbr }
+                        onUpdate(requirementGroups.mapIndexed { i, g ->
+                            if (i == groupIndex) g.copy(requirements = g.requirements.mapIndexed { ri, r -> if (ri == reqIndex) r.copy(unitId = unit?.id) else r }) else g
+                        })
                       },
                       onAddOption = {},
                       onDeleteOption = {},
@@ -767,70 +573,30 @@ fun RecipeIngredientsEditor(
                 }
               }
 
-              IconButton(
-                  onClick = {
-                    val newReqs = group.requirements.toMutableList()
-                    newReqs.removeAt(reqIndex)
-                    if (newReqs.none { it.isPrimary } && newReqs.isNotEmpty()) {
-                      newReqs[0] = newReqs[0].copy(isPrimary = true)
-                    }
-                    if (newReqs.isEmpty()) {
-                      onUpdate(requirementGroups.filterIndexed { i, _ -> i != groupIndex })
-                    } else {
-                      onUpdate(
-                          requirementGroups.mapIndexed { i, g ->
-                            if (i == groupIndex) group.copy(requirements = newReqs) else g
-                          }
-                      )
-                    }
-                  }
-              ) {
+              IconButton(onClick = {
+                val newReqs = group.requirements.toMutableList().apply { removeAt(reqIndex) }
+                if (newReqs.none { it.isPrimary } && newReqs.isNotEmpty()) newReqs[0] = newReqs[0].copy(isPrimary = true)
+                if (newReqs.isEmpty()) onUpdate(requirementGroups.filterIndexed { i, _ -> i != groupIndex })
+                else onUpdate(requirementGroups.mapIndexed { i, g -> if (i == groupIndex) g.copy(requirements = newReqs) else g })
+              }) {
                 Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
               }
             }
           }
 
-          TextButton(
-              onClick = {
-                val newReq =
-                    RecipeRequirement(
-                        quantity = 0.0,
-                        unitId = null,
-                        isPrimary = false,
-                    )
-                onUpdate(
-                    requirementGroups.mapIndexed { i, g ->
-                      if (i == groupIndex) group.copy(requirements = group.requirements + newReq)
-                      else g
-                    }
-                )
-              }
-          ) {
+          TextButton(onClick = {
+            onUpdate(requirementGroups.mapIndexed { i, g ->
+                if (i == groupIndex) g.copy(requirements = g.requirements + FoodItemRequirement(foodItemId = Uuid.NIL, quantity = 0.0, isPrimary = false)) else g
+            })
+          }) {
             Text("+ Add Alternative")
           }
         }
       }
     }
 
-    Button(
-        onClick = {
-          val newGroup =
-              RecipeRequirementGroup(
-                  id = kotlin.uuid.Uuid.random(),
-                  requirements =
-                      listOf(
-                          RecipeRequirement(
-                              quantity = 0.0,
-                              unitId = null,
-                              isPrimary = true,
-                          )
-                      ),
-              )
-          onUpdate(requirementGroups + newGroup)
-        },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-      Text("+ Add New Ingredient Slot")
+    Button(onClick = { onUpdate(requirementGroups + FoodItemRequirementGroup(requirements = listOf(FoodItemRequirement(foodItemId = Uuid.NIL, quantity = 0.0, isPrimary = true)))) }, modifier = Modifier.fillMaxWidth()) {
+      Text("+ Add New Slot")
     }
   }
 }

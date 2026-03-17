@@ -13,10 +13,6 @@ import kotlin.uuid.Uuid
 // Embedded value objects
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Embedded struct that lives inside [AppSettingsEntity]. Maps to three flat columns in the
- * app_settings table.
- */
 data class DashboardConfig(
     @ColumnInfo(name = "show_weekly_cost") val showWeeklyCost: Boolean = false,
     @ColumnInfo(name = "show_shopping_list_summary") val showShoppingListSummary: Boolean = false,
@@ -27,11 +23,6 @@ data class DashboardConfig(
 // LOOKUP / REFERENCE NODES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Represents a physical or logical unit of measurement (g, ml, cups, etc.). [factorToBase] stores
- * the multiplier needed to convert this unit to the canonical base unit within its [unitType]
- * group, enabling universal conversions.
- */
 @Entity(tableName = "units", indices = [Index(value = ["name"])])
 data class UnitEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
@@ -62,11 +53,14 @@ data class RestaurantEntity(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHOPPING-ITEM HIERARCHY
+// ECS CORE: FOOD ITEMS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The root Entity for all food-related data (Ingredients, Recipes, Meals, Leftovers).
+ */
 @Entity(
-    tableName = "ingredients",
+    tableName = "food_items",
     indices = [Index(value = ["name"]), Index(value = ["preferred_unit_id"])],
     foreignKeys =
         [
@@ -78,7 +72,7 @@ data class RestaurantEntity(
             )
         ],
 )
-data class IngredientEntity(
+data class FoodItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "preferred_unit_id") val preferredUnitId: Uuid? = null,
@@ -87,109 +81,113 @@ data class IngredientEntity(
 )
 
 /**
- * A free-form shopping item not tied to any recipe ingredient (e.g. "Paper Towels"). Shares the
- * polymorphic [ShoppingCartItemEntity.ingredientId] / [ShoppingCartItemEntity.customShoppingItemId]
- * pattern.
- */
-@Entity(tableName = "custom_shopping_items", indices = [Index(value = ["name"])])
-data class CustomShoppingItemEntity(
-    @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "name") val name: String,
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RECIPE DOMAIN
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * A culinary recipe with metadata. Instructions are stored in a child [RecipeInstructionEntity]
- * table to keep this entity in 3NF (a List<String> column would violate 1NF).
+ * Component for items that can be purchased from a store.
  */
 @Entity(
-    tableName = "recipes",
+    tableName = "purchasable_components",
     foreignKeys =
         [
             ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["produces_ingredient_id"],
+                entity = FoodItemEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["food_item_id"],
+                onDelete = ForeignKey.CASCADE,
+            ),
+            ForeignKey(
+                entity = CategoryEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["category_id"],
                 onDelete = ForeignKey.SET_NULL,
             )
         ],
-    indices =
-        [
-            Index(value = ["name"]),
-            Index(value = ["description"]),
-            Index(value = ["produces_ingredient_id"]),
-        ],
+    indices = [Index(value = ["food_item_id"]), Index(value = ["category_id"])],
 )
-data class RecipeEntity(
-    @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "name") val name: String,
-    @ColumnInfo(name = "description") val description: String? = null,
-    @ColumnInfo(name = "servings") val servings: Double? = null,
-    @ColumnInfo(name = "meal_type") val mealType: RecipeMealType? = null,
-    @ColumnInfo(name = "prep_time_minutes") val prepTimeMinutes: Int? = null,
-    @ColumnInfo(name = "cook_time_minutes") val cookTimeMinutes: Int? = null,
-    @ColumnInfo(name = "produces_ingredient_id") val producesIngredientId: Uuid? = null,
-    @ColumnInfo(name = "yield_quantity") val amountPerServing: Double? = null,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-    @ColumnInfo(name = "updated_at") val updatedAt: Long? = null,
+data class PurchasableComponentEntity(
+    @PrimaryKey @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "expected_price_cents") val expectedPriceCents: Int = 0,
+    @ColumnInfo(name = "category_id") val categoryId: Uuid? = null,
 )
 
 /**
- * One ordered step from a recipe's instruction list. [stepOrder] is a zero-based index; queries
- * should ORDER BY step_order ASC.
+ * Component for items that have a recipe or assembly instructions.
  */
+@Entity(
+    tableName = "recipe_components",
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = FoodItemEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["food_item_id"],
+                onDelete = ForeignKey.CASCADE,
+            )
+        ],
+    indices = [Index(value = ["food_item_id"])],
+)
+data class RecipeComponentEntity(
+    @PrimaryKey @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "description") val description: String? = null,
+    @ColumnInfo(name = "servings") val servings: Double = 1.0,
+    @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
+    @ColumnInfo(name = "prep_time_minutes") val prepTimeMinutes: Int = 0,
+    @ColumnInfo(name = "cook_time_minutes") val cookTimeMinutes: Int = 0,
+)
+
+/**
+ * Component for items currently in the pantry as leftovers/prepared food.
+ */
+@Entity(
+    tableName = "leftover_components",
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = FoodItemEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["food_item_id"],
+                onDelete = ForeignKey.CASCADE,
+            )
+        ],
+    indices = [Index(value = ["food_item_id"])],
+)
+data class LeftoverComponentEntity(
+    @PrimaryKey @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "remaining_servings") val remainingServings: Double,
+    @ColumnInfo(name = "date_added") val dateAdded: String,
+    @ColumnInfo(name = "expiration_date") val expirationDate: String? = null,
+)
+
 @Entity(
     tableName = "recipe_instructions",
     foreignKeys =
         [
             ForeignKey(
-                entity = RecipeEntity::class,
+                entity = FoodItemEntity::class,
                 parentColumns = ["id"],
-                childColumns = ["recipe_id"],
+                childColumns = ["food_item_id"],
                 onDelete = ForeignKey.CASCADE,
             )
         ],
-    indices = [Index(value = ["recipe_id"])],
+    indices = [Index(value = ["food_item_id"])],
 )
 data class RecipeInstructionEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "recipe_id") val recipeId: Uuid,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "step_order") val stepOrder: Int,
     @ColumnInfo(name = "instruction") val instruction: String,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MEAL PLANNING DOMAIN
+// MEAL PLANNING & CALENDAR
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * A reusable, named meal template composed of recipes and/or standalone ingredients. Think "Sunday
- * Roast" or "Quick Weekday Lunch".
- */
-@Entity(tableName = "pre_planned_meals")
-data class PrePlannedMealEntity(
-    @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "name") val name: String,
-    @ColumnInfo(name = "meal_type") val mealType: RecipeMealType? = null,
-)
-
-/**
- * A specific occurrence of a meal placed on the calendar.
- *
- * Exactly one of [prePlannedMealId] or [restaurantId] must be non-null (enforced by a CHECK
- * constraint in the schema and validated by the DAO).
- */
 @Entity(
     tableName = "scheduled_meals",
     foreignKeys =
         [
             ForeignKey(
-                entity = PrePlannedMealEntity::class,
+                entity = FoodItemEntity::class,
                 parentColumns = ["id"],
-                childColumns = ["pre_planned_meal_id"],
+                childColumns = ["food_item_id"],
                 onDelete = ForeignKey.CASCADE,
             ),
             ForeignKey(
@@ -202,38 +200,32 @@ data class PrePlannedMealEntity(
     indices =
         [
             Index(value = ["date"]),
-            Index(value = ["pre_planned_meal_id"]),
+            Index(value = ["food_item_id"]),
             Index(value = ["restaurant_id"]),
         ],
 )
 data class ScheduledMealEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    /** ISO-8601 date string, e.g. "2025-03-15" */
     @ColumnInfo(name = "date") val date: String,
-    /** ISO-8601 time string, e.g. "18:30:00" */
     @ColumnInfo(name = "time") val time: String,
-    @ColumnInfo(name = "meal_type") val mealType: RecipeMealType? = null,
-    @ColumnInfo(name = "people_count") val peopleCount: Int? = null,
+    @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
+    @ColumnInfo(name = "people_count") val peopleCount: Int = 1,
     @ColumnInfo(name = "is_consumed") val isConsumed: Boolean = false,
     @ColumnInfo(name = "anticipated_cost_cents") val anticipatedCostCents: Int? = null,
-    @ColumnInfo(name = "pre_planned_meal_id") val prePlannedMealId: Uuid? = null,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
     @ColumnInfo(name = "restaurant_id") val restaurantId: Uuid? = null,
 ) {
-  init {
-    require((prePlannedMealId != null) xor (restaurantId != null)) {
-      "A ScheduledMeal must reference exactly one of prePlannedMealId or restaurantId."
+    init {
+        require((foodItemId != null) xor (restaurantId != null)) {
+            "A ScheduledMeal must reference exactly one of foodItemId or restaurantId."
+        }
     }
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP SETTINGS (singleton)
+// APP SETTINGS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Application-wide settings stored as a single row. Singleton enforcement strategy: the DAO's
- * upsert uses a fixed sentinel ID.
- */
 @Entity(tableName = "app_settings")
 data class AppSettingsEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: String = SINGLETON_ID,
@@ -245,52 +237,29 @@ data class AppSettingsEntity(
     @ColumnInfo(name = "accent_color") val accentColor: String = "GREEN",
     @Embedded val dashboard: DashboardConfig = DashboardConfig(),
 ) {
-  companion object {
-    const val SINGLETON_ID = "app_settings_singleton"
-  }
+    companion object {
+        const val SINGLETON_ID = "app_settings_singleton"
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RECEIPT / LEDGER DOMAIN
+// RECEIPTS & LEDGER
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A historical purchase receipt from a store trip. */
 @Entity(
     tableName = "store_receipts",
     foreignKeys =
         [
-            ForeignKey(
-                entity = StoreEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["store_id"],
-                onDelete = ForeignKey.RESTRICT,
-            ),
-            ForeignKey(
-                entity = RestaurantEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["restaurant_id"],
-                onDelete = ForeignKey.RESTRICT,
-            ),
-            ForeignKey(
-                entity = ScheduledMealEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["scheduled_meal_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
+            ForeignKey(entity = StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = RestaurantEntity::class, ["id"], ["restaurant_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = ScheduledMealEntity::class, ["id"], ["scheduled_meal_id"], onDelete = ForeignKey.CASCADE),
         ],
-    indices =
-        [
-            Index(value = ["store_id"]),
-            Index(value = ["restaurant_id"]),
-            Index(value = ["scheduled_meal_id"]),
-        ],
+    indices = [Index(value = ["store_id"]), Index(value = ["restaurant_id"]), Index(value = ["scheduled_meal_id"])],
 )
 data class StoreReceiptEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "name") val name: String,
-    /** ISO-8601 date string */
     @ColumnInfo(name = "date") val date: String,
-    /** ISO-8601 time string */
     @ColumnInfo(name = "time") val time: String,
     @ColumnInfo(name = "store_id") val storeId: Uuid? = null,
     @ColumnInfo(name = "restaurant_id") val restaurantId: Uuid? = null,
@@ -301,283 +270,108 @@ data class StoreReceiptEntity(
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EDGE / JUNCTION ENTITIES
+// EDGES & COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Unit conversion factor specific to a single ingredient. e.g. "For 'Butter': 1 cup → 227 g". */
 @Entity(
     tableName = "unit_conversion_bridges",
     foreignKeys =
         [
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(UnitEntity::class, ["id"], ["from_unit_id"], onDelete = ForeignKey.RESTRICT),
-            ForeignKey(UnitEntity::class, ["id"], ["to_unit_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(entity = UnitEntity::class, ["id"], ["from_unit_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = UnitEntity::class, ["id"], ["to_unit_id"], onDelete = ForeignKey.RESTRICT),
         ],
-    indices =
-        [
-            Index(value = ["ingredient_id"]),
-            Index(value = ["from_unit_id"]),
-            Index(value = ["to_unit_id"]),
-            Index(value = ["ingredient_id", "from_unit_id", "to_unit_id"], unique = true),
-        ],
+    indices = [Index(value = ["food_item_id"]), Index(value = ["from_unit_id"]), Index(value = ["to_unit_id"])],
 )
 data class UnitConversionBridgeEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "from_unit_id") val fromUnitId: Uuid,
     @ColumnInfo(name = "to_unit_id") val toUnitId: Uuid,
     @ColumnInfo(name = "from_quantity") val fromQuantity: Double,
     @ColumnInfo(name = "to_quantity") val toQuantity: Double,
 )
 
-/** M:N association between [IngredientEntity] and [CategoryEntity]. */
-@Entity(
-    tableName = "ingredient_categories",
-    primaryKeys = ["ingredient_id", "category_id"],
-    foreignKeys =
-        [
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                CategoryEntity::class,
-                ["id"],
-                ["category_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-        ],
-    indices = [Index(value = ["category_id"])],
-)
-data class IngredientCategoryEntity(
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid,
-    @ColumnInfo(name = "category_id") val categoryId: Uuid,
-)
-
-/** A store's specific product listing for an ingredient (SKU-level detail). */
 @Entity(
     tableName = "package_options",
     foreignKeys =
         [
             ForeignKey(StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.CASCADE),
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
+            ForeignKey(FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
             ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
         ],
-    indices =
-        [
-            Index(value = ["store_id"]),
-            Index(value = ["ingredient_id"]),
-            Index(value = ["unit_id"]),
-        ],
+    indices = [Index(value = ["store_id"]), Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
 )
 data class PackageOptionEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "store_id") val storeId: Uuid,
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "unit_id") val unitId: Uuid,
     @ColumnInfo(name = "price_cents") val priceCents: Int? = null,
     @ColumnInfo(name = "quantity") val quantity: Double? = null,
 )
 
-/**
- * A group of requirements for a recipe (e.g. "The Base", "The Topping", or an "Either/Or" slot).
- */
 @Entity(
     tableName = "recipe_requirement_groups",
     foreignKeys =
-        [ForeignKey(RecipeEntity::class, ["id"], ["recipe_id"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index(value = ["recipe_id"])],
+        [ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["food_item_id"])],
 )
 data class RecipeRequirementGroupEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "recipe_id") val recipeId: Uuid,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
 )
 
-/** Links an ingredient to a recipe requirement group, specifying the amount and unit required. */
 @Entity(
     tableName = "recipe_requirements",
     foreignKeys =
         [
-            ForeignKey(
-                RecipeRequirementGroupEntity::class,
-                ["id"],
-                ["group_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = RecipeRequirementGroupEntity::class, ["id"], ["group_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(entity = UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
         ],
-    indices =
-        [
-            Index(value = ["group_id"]),
-            Index(value = ["ingredient_id"]),
-            Index(value = ["unit_id"]),
-        ],
+    indices = [Index(value = ["group_id"]), Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
 )
 data class RecipeRequirementEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "group_id") val groupId: Uuid,
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid? = null,
-    @ColumnInfo(name = "sub_recipe_id") val subRecipeId: Uuid? = null,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "unit_id") val unitId: Uuid? = null,
     @ColumnInfo(name = "quantity") val quantity: Double,
     @ColumnInfo(name = "is_primary") val isPrimary: Boolean = true,
 )
 
-/** M:N join between [PrePlannedMealEntity] and [RecipeEntity]. */
-@Entity(
-    tableName = "meal_recipes",
-    primaryKeys = ["pre_planned_meal_id", "recipe_id"],
-    foreignKeys =
-        [
-            ForeignKey(
-                entity = PrePlannedMealEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["pre_planned_meal_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                entity = RecipeEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["recipe_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-        ],
-    indices = [Index(value = ["recipe_id"])],
-)
-data class MealRecipeEntity(
-    @ColumnInfo(name = "pre_planned_meal_id") val prePlannedMealId: Uuid,
-    @ColumnInfo(name = "recipe_id") val recipeId: Uuid,
-)
-
-/** Standalone ingredients added directly to a pre-planned meal. */
-@Entity(
-    tableName = "meal_independent_ingredients",
-    foreignKeys =
-        [
-            ForeignKey(
-                entity = PrePlannedMealEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["pre_planned_meal_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
-        ],
-    indices =
-        [
-            Index(value = ["pre_planned_meal_id"]),
-            Index(value = ["ingredient_id"]),
-            Index(value = ["unit_id"]),
-        ],
-)
-data class MealIndependentIngredientEntity(
-    @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "pre_planned_meal_id") val prePlannedMealId: Uuid,
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid,
-    @ColumnInfo(name = "quantity") val quantity: Double,
-)
-
-/** Current pantry stock for a given ingredient. */
 @Entity(
     tableName = "pantry_inventory",
     foreignKeys =
         [
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
+            ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(entity = UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
         ],
-    indices = [Index(value = ["ingredient_id"]), Index(value = ["unit_id"])],
+    indices = [Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
 )
 data class PantryInventoryEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "unit_id") val unitId: Uuid,
     @ColumnInfo(name = "quantity") val quantity: Double = 0.0,
 )
 
-/** Leftover and prepared food tracking. */
-@Entity(
-    tableName = "leftover_inventory",
-    foreignKeys =
-        [ForeignKey(RecipeEntity::class, ["id"], ["recipe_id"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index(value = ["recipe_id"])],
-)
-data class LeftoverInventoryEntity(
-    @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "recipe_id") val recipeId: Uuid,
-    @ColumnInfo(name = "remaining_servings") val remainingServings: Double,
-    @ColumnInfo(name = "date_added") val dateAdded: String,
-    @ColumnInfo(name = "expiration_date") val expirationDate: String? = null,
-)
-
-/** An item on the active shopping list. */
 @Entity(
     tableName = "shopping_cart_items",
     foreignKeys =
         [
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                CustomShoppingItemEntity::class,
-                ["id"],
-                ["custom_shopping_item_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
+            ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
             ForeignKey(StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.SET_NULL),
             ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
-            ForeignKey(
-                PackageOptionEntity::class,
-                ["id"],
-                ["package_option_id"],
-                onDelete = ForeignKey.SET_NULL,
-            ),
+            ForeignKey(PackageOptionEntity::class, ["id"], ["package_option_id"], onDelete = ForeignKey.SET_NULL),
         ],
-    indices =
-        [
-            Index(value = ["ingredient_id"]),
-            Index(value = ["custom_shopping_item_id"]),
-            Index(value = ["store_id"]),
-            Index(value = ["unit_id"]),
-            Index(value = ["package_option_id"]),
-        ],
+    indices = [Index(value = ["food_item_id"]), Index(value = ["store_id"]), Index(value = ["unit_id"]), Index(value = ["package_option_id"])],
 )
 data class ShoppingCartItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid? = null,
-    @ColumnInfo(name = "custom_shopping_item_id") val customShoppingItemId: Uuid? = null,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "store_id") val storeId: Uuid? = null,
     @ColumnInfo(name = "unit_id") val unitId: Uuid,
     @ColumnInfo(name = "package_option_id") val packageOptionId: Uuid? = null,
@@ -587,36 +381,20 @@ data class ShoppingCartItemEntity(
     @ColumnInfo(name = "is_pantry_item") val isPantryItem: Boolean = true,
 )
 
-/** One line on a [StoreReceiptEntity] — what was bought, how much, and at what price. */
 @Entity(
     tableName = "receipt_line_items",
     foreignKeys =
         [
-            ForeignKey(
-                StoreReceiptEntity::class,
-                ["id"],
-                ["receipt_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                IngredientEntity::class,
-                ["id"],
-                ["ingredient_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
+            ForeignKey(StoreReceiptEntity::class, ["id"], ["receipt_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
             ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
         ],
-    indices =
-        [
-            Index(value = ["receipt_id"]),
-            Index(value = ["ingredient_id"]),
-            Index(value = ["unit_id"]),
-        ],
+    indices = [Index(value = ["receipt_id"]), Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
 )
 data class ReceiptLineItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "receipt_id") val receiptId: Uuid,
-    @ColumnInfo(name = "ingredient_id") val ingredientId: Uuid? = null,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
     @ColumnInfo(name = "unit_id") val unitId: Uuid? = null,
     @ColumnInfo(name = "custom_name") val customName: String? = null,
     @ColumnInfo(name = "quantity_bought") val quantityBought: Double,

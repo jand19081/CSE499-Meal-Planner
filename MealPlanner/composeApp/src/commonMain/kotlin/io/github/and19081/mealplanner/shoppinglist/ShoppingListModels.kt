@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ShoppingListItem(
     val id: Uuid = Uuid.random(),
-    val ingredientId: Uuid? = null,
+    val foodItemId: Uuid? = null,
     val customName: String? = null,
     val storeId: Uuid,
     val neededQuantity: Double? = null,
@@ -35,11 +35,11 @@ data class ReceiptHistory(
 data class ReceiptLineItem(
     val id: Uuid = Uuid.random(),
     val receiptId: Uuid,
-    val ingredientId: Uuid? = null,
+    val foodItemId: Uuid? = null,
     val unitId: Uuid? = null,
     val customName: String? = null,
     val quantityBought: Double,
     val pricePaidCents: Int,
 )
 
-@Serializable data class PriceUpdate(val ingredientId: Uuid, val newPriceCents: Int)
+@Serializable data class PriceUpdate(val foodItemId: Uuid, val priceCents: Int)

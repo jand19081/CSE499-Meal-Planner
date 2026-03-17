@@ -9,14 +9,14 @@ interface PantryRepository {
   val pantryItems: StateFlow<List<PantryItem>>
 
   suspend fun updateQuantity(
-      ingredientId: Uuid,
+      foodItemId: Uuid,
       quantity: Double,
       unitId: Uuid,
   )
 
   suspend fun setPantryItems(items: List<PantryItem>)
 
-  suspend fun remove(ingredientId: Uuid, unitId: Uuid)
+  suspend fun remove(foodItemId: Uuid, unitId: Uuid)
 
   suspend fun removeBatch(batchId: Uuid)
 }
@@ -58,4 +58,16 @@ interface ReceiptHistoryRepository {
   suspend fun removeTrip(id: Uuid)
 
   suspend fun setTrips(history: List<ReceiptHistory>)
+}
+
+interface RestaurantRepository {
+  val restaurants: StateFlow<List<Restaurant>>
+
+  suspend fun addRestaurant(restaurant: Restaurant)
+
+  suspend fun updateRestaurant(restaurant: Restaurant)
+
+  suspend fun deleteRestaurant(id: Uuid)
+
+  suspend fun setRestaurants(restaurants: List<Restaurant>)
 }

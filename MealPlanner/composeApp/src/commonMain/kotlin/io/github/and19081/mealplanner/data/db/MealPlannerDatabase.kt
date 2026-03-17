@@ -7,9 +7,9 @@ import io.github.and19081.mealplanner.data.db.converters.MealPlannerTypeConverte
 import io.github.and19081.mealplanner.data.db.dao.*
 import io.github.and19081.mealplanner.data.db.entity.*
 
-/** Room database for the Meal Planner application. */
+/** Room database for the Meal Planner application with ECS architecture. */
 @Database(
-    version = 2,
+    version = 3,
     exportSchema = true,
     entities =
         [
@@ -19,16 +19,14 @@ import io.github.and19081.mealplanner.data.db.entity.*
             StoreEntity::class,
             RestaurantEntity::class,
 
-            // Shopping-item hierarchy
-            IngredientEntity::class,
-            CustomShoppingItemEntity::class,
-
-            // Recipe domain
-            RecipeEntity::class,
+            // ECS Food Items & Components
+            FoodItemEntity::class,
+            PurchasableComponentEntity::class,
+            RecipeComponentEntity::class,
+            LeftoverComponentEntity::class,
             RecipeInstructionEntity::class,
 
             // Meal planning domain
-            PrePlannedMealEntity::class,
             ScheduledMealEntity::class,
 
             // Settings
@@ -39,14 +37,10 @@ import io.github.and19081.mealplanner.data.db.entity.*
 
             // Edges / junction tables
             UnitConversionBridgeEntity::class,
-            IngredientCategoryEntity::class,
             PackageOptionEntity::class,
             RecipeRequirementGroupEntity::class,
             RecipeRequirementEntity::class,
-            MealRecipeEntity::class,
-            MealIndependentIngredientEntity::class,
             PantryInventoryEntity::class,
-            LeftoverInventoryEntity::class,
             ShoppingCartItemEntity::class,
             ReceiptLineItemEntity::class,
         ],
@@ -63,11 +57,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
 
   abstract fun restaurantDao(): RestaurantDao
 
-  abstract fun ingredientDao(): IngredientDao
-
-  abstract fun recipeDao(): RecipeDao
-
-  abstract fun prePlannedMealDao(): PrePlannedMealDao
+  abstract fun foodItemDao(): FoodItemDao
 
   abstract fun scheduledMealDao(): ScheduledMealDao
 
@@ -80,8 +70,6 @@ abstract class MealPlannerDatabase : RoomDatabase() {
   abstract fun receiptDao(): ReceiptDao
 
   abstract fun appSettingsDao(): AppSettingsDao
-
-  abstract fun leftoverDao(): LeftoverDao
 
   companion object {
     fun getDatabase(builder: RoomDatabase.Builder<MealPlannerDatabase>): MealPlannerDatabase {

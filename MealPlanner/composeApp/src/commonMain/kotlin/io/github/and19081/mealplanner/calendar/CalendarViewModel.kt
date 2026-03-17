@@ -3,45 +3,24 @@ package io.github.and19081.mealplanner.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
-import io.github.and19081.mealplanner.domain.DataQualityValidator
-import io.github.and19081.mealplanner.domain.DataWarning
-import io.github.and19081.mealplanner.domain.UnitConverter
-import io.github.and19081.mealplanner.ingredients.BridgeConversion
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.IngredientRepository
-import io.github.and19081.mealplanner.ingredients.Package
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.kitchen.*
-import io.github.and19081.mealplanner.meals.MealRepository
-import io.github.and19081.mealplanner.recipes.RecipeRepository
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
-import kotlinx.datetime.plus
-import kotlinx.datetime.todayIn
+import kotlinx.datetime.*
 
-// The UI State
 data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
     val weekDates: List<DateUiModel>,
-    val availableMeals: List<PrePlannedMeal> = emptyList(),
-    val allRecipes: List<Recipe> = emptyList(),
-    val allIngredients: List<Ingredient> = emptyList(),
+    val availableMeals: List<FoodItem> = emptyList(),
+    val allItems: List<FoodItem> = emptyList(),
     val allUnits: List<UnitModel> = emptyList(),
-    val allRestaurants: List<Restaurant> = emptyList(), // Added
+    val allRestaurants: List<Restaurant> = emptyList(),
     val allEntries: List<ScheduledMeal> = emptyList(),
     val errorMessage: String? = null,
     val warnings: Map<Uuid, List<DataWarning>> = emptyMap(),
@@ -64,7 +43,6 @@ data class CalendarEvent(
     val warnings: List<DataWarning> = emptyList(),
 )
 
-// The Logic to generate the grid
 object CalendarDataSource {
   fun getDates(referenceDate: LocalDate): List<LocalDate> {
     val firstDayOfMonth = LocalDate(referenceDate.year, referenceDate.month, 1)
@@ -80,18 +58,13 @@ object CalendarDataSource {
   }
 }
 
-// The ViewModel
 class CalendarViewModel(
     currentMonthFlow: StateFlow<LocalDate>,
     private val mealPlanRepository: MealPlanRepository,
-    private val mealRepository: MealRepository,
-    private val recipeRepository: RecipeRepository,
-    private val ingredientRepository: IngredientRepository,
+    private val foodItemRepository: FoodItemRepository,
     private val pantryRepository: PantryRepository,
-    private val leftoverRepository: LeftoverRepository,
     private val unitRepository: UnitRepository,
-    private val restaurantRepository:
-        io.github.and19081.mealplanner.ingredients.RestaurantRepository,
+    private val restaurantRepository: RestaurantRepository,
     private val notificationScheduler: io.github.and19081.mealplanner.notifications.MealNotificationScheduler,
 ) : ViewModel() {
   private val _selectedDate = MutableStateFlow<LocalDate?>(null)
@@ -99,53 +72,42 @@ class CalendarViewModel(
 
   val uiState: StateFlow<CalendarUiState> =
       combine(
-              listOf(
-                  currentMonthFlow,
-                  _selectedDate,
-                  mealPlanRepository.entries,
-                  mealRepository.meals,
-                  recipeRepository.recipes,
-                  ingredientRepository.ingredients,
-                  ingredientRepository.packages,
-                  ingredientRepository.bridges,
-                  unitRepository.units,
-                  restaurantRepository.restaurants,
-                  _errorMessage,
-              )
-          ) { array ->
-            val currentMonth = array[0] as LocalDate
-            val selectedDate = array[1] as LocalDate?
-            val entries = array[2] as List<ScheduledMeal>
-            val meals = array[3] as List<PrePlannedMeal>
-            val recipes = array[4] as List<Recipe>
-            val ingredients = array[5] as List<Ingredient>
-            val packages = array[6] as List<Package>
-            val bridges = array[7] as List<BridgeConversion>
-            val allUnits = array[8] as List<UnitModel>
-            val restaurants = array[9] as List<Restaurant>
-            val error = array[10] as String?
+              currentMonthFlow,
+              _selectedDate,
+              mealPlanRepository.entries,
+              foodItemRepository.foodItems,
+              foodItemRepository.packages,
+              foodItemRepository.conversions,
+              unitRepository.units,
+              restaurantRepository.restaurants,
+              _errorMessage,
+          ) { args: Array<Any?> ->
+            val currentMonth = args[0] as LocalDate
+            val selectedDate = args[1] as LocalDate?
+            val entries = args[2] as List<ScheduledMeal>
+            val allItems = args[3] as List<FoodItem>
+            val packages = args[4] as List<Package>
+            val bridges = args[5] as List<BridgeConversion>
+            val allUnits = args[6] as List<UnitModel>
+            val restaurants = args[7] as List<Restaurant>
+            val error = args[8] as String?
 
             val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
-
-            // Use selectedDate as reference for the month grid if it's available
-            // This ensures that when we switch views, the selected date is in the generated models.
             val gridReference = selectedDate ?: currentMonth
             val dateList = CalendarDataSource.getDates(gridReference)
 
             val entriesByDate = entries.groupBy { it.date }
-            val mealsById = meals.associateBy { it.id }
-            val recipesById = recipes.associateBy { it.id }
-            val ingredientsById = ingredients.associateBy { it.id }
+            val itemsById = allItems.associateBy { it.id }
             val restaurantsById = restaurants.associateBy { it.id }
 
-            // Pre-calculate warnings for all meals
+            val availableMeals = allItems.filter { it.isRecipe }
+
             val mealWarnings =
-                meals.associate { meal ->
+                availableMeals.associate { meal ->
                   meal.id to
-                      DataQualityValidator.validateMeal(
+                      DataQualityValidator.validateFoodItem(
                           meal,
-                          recipesById,
-                          ingredientsById,
+                          itemsById,
                           packages,
                           bridges,
                           allUnits,
@@ -159,7 +121,7 @@ class CalendarViewModel(
                   val resolvedEvents =
                       daysEntries.map { entry ->
                         val mealName =
-                            entry.prePlannedMealId?.let { mealsById[it]?.name }
+                            entry.prePlannedMealId?.let { itemsById[it]?.name }
                                 ?: entry.restaurantId?.let { restaurantsById[it]?.name }
                                 ?: "Unknown Meal"
                         val warnings =
@@ -203,9 +165,8 @@ class CalendarViewModel(
                 currentMonth = currentMonth,
                 dates = dateUiModels,
                 weekDates = weekDates,
-                availableMeals = meals,
-                allRecipes = recipes,
-                allIngredients = ingredients,
+                availableMeals = availableMeals,
+                allItems = allItems,
                 allUnits = allUnits,
                 allRestaurants = restaurants,
                 allEntries = entries,
@@ -219,17 +180,9 @@ class CalendarViewModel(
               started = SharingStarted.WhileSubscribed(5000),
               initialValue =
                   CalendarUiState(
-                      Clock.System.todayIn(TimeZone.currentSystemDefault()),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      emptyList(),
-                      null,
-                      emptyMap(),
+                      currentMonth = Clock.System.todayIn(TimeZone.currentSystemDefault()),
+                      dates = emptyList(),
+                      weekDates = emptyList(),
                   ),
           )
 
@@ -251,7 +204,7 @@ class CalendarViewModel(
   fun addPlan(
       date: LocalDate,
       time: LocalTime,
-      meal: PrePlannedMeal? = null,
+      meal: FoodItem? = null,
       restaurant: Restaurant? = null,
       mealType: RecipeMealType,
       peopleCount: Int,
@@ -260,14 +213,14 @@ class CalendarViewModel(
     _errorMessage.value = null
     val newEntry =
         ScheduledMeal(
+            id = Uuid.random(),
             date = date,
             time = time,
             mealType = mealType,
-            peopleCount = peopleCount,
             prePlannedMealId = meal?.id,
             restaurantId = restaurant?.id,
+            peopleCount = peopleCount,
             anticipatedCostCents = anticipatedCostCents,
-            id = Uuid.random(),
         )
 
     viewModelScope.launch { 
@@ -289,153 +242,11 @@ class CalendarViewModel(
     }
   }
 
-  fun consumeMeal(
-      entryId: Uuid,
-      totalCents: Int? = null,
-      taxCents: Int? = null,
-      lineItems: List<Triple<String, Double, Int>> = emptyList(),
-      leftovers: List<Pair<Uuid, Double>> = emptyList(),
-  ) {
-    viewModelScope.launch {
-      if (totalCents != null && taxCents != null) {
-        mealPlanRepository.addReceipt(entryId, totalCents, taxCents, lineItems)
-      }
-
-      val todayStr = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
-      leftovers.forEach { (recipeId, servings) ->
-        if (servings > 0) {
-          leftoverRepository.addLeftover(recipeId, servings, todayStr)
-        }
-      }
-
-      mealPlanRepository.setConsumedStatus(entryId, true)
-    }
-  }
-
-  fun createConsumptionTransaction(entry: ScheduledMeal): KitchenTransaction? {
-    val meal = mealRepository.meals.value.find { it.id == entry.prePlannedMealId } ?: return null
-    val allRecipes = recipeRepository.recipes.value
-    val allIngredients = ingredientRepository.ingredients.value
-    val allUnits = unitRepository.units.value
-    val ingredientsMap = allIngredients.associateBy { it.id }
-
-    val changes = mutableListOf<InventoryChange>()
-
-    // Helper to add changes
-    fun addChange(ingId: Uuid, qty: Double, unitId: Uuid?) {
-      val name = ingredientsMap[ingId]?.name ?: "Unknown"
-      val unit = allUnits.find { it.id == unitId }
-      changes.add(
-          InventoryChange(
-              ingredientId = ingId,
-              ingredientName = name,
-              quantity = qty,
-              unitId = unitId,
-              unitAbbreviation = unit?.abbreviation ?: "?",
-              direction = TransactionDirection.OUT
-          )
-      )
-    }
-
-    // Recipes
-    meal.recipes.forEach { rId ->
-      val recipe = allRecipes.find { it.id == rId }
-      if (recipe != null) {
-        val servingsPerBatch = if (recipe.servings > 0) recipe.servings else 1.0
-        val batchesCooked = max(1.0, ceil(entry.peopleCount / servingsPerBatch))
-        recipe.ingredients.forEach { ri ->
-          if (ri.ingredientId != null) {
-            addChange(ri.ingredientId, ri.quantity * batchesCooked, ri.unitId)
-          }
-        }
-      }
-    }
-
-    // Independent Ingredients
-    meal.independentIngredients.forEach { item ->
-      addChange(item.ingredientId, item.quantity * entry.peopleCount, item.unitId)
-    }
-
-    return KitchenTransaction(
-        type = TransactionType.Consumption,
-        title = "Consuming: ${meal.name}",
-        changes = changes
-    )
-  }
-
-  fun commitTransaction(entryId: Uuid, transaction: KitchenTransaction, leftovers: List<Pair<Uuid, Double>> = emptyList()) {
-    viewModelScope.launch {
-      val allUnits = unitRepository.units.value
-      val allIngredients = ingredientRepository.ingredients.value
-      val allBridges = ingredientRepository.bridges.value
-      val pantryItems = pantryRepository.pantryItems.value
-
-      // 1. Process Changes
-      transaction.changes.forEach { change ->
-        val ingredient = allIngredients.find { it.id == change.ingredientId }
-        val unit = allUnits.find { it.id == change.unitId }
-
-        if (ingredient != null && unit != null) {
-          val preferredUnitId = ingredient.preferredUnitId
-          val targetUnitId = preferredUnitId ?: when (unit.type) {
-              UnitType.Weight -> SystemUnits.Gram.id
-              UnitType.Volume -> SystemUnits.Ml.id
-              UnitType.Count -> SystemUnits.Each.id
-              else -> unit.id
-          }
-
-          val targetUnit = allUnits.find { it.id == targetUnitId }
-
-          if (targetUnit != null) {
-            val bridges = allBridges.filter { it.ingredientId == change.ingredientId }
-            val changeInTargetUnit = UnitConverter.convert(
-                amount = change.quantity,
-                fromUnitId = change.unitId,
-                toUnitId = targetUnitId,
-                allUnits = allUnits.associateBy { it.id },
-                bridges = bridges
-            ) ?: 0.0
-
-            val currentPantryItem = pantryItems.find { it.ingredientId == change.ingredientId }
-            val currentQtyInTargetUnit = if (currentPantryItem != null) {
-                UnitConverter.convert(
-                    amount = currentPantryItem.quantity,
-                    fromUnitId = currentPantryItem.unitId,
-                    toUnitId = targetUnitId,
-                    allUnits = allUnits.associateBy { it.id },
-                    bridges = bridges
-                ) ?: 0.0
-            } else 0.0
-
-            val newQty = if (change.direction == TransactionDirection.IN) {
-                currentQtyInTargetUnit + changeInTargetUnit
-            } else {
-                max(0.0, currentQtyInTargetUnit - changeInTargetUnit)
-            }
-            pantryRepository.updateQuantity(change.ingredientId, newQty, targetUnitId)
-          }
-        }
-      }
-
-      // 2. Process Leftovers
-      val todayStr = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
-      leftovers.forEach { (recipeId, servings) ->
-        if (servings > 0) {
-          leftoverRepository.addLeftover(recipeId, servings, todayStr)
-        }
-      }
-
-      // 3. Mark as Consumed
-      mealPlanRepository.setConsumedStatus(entryId, true)
-    }
-  }
-
   fun toggleMealConsumption(entryId: Uuid) {
     val entry = mealPlanRepository.entries.value.find { it.id == entryId } ?: return
     val newStatus = !entry.isConsumed
 
     if (entry.restaurantId != null && newStatus) {
-      // For restaurants we should show a dialog, handled by UI.
       return
     }
 
@@ -448,6 +259,118 @@ class CalendarViewModel(
       }
     } else {
       viewModelScope.launch { mealPlanRepository.setConsumedStatus(entryId, false) }
+    }
+  }
+
+  fun createConsumptionTransaction(entry: ScheduledMeal): KitchenTransaction? {
+    val allItems = foodItemRepository.foodItems.value
+    val itemsMap = allItems.associateBy { it.id }
+    val meal = itemsMap[entry.prePlannedMealId] ?: return null
+    val recipeInfo = meal.recipeInfo ?: return null
+    
+    val allUnits = unitRepository.units.value
+    val changes = mutableListOf<InventoryChange>()
+
+    fun addRequirementsRecursive(item: FoodItem, multiplier: Double) {
+        val info = item.recipeInfo ?: return
+        info.requirements.forEach { req ->
+            val subItem = itemsMap[req.foodItemId] ?: return@forEach
+            if (subItem.isRecipe) {
+                val subRecipeInfo = subItem.recipeInfo!!
+                val scale = if (subRecipeInfo.servings > 0) req.quantity / subRecipeInfo.servings else 1.0
+                addRequirementsRecursive(subItem, multiplier * scale)
+            } else {
+                val unit = allUnits.find { it.id == req.unitId }
+                changes.add(
+                    InventoryChange(
+                        foodItemId = req.foodItemId,
+                        ingredientName = subItem.name,
+                        quantity = req.quantity * multiplier,
+                        unitId = req.unitId ?: subItem.preferredUnitId,
+                        unitAbbreviation = unit?.abbreviation ?: "?",
+                        direction = TransactionDirection.OUT
+                    )
+                )
+            }
+        }
+    }
+
+    val servingsPerBatch = if (recipeInfo.servings > 0) recipeInfo.servings else 1.0
+    val batchesCooked = max(1.0, entry.peopleCount / servingsPerBatch)
+    
+    addRequirementsRecursive(meal, batchesCooked)
+
+    return KitchenTransaction(
+        type = TransactionType.Consumption,
+        title = "Consuming: ${meal.name}",
+        changes = changes
+    )
+  }
+
+  fun commitTransaction(entryId: Uuid, transaction: KitchenTransaction, leftovers: List<Pair<Uuid, Double>> = emptyList()) {
+    viewModelScope.launch {
+      val allUnits = unitRepository.units.value
+      val allItems = foodItemRepository.foodItems.value
+      val allBridges = foodItemRepository.conversions.value
+      val pantryItems = pantryRepository.pantryItems.value
+
+      transaction.changes.forEach { change ->
+        val item = allItems.find { it.id == change.foodItemId }
+        val unit = allUnits.find { it.id == change.unitId }
+
+        if (item != null && unit != null) {
+          val targetUnitId = item.preferredUnitId ?: when (unit.type) {
+              UnitType.Mass -> SystemUnits.Gram.id
+              UnitType.Volume -> SystemUnits.Ml.id
+              UnitType.Count -> SystemUnits.Each.id
+              else -> unit.id
+          }
+
+          val bridges = allBridges.filter { it.foodItemId == change.foodItemId }
+          val changeInTargetUnit = UnitConverter.convert(
+              amount = change.quantity ?: 0.0,
+              fromUnitId = change.unitId ?: Uuid.NIL,
+              toUnitId = targetUnitId,
+              allUnits = allUnits.associateBy { it.id },
+              bridges = bridges
+          ) ?: 0.0
+
+          val currentPantryItem = pantryItems.find { it.foodItemId == change.foodItemId }
+          val currentQtyInTargetUnit = if (currentPantryItem != null) {
+              UnitConverter.convert(
+                  amount = currentPantryItem.quantity,
+                  fromUnitId = currentPantryItem.unitId,
+                  toUnitId = targetUnitId,
+                  allUnits = allUnits.associateBy { it.id },
+                  bridges = bridges
+              ) ?: 0.0
+          } else 0.0
+
+          val newQty = if (change.direction == TransactionDirection.IN) {
+              currentQtyInTargetUnit + changeInTargetUnit
+          } else {
+              max(0.0, currentQtyInTargetUnit - changeInTargetUnit)
+          }
+          pantryRepository.updateQuantity(change.foodItemId, newQty, targetUnitId)
+        }
+      }
+
+      val todayStr = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
+      leftovers.forEach { (recipeId, servings) ->
+        if (servings > 0) {
+          val originalRecipe = allItems.find { it.id == recipeId }
+          val leftoverItem = FoodItem(
+              name = "${originalRecipe?.name ?: "Meal"} (Leftover)",
+              leftoverInfo = LeftoverInfo(
+                  remainingServings = servings,
+                  dateAdded = todayStr
+              )
+          )
+          foodItemRepository.saveFoodItem(leftoverItem)
+        }
+      }
+
+      mealPlanRepository.setConsumedStatus(entryId, true)
     }
   }
 }

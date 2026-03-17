@@ -12,11 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.dependencyinjection.DependencyInjectionContainer
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.IngredientForm
+import io.github.and19081.mealplanner.domain.FoodItem
 import io.github.and19081.mealplanner.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.kitchen.KitchenModal
-import io.github.and19081.mealplanner.kitchen.TransactionReviewSheet
 import io.github.and19081.mealplanner.pantry.PantryView
 import io.github.and19081.mealplanner.pantry.PantryViewModel
 import io.github.and19081.mealplanner.settings.Mode
@@ -35,38 +33,10 @@ fun InventoryView(
   var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   val tabs = listOf("Shopping List", "Pantry")
 
-  // Hoist ViewModels to prevent creation in conditional blocks
-  val shoppingListVm = viewModel {
-    ShoppingListViewModel(
-        diContainer.recipeRepository,
-        diContainer.ingredientRepository,
-        diContainer.storeRepository,
-        diContainer.unitRepository,
-        diContainer.settingsRepository,
-        diContainer.mealPlanRepository,
-        diContainer.mealRepository,
-        diContainer.shoppingListRepository,
-        diContainer.pantryRepository,
-        diContainer.shoppingListItemRepository,
-        diContainer.receiptHistoryRepository,
-    )
-  }
-  val pantryVm = viewModel {
-    PantryViewModel(
-        diContainer.pantryRepository,
-        diContainer.leftoverRepository,
-        diContainer.recipeRepository,
-        diContainer.ingredientRepository,
-        diContainer.unitRepository,
-    )
-  }
-  val ingredientsVm = viewModel {
-    IngredientsViewModel(
-        diContainer.ingredientRepository,
-        diContainer.storeRepository,
-        diContainer.unitRepository,
-    )
-  }
+  // Use the factory to create ViewModels
+  val shoppingListVm: ShoppingListViewModel = viewModel { diContainer.viewModelFactory.createShoppingListViewModel() }
+  val pantryVm: PantryViewModel = viewModel { diContainer.viewModelFactory.createPantryViewModel() }
+  val ingredientsVm: IngredientsViewModel = viewModel { diContainer.viewModelFactory.createIngredientsViewModel() }
 
   val ingredientsUiState by ingredientsVm.uiState.collectAsState()
 
@@ -122,8 +92,8 @@ fun InventoryView(
             viewModel = pantryVm,
             mode = mode,
             isExpanded = isExpanded,
-            onAddIngredient = { name: String, onCreated: (Ingredient) -> Unit ->
-              pushModal(KitchenModal.IngredientCreator(name, onCreated))
+            onAddIngredient = { name: String, onCreated: (FoodItem) -> Unit ->
+              pushModal(KitchenModal.FoodItemCreator(name, onCreated))
             },
         )
       }

@@ -4,10 +4,8 @@ import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.repository.*
-import io.github.and19081.mealplanner.ingredients.IngredientRepository
+import io.github.and19081.mealplanner.domain.FoodItemRepository
 import io.github.and19081.mealplanner.ingredients.StoreRepository
-import io.github.and19081.mealplanner.meals.MealRepository
-import io.github.and19081.mealplanner.recipes.RecipeRepository
 import io.github.and19081.mealplanner.settings.SettingsRepository
 import io.github.and19081.mealplanner.shoppinglist.ShoppingListRepository
 import kotlinx.coroutines.CoroutineScope
@@ -20,30 +18,29 @@ class DependencyInjectionContainer(
   val settingsRepository: SettingsRepository = RoomSettingsRepository(db, scope)
   val unitRepository: UnitRepository = RoomUnitRepository(db, scope)
   val storeRepository: StoreRepository = RoomStoreRepository(db, scope)
-  val ingredientRepository: IngredientRepository = RoomIngredientRepository(db, scope)
-  val recipeRepository: RecipeRepository = RoomRecipeRepository(db, scope)
-  val mealRepository: MealRepository = RoomMealRepository(db, scope)
+  val restaurantRepository: RestaurantRepository = RoomRestaurantRepository(db, scope)
+  
+  // ECS Unified Repository
+  val foodItemRepository: FoodItemRepository = RoomFoodItemRepository(db, scope)
+  
   val mealPlanRepository: MealPlanRepository = RoomMealPlanRepository(db, scope)
   val pantryRepository: PantryRepository = RoomPantryRepository(db, scope)
-  val leftoverRepository: LeftoverRepository = RoomLeftoverRepository(db, scope)
   val shoppingListRepository = ShoppingListRepository()
   val shoppingListItemRepository: ShoppingListItemRepository =
       RoomShoppingListItemRepository(db, scope)
   val receiptHistoryRepository: ReceiptHistoryRepository = RoomReceiptHistoryRepository(db, scope)
-  val restaurantRepository: io.github.and19081.mealplanner.ingredients.RestaurantRepository =
-      RoomRestaurantRepository(db, scope)
   val notificationScheduler: io.github.and19081.mealplanner.notifications.MealNotificationScheduler =
       io.github.and19081.mealplanner.notifications.createNotificationScheduler()
 
+  val viewModelFactory = ViewModelFactory(this)
+
   suspend fun initializeMockData() {
     MockData.initialize(
-        unitRepository = unitRepository,
-        storeRepository = storeRepository,
-        ingredientRepository = ingredientRepository,
-        recipeRepository = recipeRepository,
-        mealRepository = mealRepository,
-        mealPlanRepository = mealPlanRepository,
-        restaurantRepository = restaurantRepository,
+        unitRepository,
+        storeRepository,
+        foodItemRepository,
+        mealPlanRepository,
+        restaurantRepository
     )
   }
 }

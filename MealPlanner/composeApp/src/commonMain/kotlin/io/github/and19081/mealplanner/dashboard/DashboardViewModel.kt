@@ -5,14 +5,11 @@ import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.calendar.CalendarEvent
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
-import io.github.and19081.mealplanner.domain.DataQualityValidator
-import io.github.and19081.mealplanner.domain.DataWarning
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.IngredientRepository
-import io.github.and19081.mealplanner.meals.MealRepository
-import io.github.and19081.mealplanner.recipes.RecipeRepository
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.settings.DashboardConfig
 import io.github.and19081.mealplanner.settings.SettingsRepository
+import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
+import io.github.and19081.mealplanner.shoppinglist.ShoppingListItem
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,16 +23,13 @@ import kotlinx.datetime.todayIn
 
 class DashboardViewModel(
     private val mealPlanRepository: MealPlanRepository,
-    private val mealRepository: MealRepository,
-    private val recipeRepository: RecipeRepository,
-    private val ingredientRepository: IngredientRepository,
+    private val foodItemRepository: FoodItemRepository,
     private val pantryRepository: PantryRepository,
     private val unitRepository: UnitRepository,
     private val settingsRepository: SettingsRepository,
     private val receiptHistoryRepository: ReceiptHistoryRepository,
     private val shoppingListItemRepository: ShoppingListItemRepository,
-    private val restaurantRepository:
-        io.github.and19081.mealplanner.ingredients.RestaurantRepository,
+    private val restaurantRepository: RestaurantRepository,
 ) : ViewModel() {
 
   data class DashboardUiState(
@@ -52,62 +46,45 @@ class DashboardViewModel(
 
   val uiState =
       combine(
-              listOf(
-                  mealPlanRepository.entries,
-                  mealRepository.meals,
-                  recipeRepository.recipes,
-                  ingredientRepository.ingredients,
-                  ingredientRepository.packages,
-                  ingredientRepository.bridges,
-                  unitRepository.units,
-                  pantryRepository.pantryItems,
-                  settingsRepository.dashboardConfig,
-                  receiptHistoryRepository.trips,
-                  shoppingListItemRepository.items,
-                  restaurantRepository.restaurants,
-              )
+              mealPlanRepository.entries,
+              foodItemRepository.foodItems,
+              foodItemRepository.packages,
+              foodItemRepository.conversions,
+              unitRepository.units,
+              pantryRepository.pantryItems,
+              settingsRepository.dashboardConfig,
+              receiptHistoryRepository.trips,
+              shoppingListItemRepository.items,
+              restaurantRepository.restaurants,
           ) { args: Array<Any?> ->
-            val entries = args[0] as? List<ScheduledMeal> ?: emptyList()
-            val meals = args[1] as? List<PrePlannedMeal> ?: emptyList()
-            val recipes = args[2] as? List<Recipe> ?: emptyList()
-            val ingredients = args[3] as? List<Ingredient> ?: emptyList()
-            val packages =
-                args[4] as? List<io.github.and19081.mealplanner.ingredients.Package> ?: emptyList()
-            val bridges =
-                args[5] as? List<io.github.and19081.mealplanner.ingredients.BridgeConversion>
-                    ?: emptyList()
-            val allUnits = args[6] as? List<UnitModel> ?: emptyList()
-            val pantry = args[7] as? List<PantryItem> ?: emptyList()
-            val config = args[8] as? DashboardConfig ?: DashboardConfig()
-            val trips =
-                args[9] as? List<io.github.and19081.mealplanner.shoppinglist.ReceiptHistory>
-                    ?: emptyList()
-            val shoppingItems =
-                args[10] as? List<io.github.and19081.mealplanner.shoppinglist.ShoppingListItem>
-                    ?: emptyList()
-            val restaurants = args[11] as? List<Restaurant> ?: emptyList()
+            val entries = args[0] as List<ScheduledMeal>
+            val allItems = args[1] as List<FoodItem>
+            val packages = args[2] as List<Package>
+            val bridges = args[3] as List<BridgeConversion>
+            val allUnits = args[4] as List<UnitModel>
+            val pantry = args[5] as List<PantryItem>
+            val config = args[6] as DashboardConfig
+            val trips = args[7] as List<ReceiptHistory>
+            val shoppingItems = args[8] as List<ShoppingListItem>
+            val restaurants = args[9] as List<Restaurant>
 
-            val mealsMap = meals.associateBy { it.id }
-            val recipesMap = recipes.associateBy { it.id }
-            val ingredientsMap = ingredients.associateBy { it.id }
+            val itemsMap = allItems.associateBy { it.id }
             val restaurantsMap = restaurants.associateBy { it.id }
 
-            // 1. Today's Meals - Sorted by Time
             val todaysEntries = entries.filter { it.date == today }.sortedBy { it.time }
 
             val todaysEvents =
                 todaysEntries.map { entry ->
-                  val meal = mealsMap[entry.prePlannedMealId]
+                  val item = itemsMap[entry.prePlannedMealId]
                   val restaurant = restaurantsMap[entry.restaurantId]
 
-                  val title = meal?.name ?: restaurant?.name ?: "Unknown Meal"
+                  val title = item?.name ?: restaurant?.name ?: "Unknown Meal"
 
                   val warnings =
-                      meal?.let {
-                        DataQualityValidator.validateMeal(
-                            it,
-                            recipesMap,
-                            ingredientsMap,
+                      item?.let { foodItem ->
+                        DataQualityValidator.validateFoodItem(
+                            foodItem,
+                            itemsMap,
                             packages,
                             bridges,
                             allUnits,
@@ -125,15 +102,11 @@ class DashboardViewModel(
                 }
 
             val nextMeal = todaysEvents.firstOrNull { !it.isConsumed }
-            val allWarnings = todaysEvents.flatMap { it.warnings }.distinctBy { it.message }
+            val allWarnings = todaysEvents.flatMap { event -> event.warnings }.distinctBy { it.message }
 
-            // 2. Pantry Count
             val pantryCount = pantry.size
-
-            // 3. Shopping List Count
             val shoppingCount = shoppingItems.count { !it.isPurchased }
 
-            // 4. Weekly Cost (Sum of actual totals in last 7 days)
             val sevenDaysAgo = today.minus(DatePeriod(days = 7))
             val cost =
                 trips.filter { it.date >= sevenDaysAgo }.sumOf { it.actualTotalCents.toLong() }

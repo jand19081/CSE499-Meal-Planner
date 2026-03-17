@@ -4,17 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.calendar.MealPlanRepository
-import io.github.and19081.mealplanner.domain.DataQualityValidator
-import io.github.and19081.mealplanner.domain.DataWarning
-import io.github.and19081.mealplanner.domain.PriceCalculator
-import io.github.and19081.mealplanner.ingredients.BridgeConversion
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.IngredientRepository
-import io.github.and19081.mealplanner.ingredients.Package
-import io.github.and19081.mealplanner.ingredients.Store
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.ingredients.StoreRepository
-import io.github.and19081.mealplanner.meals.MealRepository
-import io.github.and19081.mealplanner.recipes.RecipeRepository
 import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -46,14 +37,11 @@ enum class AnalyticsDateRange {
 
 class AnalyticsViewModel(
     private val mealPlanRepository: MealPlanRepository,
-    private val mealRepository: MealRepository,
-    private val recipeRepository: RecipeRepository,
-    private val ingredientRepository: IngredientRepository,
+    private val foodItemRepository: FoodItemRepository,
     private val receiptHistoryRepository: ReceiptHistoryRepository,
     private val storeRepository: StoreRepository,
     private val unitRepository: UnitRepository,
-    private val restaurantRepository:
-        io.github.and19081.mealplanner.ingredients.RestaurantRepository,
+    private val restaurantRepository: RestaurantRepository,
 ) : ViewModel() {
 
   private val _filter = MutableStateFlow(AnalyticsFilter.ALL)
@@ -61,12 +49,9 @@ class AnalyticsViewModel(
   private val _customStartDate = MutableStateFlow<LocalDate?>(null)
   private val _customEndDate = MutableStateFlow<LocalDate?>(null)
 
-  // Helper for typed combination
   data class InputData(
       val entries: List<ScheduledMeal>,
-      val meals: List<PrePlannedMeal>,
-      val recipes: List<Recipe>,
-      val ingredients: List<Ingredient>,
+      val allItems: List<FoodItem>,
       val packages: List<Package>,
       val bridges: List<BridgeConversion>,
       val receiptHistory: List<ReceiptHistory>,
@@ -81,56 +66,58 @@ class AnalyticsViewModel(
 
   val uiState =
       combine(
-              listOf(
-                  mealPlanRepository.entries,
-                  mealRepository.meals,
-                  recipeRepository.recipes,
-                  ingredientRepository.ingredients,
-                  ingredientRepository.packages,
-                  ingredientRepository.bridges,
-                  receiptHistoryRepository.trips,
-                  storeRepository.stores,
-                  restaurantRepository.restaurants,
-                  unitRepository.units,
-                  _filter,
-                  _dateRange,
-                  _customStartDate,
-                  _customEndDate,
-              )
+              mealPlanRepository.entries,
+              foodItemRepository.foodItems,
+              foodItemRepository.packages,
+              foodItemRepository.conversions,
+              receiptHistoryRepository.trips,
+              storeRepository.stores,
+              restaurantRepository.restaurants,
+              unitRepository.units,
+              _filter,
+              _dateRange,
+              _customStartDate,
+              _customEndDate,
           ) { args: Array<Any?> ->
+            val entries = args[0] as List<ScheduledMeal>
+            val allItems = args[1] as List<FoodItem>
+            val packages = args[2] as List<Package>
+            val bridges = args[3] as List<BridgeConversion>
+            val trips = args[4] as List<ReceiptHistory>
+            val stores = args[5] as List<Store>
+            val restaurants = args[6] as List<Restaurant>
+            val units = args[7] as List<UnitModel>
+            val filter = args[8] as AnalyticsFilter
+            val range = args[9] as AnalyticsDateRange
+            val customStart = args[10] as LocalDate?
+            val customEnd = args[11] as LocalDate?
+
             val data =
                 InputData(
-                    entries = args[0] as List<ScheduledMeal>,
-                    meals = args[1] as List<PrePlannedMeal>,
-                    recipes = args[2] as List<Recipe>,
-                    ingredients = args[3] as List<Ingredient>,
-                    packages = args[4] as List<Package>,
-                    bridges = args[5] as List<BridgeConversion>,
-                    receiptHistory = args[6] as List<ReceiptHistory>,
-                    stores = args[7] as List<Store>,
-                    restaurants = args[8] as List<Restaurant>,
-                    allUnits = args[9] as List<UnitModel>,
-                    filter = args[10] as AnalyticsFilter,
-                    dateRange = args[11] as AnalyticsDateRange,
-                    customStart = args[12] as LocalDate?,
-                    customEnd = args[13] as LocalDate?,
+                    entries = entries,
+                    allItems = allItems,
+                    packages = packages,
+                    bridges = bridges,
+                    receiptHistory = trips,
+                    stores = stores,
+                    restaurants = restaurants,
+                    allUnits = units,
+                    filter = filter,
+                    dateRange = range,
+                    customStart = customStart,
+                    customEnd = customEnd,
                 )
 
-            // Pre-calculate Maps for O(1) Lookups
-            val mealsMap = data.meals.associateBy { it.id }
-            val recipesMap = data.recipes.associateBy { it.id }
-            val ingredientsMap = data.ingredients.associateBy { it.id }
+            val itemsMap = data.allItems.associateBy { it.id }
             val storeMap = data.stores.associateBy { it.id }
             val restaurantMap = data.restaurants.associateBy { it.id }
 
-            // Data Quality Validation
             val globalWarnings =
-                data.meals
+                data.allItems.filter { it.isRecipe }
                     .flatMap { meal ->
-                      DataQualityValidator.validateMeal(
+                      DataQualityValidator.validateFoodItem(
                           meal,
-                          recipesMap,
-                          ingredientsMap,
+                          itemsMap,
                           data.packages,
                           data.bridges,
                           data.allUnits,
@@ -138,7 +125,6 @@ class AnalyticsViewModel(
                     }
                     .distinctBy { it.message }
 
-            // Determine active date range
             val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
             val (startDate, endDate) =
                 when (data.dateRange) {
@@ -150,7 +136,6 @@ class AnalyticsViewModel(
                       (data.customStart ?: today) to (data.customEnd ?: today)
                 }
 
-            // Filter Receipts
             val filteredReceipts =
                 data.receiptHistory.filter { receipt ->
                   val matchesFilter =
@@ -163,7 +148,6 @@ class AnalyticsViewModel(
                   matchesFilter && matchesDate
                 }
 
-            // Filter Scheduled Meals for projected costs
             val futureStartDate = today
             val futureEndDate =
                 when (data.dateRange) {
@@ -177,16 +161,13 @@ class AnalyticsViewModel(
             val projectedEntries =
                 data.entries.filter { it.date >= futureStartDate && it.date <= futureEndDate }
 
-            // Cost Calculations
             fun sumCost(list: List<ScheduledMeal>): Long {
               return list.sumOf { entry ->
                 PriceCalculator.calculateEstimatedCost(
                     entry = entry,
-                    mealsMap = mealsMap,
-                    recipesMap = recipesMap,
-                    ingredientsMap = ingredientsMap,
-                    packagesByIngredient = data.packages.groupBy { it.ingredientId },
-                    bridgesByIngredient = data.bridges.groupBy { it.ingredientId },
+                    allItemsMap = itemsMap,
+                    packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                    bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                     allUnits = data.allUnits.associateBy { it.id },
                 )
               }
@@ -195,13 +176,9 @@ class AnalyticsViewModel(
             val projectedTotal = sumCost(projectedEntries)
             val actualTotal = filteredReceipts.sumOf { it.actualTotalCents.toLong() }
 
-            // Average Cost Calculation (Actuals)
-            // We want to include both store receipts (divided by some heuristic or just per meal)
-            // and restaurant receipts (actual per meal).
             val restaurantActuals = data.receiptHistory.filter { it.restaurantId != null }
             val groceryActuals = data.receiptHistory.filter { it.storeId != null }
 
-            // Count consumed home meals for averaging grocery costs
             val consumedHomeMealsCount =
                 data.entries.count { it.isConsumed && it.prePlannedMealId != null }
             val consumedRestaurantMealsCount =
@@ -215,7 +192,6 @@ class AnalyticsViewModel(
             val avgMealCost =
                 if (totalConsumed > 0) totalSpentActual.toDouble() / totalConsumed else 0.0
 
-            // Spending by Location
             val spendingByLocation =
                 filteredReceipts
                     .groupBy { it.storeId ?: it.restaurantId ?: Uuid.NIL }
@@ -227,17 +203,15 @@ class AnalyticsViewModel(
                     .sortedByDescending { it.second }
                     .toMap()
 
-            // Most Expensive Meals (Planned or Consumed)
             val mealCosts =
-                data.meals
+                data.allItems.filter { it.isRecipe }
                     .map { meal ->
                       val cost =
-                          PriceCalculator.calculateMealCost(
-                              meal = meal,
-                              recipesMap = recipesMap,
-                              ingredientsMap = ingredientsMap,
-                              packagesByIngredient = data.packages.groupBy { it.ingredientId },
-                              bridgesByIngredient = data.bridges.groupBy { it.ingredientId },
+                          PriceCalculator.calculateFoodItemCost(
+                              item = meal,
+                              allItemsMap = itemsMap,
+                              packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                              bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                               allUnits = data.allUnits.associateBy { it.id },
                           )
                       meal.name to cost
@@ -259,7 +233,7 @@ class AnalyticsViewModel(
                         .sortedByDescending { it.date },
                 allStores = data.stores,
                 allRestaurants = data.restaurants,
-                allIngredients = data.ingredients,
+                allIngredients = data.allItems.filter { it.isIngredient },
                 allUnits = data.allUnits,
                 warnings = globalWarnings,
                 currentFilter = data.filter,
@@ -308,7 +282,7 @@ data class AnalyticsUiState(
     val recentRestaurantMeals: List<ReceiptHistory> = emptyList(),
     val allStores: List<Store> = emptyList(),
     val allRestaurants: List<Restaurant> = emptyList(),
-    val allIngredients: List<Ingredient> = emptyList(),
+    val allIngredients: List<FoodItem> = emptyList(),
     val allUnits: List<UnitModel> = emptyList(),
     val warnings: List<DataWarning> = emptyList(),
     val currentFilter: AnalyticsFilter = AnalyticsFilter.ALL,

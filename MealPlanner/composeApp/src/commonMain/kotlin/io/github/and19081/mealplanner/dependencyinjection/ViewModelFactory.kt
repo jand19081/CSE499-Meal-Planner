@@ -3,15 +3,18 @@ package io.github.and19081.mealplanner.dependencyinjection
 import io.github.and19081.mealplanner.analytics.AnalyticsViewModel
 import io.github.and19081.mealplanner.calendar.CalendarViewModel
 import io.github.and19081.mealplanner.dashboard.DashboardViewModel
+import io.github.and19081.mealplanner.ingredients.IngredientsViewModel
+import io.github.and19081.mealplanner.meals.MealsViewModel
+import io.github.and19081.mealplanner.pantry.PantryViewModel
+import io.github.and19081.mealplanner.recipes.RecipesViewModel
 import io.github.and19081.mealplanner.settings.SettingsViewModel
+import io.github.and19081.mealplanner.shoppinglist.ShoppingListViewModel
 import kotlinx.coroutines.flow.StateFlow
 
 class ViewModelFactory(private val di: DependencyInjectionContainer) {
     fun createDashboardViewModel() = DashboardViewModel(
         di.mealPlanRepository,
-        di.mealRepository,
-        di.recipeRepository,
-        di.ingredientRepository,
+        di.foodItemRepository,
         di.pantryRepository,
         di.unitRepository,
         di.settingsRepository,
@@ -23,11 +26,8 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
     fun createCalendarViewModel(currentMonthFlow: StateFlow<kotlinx.datetime.LocalDate>) = CalendarViewModel(
         currentMonthFlow = currentMonthFlow,
         mealPlanRepository = di.mealPlanRepository,
-        mealRepository = di.mealRepository,
-        recipeRepository = di.recipeRepository,
-        ingredientRepository = di.ingredientRepository,
+        foodItemRepository = di.foodItemRepository,
         pantryRepository = di.pantryRepository,
-        leftoverRepository = di.leftoverRepository,
         unitRepository = di.unitRepository,
         restaurantRepository = di.restaurantRepository,
         notificationScheduler = di.notificationScheduler,
@@ -35,9 +35,7 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
 
     fun createAnalyticsViewModel() = AnalyticsViewModel(
         di.mealPlanRepository,
-        di.mealRepository,
-        di.recipeRepository,
-        di.ingredientRepository,
+        di.foodItemRepository,
         di.receiptHistoryRepository,
         di.storeRepository,
         di.unitRepository,
@@ -46,9 +44,47 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
 
     fun createSettingsViewModel() = SettingsViewModel(
         di.settingsRepository,
-        di.ingredientRepository,
+        di.foodItemRepository,
         di.storeRepository,
         di.restaurantRepository,
         di.unitRepository,
+    )
+
+    fun createIngredientsViewModel() = IngredientsViewModel(
+        di.foodItemRepository,
+        di.storeRepository,
+        di.unitRepository,
+        di.shoppingListItemRepository
+    )
+
+    fun createRecipesViewModel() = RecipesViewModel(
+        di.foodItemRepository,
+        di.pantryRepository,
+        di.unitRepository,
+        di.shoppingListItemRepository
+    )
+
+    fun createMealsViewModel() = MealsViewModel(
+        di.foodItemRepository,
+        di.pantryRepository,
+        di.unitRepository,
+    )
+
+    fun createPantryViewModel() = PantryViewModel(
+        di.pantryRepository,
+        di.foodItemRepository,
+        di.unitRepository,
+    )
+
+    fun createShoppingListViewModel() = ShoppingListViewModel(
+        di.foodItemRepository,
+        di.storeRepository,
+        di.unitRepository,
+        di.settingsRepository,
+        di.mealPlanRepository,
+        di.shoppingListRepository,
+        di.pantryRepository,
+        di.shoppingListItemRepository,
+        di.receiptHistoryRepository,
     )
 }

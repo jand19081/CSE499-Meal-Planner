@@ -9,10 +9,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class UnitType {
-  Weight,
+  Mass,
   Volume,
   Count,
-  Custom,
+  Time,
+  Energy,
+  Other,
 }
 
 @Serializable
@@ -26,11 +28,11 @@ data class UnitModel(
 )
 
 object SystemUnits {
-  // Weight Base: Gram (g)
+  // Mass Base: Gram (g)
   val Gram =
       UnitModel(
           Uuid.parse("00000000-0000-0000-0001-000000000001"),
-          UnitType.Weight,
+          UnitType.Mass,
           "g",
           "Grams",
           true,
@@ -39,7 +41,7 @@ object SystemUnits {
   val Kg =
       UnitModel(
           Uuid.parse("00000000-0000-0000-0001-000000000002"),
-          UnitType.Weight,
+          UnitType.Mass,
           "kg",
           "Kilograms",
           true,
@@ -48,7 +50,7 @@ object SystemUnits {
   val Oz =
       UnitModel(
           Uuid.parse("00000000-0000-0000-0001-000000000003"),
-          UnitType.Weight,
+          UnitType.Mass,
           "oz",
           "Ounces",
           true,
@@ -57,7 +59,7 @@ object SystemUnits {
   val Lb =
       UnitModel(
           Uuid.parse("00000000-0000-0000-0001-000000000004"),
-          UnitType.Weight,
+          UnitType.Mass,
           "lb",
           "Pounds",
           true,
@@ -171,11 +173,9 @@ object SystemUnits {
       listOf(Gram, Kg, Oz, Lb, Ml, Liter, Tsp, Tbsp, FlOz, Cup, Pint, Quart, Gallon, Each, Dozen)
 }
 
-// Legacy compatibility helper or Value Object for usage in UI
 data class Measure(
     val amount: Double,
     val unitId: Uuid,
-    // Optional: cache the unit object for display if needed, or look it up
 )
 
 interface UnitRepository {
@@ -210,7 +210,6 @@ class InMemoryUnitRepository : UnitRepository {
   }
 
   override suspend fun setUnits(newUnits: List<UnitModel>) {
-    // Always ensure system units are present
     val systemIds = SystemUnits.all.map { it.id }.toSet()
     val customUnits = newUnits.filter { it.id !in systemIds }
     _units.value = SystemUnits.all + customUnits

@@ -258,7 +258,7 @@ fun SystemDataManagerForm(viewModel: SettingsViewModel, onClose: () -> Unit) {
                 items = uiState.allStores.map { it.id to it.name },
                 onSave = { id, name ->
                   viewModel.saveStore(
-                      io.github.and19081.mealplanner.ingredients.Store(
+                      io.github.and19081.mealplanner.domain.Store(
                           id ?: kotlin.uuid.Uuid.random(),
                           name,
                       )
@@ -272,7 +272,7 @@ fun SystemDataManagerForm(viewModel: SettingsViewModel, onClose: () -> Unit) {
                 items = uiState.allCategories.map { it.id to it.name },
                 onSave = { id, name ->
                   viewModel.saveCategory(
-                      io.github.and19081.mealplanner.ingredients.Category(
+                      io.github.and19081.mealplanner.domain.Category(
                           id ?: kotlin.uuid.Uuid.random(),
                           name,
                       )
@@ -387,14 +387,14 @@ fun UnitDataManager(
 
   var name by remember { mutableStateOf("") }
   var abbr by remember { mutableStateOf("") }
-  var type by remember { mutableStateOf(UnitType.Weight) }
+  var type by remember { mutableStateOf(UnitType.Mass) }
   var factor by remember { mutableStateOf("1.0") }
 
   fun reset() {
     editingUnit = null
     name = ""
     abbr = ""
-    type = UnitType.Weight
+    type = UnitType.Mass
     factor = "1.0"
   }
 

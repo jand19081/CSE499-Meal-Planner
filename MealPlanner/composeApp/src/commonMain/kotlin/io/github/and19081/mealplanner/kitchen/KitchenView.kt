@@ -13,22 +13,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.dependencyinjection.DependencyInjectionContainer
-import io.github.and19081.mealplanner.ingredients.*
+import io.github.and19081.mealplanner.domain.FoodItem
 import io.github.and19081.mealplanner.ingredients.IngredientsView
 import io.github.and19081.mealplanner.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.meals.MealsView
 import io.github.and19081.mealplanner.meals.MealsViewModel
-import io.github.and19081.mealplanner.recipes.RecipeForm
 import io.github.and19081.mealplanner.recipes.RecipesView
 import io.github.and19081.mealplanner.recipes.RecipesViewModel
 import io.github.and19081.mealplanner.settings.Mode
 import kotlin.uuid.Uuid
 
 sealed class KitchenModal {
-  data class IngredientCreator(val name: String, val onCreated: (Ingredient) -> Unit) :
+  data class FoodItemCreator(val name: String, val onCreated: (FoodItem) -> Unit) :
       KitchenModal()
-
-  data class RecipeCreator(val name: String, val onCreated: (Recipe) -> Unit) : KitchenModal()
 
   data class KitchenTransactionReview(
       val transaction: KitchenTransaction,
@@ -48,113 +45,75 @@ fun KitchenView(
   var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   val tabs = listOf("Meals", "Recipes", "Ingredients")
 
-  // Hoist ViewModels
-  val mealsVm = viewModel {
-    MealsViewModel(
-        diContainer.mealRepository,
-        diContainer.recipeRepository,
-        diContainer.ingredientRepository,
-        diContainer.pantryRepository,
-        diContainer.unitRepository,
-    )
-  }
-  val recipesVm = viewModel {
-    RecipesViewModel(
-        diContainer.recipeRepository,
-        diContainer.ingredientRepository,
-        diContainer.pantryRepository,
-        diContainer.unitRepository,
-    )
-  }
-  val ingredientsVm = viewModel {
-    IngredientsViewModel(
-        diContainer.ingredientRepository,
-        diContainer.storeRepository,
-        diContainer.unitRepository,
-    )
-  }
-
-  val ingredientsUiState by ingredientsVm.uiState.collectAsState()
-  val recipesUiState by recipesVm.uiState.collectAsState()
+  val mealsViewModel: MealsViewModel = viewModel { diContainer.viewModelFactory.createMealsViewModel() }
+  val recipesViewModel: RecipesViewModel = viewModel { diContainer.viewModelFactory.createRecipesViewModel() }
+  val ingredientsViewModel: IngredientsViewModel = viewModel { diContainer.viewModelFactory.createIngredientsViewModel() }
 
   Column(modifier = Modifier.fillMaxSize()) {
-    if (isExpanded) {
-      PrimaryTabRow(selectedTabIndex = selectedTab) {
-        tabs.forEachIndexed { index, title ->
-          Tab(
-              selected = selectedTab == index,
-              onClick = { selectedTab = index },
-              text = { Text(title) },
-          )
-        }
-      }
-    } else {
-      var expanded by remember { mutableStateOf(false) }
-      Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-          Text(tabs[selectedTab])
-          Spacer(Modifier.width(8.dp))
-          Icon(Icons.Default.ArrowDropDown, null)
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth(0.9f),
-        ) {
-          tabs.forEachIndexed { index, title ->
-            DropdownMenuItem(
-                text = { Text(title) },
-                onClick = {
-                  selectedTab = index
-                  expanded = false
-                },
-            )
-          }
-        }
+    PrimaryTabRow(selectedTabIndex = selectedTab) {
+      tabs.forEachIndexed { index, title ->
+        Tab(
+            selected = selectedTab == index,
+            onClick = { selectedTab = index },
+            text = { Text(title) }
+        )
       }
     }
 
-    when (selectedTab) {
-      0 -> {
-        MealsView(
-            viewModel = mealsVm,
+    Box(modifier = Modifier.weight(1f)) {
+      when (selectedTab) {
+        0 -> MealsView(
+            viewModel = mealsViewModel,
             mode = mode,
             isExpanded = isExpanded,
-            onAddIngredient = { name: String, onCreated: (Ingredient) -> Unit ->
-              pushModal(KitchenModal.IngredientCreator(name, onCreated))
-            },
-            onAddRecipe = { name: String, onCreated: (Recipe) -> Unit ->
-              pushModal(KitchenModal.RecipeCreator(name, onCreated))
-            },
-            onMakeMeal = { meal, multiplier, yieldIngId, yieldQty, yieldUnitId ->
-                val transaction = mealsVm.createMakeTransaction(meal, multiplier, yieldIngId, yieldQty, yieldUnitId)
-                pushModal(KitchenModal.KitchenTransactionReview(transaction) { committed ->
-                    mealsVm.commitTransaction(committed)
-                })
+            onAddIngredient = { name, onCreated -> pushModal(KitchenModal.FoodItemCreator(name, onCreated)) },
+            onAddRecipe = { name, onCreated -> /* Logic to push recipe creator if needed */ },
+            onMakeMeal = { meal, multi, yieldId, yieldQty, yieldUnitId ->
+                val tx = mealsViewModel.createMakeTransaction(meal, multi, yieldId, yieldQty, yieldUnitId)
+                pushModal(KitchenModal.KitchenTransactionReview(tx) { mealsViewModel.commitTransaction(it) })
             }
         )
-      }
-      1 -> {
-        RecipesView(
-            viewModel = recipesVm,
+        1 -> RecipesView(
+            viewModel = recipesViewModel,
             mode = mode,
             isExpanded = isExpanded,
-            onAddIngredient = { name: String, onCreated: (Ingredient) -> Unit ->
-              pushModal(KitchenModal.IngredientCreator(name, onCreated))
+            onAddIngredient = { name, onCreated -> pushModal(KitchenModal.FoodItemCreator(name, onCreated)) },
+            onAddSubRecipe = { name, onCreated -> /* Logic to push recipe creator */ }
+        )
+        2 -> IngredientsView(viewModel = ingredientsViewModel, mode = mode, isExpanded = isExpanded)
+      }
+    }
+  }
+
+  // Modals
+  modalStack.lastOrNull()?.let { modal ->
+    when (modal) {
+      is KitchenModal.FoodItemCreator -> {
+          // Placeholder: in a real app, this would show a dialog
+      }
+      is KitchenModal.KitchenTransactionReview -> {
+        AlertDialog(
+            onDismissRequest = popModal,
+            title = { Text(modal.transaction.title) },
+            text = {
+              Column {
+                modal.transaction.changes.forEach { change ->
+                  Text("${if (change.direction == TransactionDirection.IN) "+" else "-"} ${change.quantity} ${change.unitAbbreviation} ${change.ingredientName}")
+                }
+              }
             },
-            onAddSubRecipe = { name: String, onCreated: (Recipe) -> Unit ->
-              pushModal(KitchenModal.RecipeCreator(name, onCreated))
+            confirmButton = {
+              Button(onClick = {
+                modal.onCommit(modal.transaction)
+                popModal()
+              }) {
+                Text("Confirm")
+              }
             },
-            onMakeRecipe = { recipe, multiplier, yieldIngId, yieldQty, yieldUnitId ->
-                val transaction = recipesVm.createMakeTransaction(recipe, multiplier, yieldIngId, yieldQty, yieldUnitId)
-                pushModal(KitchenModal.KitchenTransactionReview(transaction) { committed ->
-                    recipesVm.commitTransaction(committed)
-                })
+            dismissButton = {
+              TextButton(onClick = popModal) { Text("Cancel") }
             }
         )
-      }
-      2 -> {
-        IngredientsView(ingredientsVm, mode = mode, isExpanded = isExpanded)
       }
     }
   }

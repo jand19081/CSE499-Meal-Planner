@@ -1,5 +1,6 @@
 package io.github.and19081.mealplanner.ingredients
 
+import io.github.and19081.mealplanner.domain.Store
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
 

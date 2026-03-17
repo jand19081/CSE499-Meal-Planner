@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.and19081.mealplanner.UnitModel
-import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.domain.FoodItem
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
 import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
 import kotlin.uuid.Uuid
@@ -17,14 +17,14 @@ import kotlin.uuid.Uuid
 @Composable
 fun PrepareBatchDialog(
     itemName: String,
-    allIngredients: List<Ingredient>,
+    allItems: List<FoodItem>,
     allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onConfirm: (multiplier: Double, yieldIngId: Uuid?, yieldQty: Double?, yieldUnitId: Uuid?) -> Unit
+    onConfirm: (multiplier: Double, yieldFoodItemId: Uuid?, yieldQty: Double?, yieldUnitId: Uuid?) -> Unit
 ) {
     var multiplierStr by remember { mutableStateOf("1") }
     var saveYield by remember { mutableStateOf(false) }
-    var selectedIngName by remember { mutableStateOf("") }
+    var selectedItemName by remember { mutableStateOf("") }
     var yieldQtyStr by remember { mutableStateOf("") }
     var selectedUnitName by remember { mutableStateOf("") }
 
@@ -50,10 +50,10 @@ fun PrepareBatchDialog(
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SearchableDropdown(
-                                label = "Ingredient to Add",
-                                options = allIngredients.map { it.name },
-                                selectedOption = selectedIngName,
-                                onOptionSelected = { selectedIngName = it },
+                                label = "Item to Add",
+                                options = allItems.map { it.name },
+                                selectedOption = selectedItemName,
+                                onOptionSelected = { selectedItemName = it },
                                 onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -84,17 +84,17 @@ fun PrepareBatchDialog(
                 onClick = {
                     val multi = multiplierStr.toDoubleOrNull() ?: 1.0
                     if (saveYield) {
-                        val ingId = allIngredients.find { it.name == selectedIngName }?.id
+                        val itemId = allItems.find { it.name == selectedItemName }?.id
                         val qty = yieldQtyStr.toDoubleOrNull()
                         val unitId = allUnits.find { it.abbreviation == selectedUnitName }?.id
-                        if (ingId != null && qty != null && unitId != null) {
-                            onConfirm(multi, ingId, qty, unitId)
+                        if (itemId != null && qty != null && unitId != null) {
+                            onConfirm(multi, itemId, qty, unitId)
                         }
                     } else {
                         onConfirm(multi, null, null, null)
                     }
                 },
-                enabled = !saveYield || (selectedIngName.isNotBlank() && yieldQtyStr.isNotBlank() && selectedUnitName.isNotBlank())
+                enabled = !saveYield || (selectedItemName.isNotBlank() && yieldQtyStr.isNotBlank() && selectedUnitName.isNotBlank())
             ) {
                 Text("Review Transaction")
             }

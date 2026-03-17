@@ -1,13 +1,13 @@
 package io.github.and19081.mealplanner.main
 
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -23,26 +23,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowWidthSizeClass
 import io.github.and19081.mealplanner.dependencyinjection.DependencyInjectionContainer
-import io.github.and19081.mealplanner.ingredients.Ingredient
 import io.github.and19081.mealplanner.ingredients.IngredientForm
+import io.github.and19081.mealplanner.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.kitchen.KitchenModal
 import io.github.and19081.mealplanner.kitchen.TransactionReviewSheet
-import io.github.and19081.mealplanner.Recipe
 import io.github.and19081.mealplanner.recipes.RecipeForm
 import io.github.and19081.mealplanner.recipes.RecipesViewModel
-import io.github.and19081.mealplanner.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.settings.Mode
 import io.github.and19081.mealplanner.uicomponents.MpNav
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.unit.dp
-import kotlinx.datetime.plus
+import io.github.and19081.mealplanner.domain.FoodItem
+import io.github.and19081.mealplanner.domain.Package
+import io.github.and19081.mealplanner.domain.BridgeConversion
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,25 +51,11 @@ fun MainView(
   val selectedItemIndex = viewModel.selectedRailIndex.intValue
   val isNavRailVisible = viewModel.isNavRailVisible.value
   val currentMonth by viewModel.currentMonth.collectAsState()
-  val cornerStyle by diContainer.settingsRepository.cornerStyle.collectAsState()
   val appSettings by diContainer.settingsRepository.appSettings.collectAsState()
 
   // Global ViewModels for Modals
-  val recipesVm = viewModel {
-    RecipesViewModel(
-        diContainer.recipeRepository,
-        diContainer.ingredientRepository,
-        diContainer.pantryRepository,
-        diContainer.unitRepository,
-    )
-  }
-  val ingredientsVm = viewModel {
-    IngredientsViewModel(
-        diContainer.ingredientRepository,
-        diContainer.storeRepository,
-        diContainer.unitRepository,
-    )
-  }
+  val recipesVm: RecipesViewModel = viewModel { diContainer.viewModelFactory.createRecipesViewModel() }
+  val ingredientsVm: IngredientsViewModel = viewModel { diContainer.viewModelFactory.createIngredientsViewModel() }
 
   val ingredientsUiState by ingredientsVm.uiState.collectAsState()
   val recipesUiState by recipesVm.uiState.collectAsState()
@@ -134,7 +113,6 @@ fun MainView(
           Text(title)
         },
         topBarActions = {
-          // Universal Actions: Analytics and Settings
           IconButton(
               onClick = {
                 navController.navigate(AnalyticsRoute) {
@@ -160,10 +138,10 @@ fun MainView(
         },
     )
 
-    // Global Modal Overlay logic
+    // Global Modal Overlay
     modalStack.lastOrNull()?.let { modal ->
       when (modal) {
-        is KitchenModal.IngredientCreator -> {
+        is KitchenModal.FoodItemCreator -> {
           AlertDialog(
               onDismissRequest = { viewModel.popModal() },
               modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f),
@@ -173,8 +151,8 @@ fun MainView(
                 IngredientForm(
                     ingredient = null,
                     initialName = modal.name,
-                    allPackages = emptyList(),
-                    allBridges = emptyList(),
+                    allPackages = emptyList<Package>(),
+                    allBridges = emptyList<BridgeConversion>(),
                     allStores = ingredientsUiState.allStores,
                     allCategories = ingredientsUiState.allCategories,
                     allUnits = ingredientsUiState.allUnits,
@@ -188,39 +166,6 @@ fun MainView(
                     onDeleteStore = { /* ... */ },
                     onAddCategory = { ingredientsVm.addCategory(it) },
                     onDeleteCategory = { /* ... */ },
-                )
-              },
-          )
-        }
-        is KitchenModal.RecipeCreator -> {
-          AlertDialog(
-              onDismissRequest = { viewModel.popModal() },
-              modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f),
-              properties =
-                  androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-              content = {
-                RecipeForm(
-                    recipe = null,
-                    initialName = modal.name,
-                    uiState = recipesUiState,
-                    allIngredients = recipesUiState.allIngredients,
-                    allRecipes = recipesUiState.allRecipes,
-                    allPackages = recipesUiState.allPackages,
-                    allBridges = recipesUiState.allBridges,
-                    allUnits = recipesUiState.allUnits,
-                    warnings = emptyList(),
-                    onDismiss = { viewModel.popModal() },
-                    onSave = { recipe ->
-                      recipesVm.saveRecipe(recipe)
-                      modal.onCreated(recipe)
-                      viewModel.popModal()
-                    },
-                    onAddIngredient = { name: String, onCreated: (Ingredient) -> Unit ->
-                      viewModel.pushModal(KitchenModal.IngredientCreator(name, onCreated))
-                    },
-                    onAddSubRecipe = { name: String, onCreated: (Recipe) -> Unit ->
-                      viewModel.pushModal(KitchenModal.RecipeCreator(name, onCreated))
-                    },
                 )
               },
           )

@@ -2,30 +2,18 @@ package io.github.and19081.mealplanner.pantry
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.and19081.mealplanner.LeftoverItem
-import io.github.and19081.mealplanner.LeftoverRepository
 import io.github.and19081.mealplanner.PantryItem
 import io.github.and19081.mealplanner.PantryRepository
-import io.github.and19081.mealplanner.Recipe
 import io.github.and19081.mealplanner.UnitModel
 import io.github.and19081.mealplanner.UnitRepository
-import io.github.and19081.mealplanner.ingredients.Category
-import io.github.and19081.mealplanner.ingredients.Ingredient
-import io.github.and19081.mealplanner.ingredients.IngredientRepository
-import io.github.and19081.mealplanner.recipes.RecipeRepository
-import io.github.and19081.mealplanner.domain.UnitConverter
+import io.github.and19081.mealplanner.domain.*
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class PantryViewModel(
     private val pantryRepository: PantryRepository,
-    private val leftoverRepository: LeftoverRepository,
-    private val recipeRepository: RecipeRepository,
-    private val ingredientRepository: IngredientRepository,
+    private val foodItemRepository: FoodItemRepository,
     private val unitRepository: UnitRepository,
 ) : ViewModel() {
 
@@ -33,39 +21,33 @@ class PantryViewModel(
 
   val uiState =
       combine(
-              listOf(
-                  pantryRepository.pantryItems,
-                  leftoverRepository.leftovers,
-                  recipeRepository.recipes,
-                  ingredientRepository.ingredients,
-                  ingredientRepository.categories,
-                  unitRepository.units,
-                  _searchQuery,
-                  ingredientRepository.bridges,
-              )
-          ) { array ->
-            val pantryItems = array[0] as List<PantryItem>
-            val leftovers = array[1] as List<LeftoverItem>
-            val allRecipes = array[2] as List<Recipe>
-            val allIngredients = array[3] as List<Ingredient>
-            val allCategories = array[4] as List<Category>
-            val allUnits = array[5] as List<UnitModel>
-            val query = array[6] as String
-            val bridges = array[7] as List<io.github.and19081.mealplanner.ingredients.BridgeConversion>
+              pantryRepository.pantryItems,
+              foodItemRepository.foodItems,
+              foodItemRepository.categories,
+              unitRepository.units,
+              _searchQuery,
+              foodItemRepository.conversions,
+          ) { args: Array<Any?> ->
+            val pantryItems = args[0] as List<PantryItem>
+            val allItems = args[1] as List<FoodItem>
+            val allCategories = args[2] as List<Category>
+            val allUnits = args[3] as List<UnitModel>
+            val query = args[4] as String
+            val bridges = args[5] as List<BridgeConversion>
 
-            val ingredientsMap = allIngredients.associateBy { it.id }
+            val itemsMap = allItems.associateBy { it.id }
             val categoryMap = allCategories.associateBy { it.id }
             val unitMap = allUnits.associateBy { it.id }
-            val recipesMap = allRecipes.associateBy { it.id }
 
             val joinedPantry =
                 pantryItems.mapNotNull { item ->
-                  val ing = ingredientsMap[item.ingredientId]
+                  val foodItem = itemsMap[item.foodItemId]
                   val unit = unitMap[item.unitId]
-                  if (ing != null && unit != null) {
-                    val catName = categoryMap[ing.categoryId]?.name ?: "Uncategorized"
+                  if (foodItem != null && unit != null) {
+                    val catId = foodItem.purchasableInfo?.categoryId
+                    val catName = categoryMap[catId]?.name ?: "Uncategorized"
 
-                    val displayUnit = ing.preferredUnitId?.let { unitMap[it] } ?: unit
+                    val displayUnit = foodItem.preferredUnitId?.let { unitMap[it] } ?: unit
                     val displayQty =
                         if (displayUnit.id != unit.id) {
                           UnitConverter.convert(
@@ -80,9 +62,9 @@ class PantryViewModel(
                         }
 
                     PantryItemUi(
-                        id = item.ingredientId,
+                        id = item.foodItemId,
                         batchId = item.id,
-                        name = ing.name,
+                        name = foodItem.name,
                         category = catName,
                         quantity = displayQty,
                         unit = displayUnit,
@@ -91,13 +73,14 @@ class PantryViewModel(
                 }
 
             val joinedLeftovers =
-                leftovers.map { item ->
+                allItems.filter { it.isLeftover }.map { item ->
+                  val info = item.leftoverInfo!!
                   LeftoverItemUi(
                       id = item.id,
-                      recipeName = recipesMap[item.recipeId]?.name ?: "Unknown Recipe",
-                      remainingServings = item.remainingServings,
-                      dateAdded = item.dateAdded,
-                      expirationDate = item.expirationDate,
+                      recipeName = item.name,
+                      remainingServings = info.remainingServings,
+                      dateAdded = info.dateAdded,
+                      expirationDate = info.expirationDate,
                   )
                 }
 
@@ -116,7 +99,7 @@ class PantryViewModel(
             PantryUiState(
                 items = filteredPantry.sortedBy { it.name },
                 leftovers = filteredLeftovers.sortedByDescending { it.dateAdded },
-                allIngredients = allIngredients.sortedBy { it.name },
+                allIngredients = allItems.filter { it.isIngredient }.sortedBy { it.name },
                 allUnits = allUnits,
             )
           }
@@ -146,20 +129,30 @@ class PantryViewModel(
 
   fun updateLeftoverQuantity(id: Uuid, servings: Double) {
     viewModelScope.launch {
-      val existing = leftoverRepository.leftovers.value.find { it.id == id } ?: return@launch
-      leftoverRepository.consumeLeftover(id, existing.remainingServings - servings)
+      val existing = foodItemRepository.getFoodItem(id) ?: return@launch
+      val info = existing.leftoverInfo ?: return@launch
+      
+      val updated = existing.copy(
+          leftoverInfo = info.copy(remainingServings = servings)
+      )
+      
+      if (servings <= 0) {
+          foodItemRepository.deleteFoodItem(id)
+      } else {
+          foodItemRepository.saveFoodItem(updated)
+      }
     }
   }
 
   fun deleteLeftover(id: Uuid) {
-    viewModelScope.launch { leftoverRepository.removeLeftover(id) }
+    viewModelScope.launch { foodItemRepository.deleteFoodItem(id) }
   }
 }
 
 data class PantryUiState(
     val items: List<PantryItemUi>,
     val leftovers: List<LeftoverItemUi>,
-    val allIngredients: List<Ingredient>,
+    val allIngredients: List<FoodItem>,
     val allUnits: List<UnitModel>,
 )
 

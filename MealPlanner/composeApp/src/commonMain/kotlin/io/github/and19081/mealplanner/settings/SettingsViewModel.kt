@@ -3,6 +3,7 @@ package io.github.and19081.mealplanner.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.and19081.mealplanner.*
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.ingredients.*
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.SharingStarted
@@ -12,26 +13,23 @@ import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
-    private val ingredientRepository: IngredientRepository,
+    private val foodItemRepository: FoodItemRepository,
     private val storeRepository: StoreRepository,
     private val restaurantRepository: RestaurantRepository,
     private val unitRepository: UnitRepository,
 ) : ViewModel() {
-    // val
 
   val uiState =
       combine(
-              listOf(
-                  settingsRepository.appSettings,
-                  settingsRepository.theme,
-                  settingsRepository.cornerStyle,
-                  settingsRepository.accentColor,
-                  settingsRepository.dashboardConfig,
-                  ingredientRepository.categories,
-                  storeRepository.stores,
-                  restaurantRepository.restaurants,
-                  unitRepository.units,
-              )
+              settingsRepository.appSettings,
+              settingsRepository.theme,
+              settingsRepository.cornerStyle,
+              settingsRepository.accentColor,
+              settingsRepository.dashboardConfig,
+              foodItemRepository.categories,
+              storeRepository.stores,
+              restaurantRepository.restaurants,
+              unitRepository.units,
           ) { args: Array<Any> ->
             val appSettings = args[0] as AppSettings
             SettingsUiState(
@@ -104,16 +102,12 @@ class SettingsViewModel(
 
   fun saveCategory(category: Category) {
     viewModelScope.launch {
-      if (uiState.value.allCategories.any { it.id == category.id }) {
-        ingredientRepository.updateCategory(category)
-      } else {
-        ingredientRepository.addCategory(category)
-      }
+        foodItemRepository.saveCategory(category)
     }
   }
 
   fun deleteCategory(id: Uuid) {
-    viewModelScope.launch { ingredientRepository.removeCategory(id) }
+    viewModelScope.launch { foodItemRepository.deleteCategory(id) }
   }
 
   fun saveRestaurant(restaurant: Restaurant) {

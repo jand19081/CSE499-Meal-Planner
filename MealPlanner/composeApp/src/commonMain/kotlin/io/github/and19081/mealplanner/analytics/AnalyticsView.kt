@@ -22,7 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.UnitModel
-import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.domain.FoodItem
 import io.github.and19081.mealplanner.settings.Mode
 import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
@@ -478,7 +478,7 @@ fun LazyListScope.analyticsListContent(
 fun ReceiptForm(
     trip: ReceiptHistory,
     locationName: String,
-    allIngredients: List<Ingredient>,
+    allIngredients: List<FoodItem>,
     allUnits: List<UnitModel>,
     onClose: () -> Unit,
     onSave: (ReceiptHistory) -> Unit,
@@ -545,7 +545,7 @@ fun ReceiptForm(
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
           val name =
               item.customName
-                  ?: allIngredients.find { it.id == item.ingredientId }?.name
+                  ?: allIngredients.find { it.id == item.foodItemId }?.name
                   ?: "Unknown"
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)

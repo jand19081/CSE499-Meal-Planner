@@ -805,7 +805,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT",
             "notNull": true
@@ -922,7 +922,7 @@
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredient_id` TEXT NOT NULL, `category_id` TEXT NOT NULL, PRIMARY KEY(`ingredient_id`, `category_id`), FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT",
             "notNull": true
@@ -994,7 +994,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT",
             "notNull": true
@@ -1158,7 +1158,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT"
           },
@@ -1333,7 +1333,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT",
             "notNull": true
@@ -1433,7 +1433,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT",
             "notNull": true
@@ -1578,7 +1578,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT"
           },
@@ -1755,7 +1755,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "ingredientId",
+            "fieldPath": "foodItemId",
             "columnName": "ingredient_id",
             "affinity": "TEXT"
           },

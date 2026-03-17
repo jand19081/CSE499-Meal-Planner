@@ -18,76 +18,47 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.*
-import io.github.and19081.mealplanner.domain.UnitConverter
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.settings.Mode
-import io.github.and19081.mealplanner.uicomponents.CreateNewItemRow
-import io.github.and19081.mealplanner.uicomponents.ExpandableListItem
-import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
-import io.github.and19081.mealplanner.uicomponents.ListSectionHeader
-import io.github.and19081.mealplanner.uicomponents.MpOutlinedTextField
-import io.github.and19081.mealplanner.uicomponents.SearchableDropdown
+import io.github.and19081.mealplanner.uicomponents.*
 import kotlin.uuid.ExperimentalUuidApi
-import androidx.compose.runtime.saveable.rememberSaveable
 import kotlin.uuid.Uuid
 
 @Composable
 fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boolean) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Use rememberSaveable
     var selectedIngredientId by rememberSaveable { mutableStateOf<String?>(null) }
     var isAdding by rememberSaveable { mutableStateOf(false) }
     var creationName by rememberSaveable { mutableStateOf("") }
 
     val selectedIngredient = uiState.groupedIngredients.values.flatten().find { it.id.toString() == selectedIngredientId }
 
-    val onIngredientClick: (Ingredient) -> Unit = {
-        selectedIngredientId = it.id.toString()
-        isAdding = false
-    }
-
-    val onAddClick: () -> Unit = {
-        selectedIngredientId = null
-        creationName = ""
-        isAdding = true
-    }
-
-    val onDismissDetail: () -> Unit = {
-        selectedIngredientId = null
-        isAdding = false
-    }
-
-  var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-  var deleteConfirmationMessage by remember { mutableStateOf("") }
-
-  if (pendingDeleteAction != null) {
-    AlertDialog(
-        onDismissRequest = { pendingDeleteAction = null },
-        title = { Text("Confirm Deletion") },
-        text = { Text(deleteConfirmationMessage) },
-        confirmButton = {
-          Button(
-              onClick = {
-                pendingDeleteAction?.invoke()
-                pendingDeleteAction = null
-              },
-              colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-          ) {
-            Text("Delete")
-          }
-        },
-        dismissButton = { TextButton(onClick = { pendingDeleteAction = null }) { Text("Cancel") } },
-    )
+  val onIngredientClick: (FoodItem) -> Unit = {
+    selectedIngredientId = it.id.toString()
+    isAdding = false
   }
 
-  val onSave: (Ingredient, List<Package>, List<BridgeConversion>) -> Unit =
+  val onAddClick: () -> Unit = {
+    selectedIngredientId = null
+    isAdding = true
+  }
+
+  val onDismissDetail: () -> Unit = {
+    selectedIngredientId = null
+    isAdding = false
+  }
+
+  val onSave: (FoodItem, List<Package>, List<BridgeConversion>) -> Unit =
       { updatedIngredient, newPackages, newBridges ->
         viewModel.saveIngredient(updatedIngredient, newPackages, newBridges)
         onDismissDetail()
@@ -119,7 +90,7 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
         if (selectedIngredient != null || isAdding) {
           IngredientForm(
               ingredient = selectedIngredient,
-              initialName = creationName,
+              initialName = if (isAdding) uiState.searchQuery else "",
               allPackages = uiState.allPackages,
               allBridges = uiState.allBridges,
               allStores = uiState.allStores,
@@ -127,25 +98,17 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
               allUnits = uiState.allUnits,
               onDismiss = onDismissDetail,
               onSave = onSave,
-              onDelete = selectedIngredient?.let { ing -> { viewModel.deleteIngredient(ing.id) } },
+              onDelete =
+                  selectedIngredient?.let { ing ->
+                    {
+                      viewModel.deleteIngredient(ing.id)
+                      onDismissDetail()
+                    }
+                  },
               onAddStore = { viewModel.addStore(it) },
-              onDeleteStore = { storeName ->
-                val store = uiState.allStores.find { it.name == storeName }
-                if (store != null) {
-                  deleteConfirmationMessage =
-                      "This will remove this store and ALL associated prices from ALL ingredients. Are you sure?"
-                  pendingDeleteAction = { viewModel.deleteStore(store.id) }
-                }
-              },
+              onDeleteStore = { viewModel.deleteStore(it) },
               onAddCategory = { viewModel.addCategory(it) },
-              onDeleteCategory = { catName ->
-                val cat = uiState.allCategories.find { it.name == catName }
-                if (cat != null) {
-                  deleteConfirmationMessage =
-                      "Deleting this category will remove ALL ingredients in it. Are you sure?"
-                  pendingDeleteAction = { viewModel.deleteCategory(cat.id) }
-                }
-              },
+              onDeleteCategory = { categoryId -> viewModel.deleteCategory(categoryId) },
           )
         } else {
           EmptyDetailPlaceholder()
@@ -157,7 +120,7 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
     if (selectedIngredient != null || isAdding) {
       IngredientForm(
           ingredient = selectedIngredient,
-          initialName = creationName,
+          initialName = if (isAdding) uiState.searchQuery else "",
           allPackages = uiState.allPackages,
           allBridges = uiState.allBridges,
           allStores = uiState.allStores,
@@ -165,25 +128,17 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
           allUnits = uiState.allUnits,
           onDismiss = onDismissDetail,
           onSave = onSave,
-          onDelete = selectedIngredient?.let { ing -> { viewModel.deleteIngredient(ing.id) } },
+          onDelete =
+              selectedIngredient?.let { ing ->
+                {
+                  viewModel.deleteIngredient(ing.id)
+                  onDismissDetail()
+                }
+              },
           onAddStore = { viewModel.addStore(it) },
-          onDeleteStore = { storeName ->
-            val store = uiState.allStores.find { it.name == storeName }
-            if (store != null) {
-              deleteConfirmationMessage =
-                  "This will remove this store and ALL associated prices from ALL ingredients. Are you sure?"
-              pendingDeleteAction = { viewModel.deleteStore(store.id) }
-            }
-          },
+          onDeleteStore = { viewModel.deleteStore(it) },
           onAddCategory = { viewModel.addCategory(it) },
-          onDeleteCategory = { catName ->
-            val cat = uiState.allCategories.find { it.name == catName }
-            if (cat != null) {
-              deleteConfirmationMessage =
-                  "Deleting this category will remove ALL ingredients in it. Are you sure?"
-              pendingDeleteAction = { viewModel.deleteCategory(cat.id) }
-            }
-          },
+          onDeleteCategory = { categoryId -> viewModel.deleteCategory(categoryId) },
       )
     } else {
       IngredientListPane(
@@ -197,8 +152,24 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
 }
 
 @Composable
+fun EmptyDetailPlaceholder() {
+  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Icon(
+          Icons.Default.FilterList,
+          null,
+          modifier = Modifier.size(48.dp),
+          tint = MaterialTheme.colorScheme.outline,
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+      Text("Select an ingredient to view details", color = MaterialTheme.colorScheme.outline)
+    }
+  }
+}
+
+@Composable
 fun IngredientForm(
-    ingredient: Ingredient?,
+    ingredient: FoodItem?,
     initialName: String = "",
     allPackages: List<Package>,
     allBridges: List<BridgeConversion>,
@@ -206,18 +177,18 @@ fun IngredientForm(
     allCategories: List<Category>,
     allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onSave: (Ingredient, List<Package>, List<BridgeConversion>) -> Unit,
+    onSave: (FoodItem, List<Package>, List<BridgeConversion>) -> Unit,
     onDelete: (() -> Unit)? = null,
     onAddStore: (String) -> Unit,
-    onDeleteStore: (String) -> Unit,
+    onDeleteStore: (Uuid) -> Unit,
     onAddCategory: (String) -> Unit,
-    onDeleteCategory: (String) -> Unit,
+    onDeleteCategory: (Uuid) -> Unit,
 ) {
   val ingredientId = remember(ingredient) { ingredient?.id ?: Uuid.random() }
 
   var name by remember(ingredient) { mutableStateOf(ingredient?.name ?: initialName) }
 
-  val initialCatName = allCategories.find { it.id == ingredient?.categoryId }?.name ?: ""
+  val initialCatName = allCategories.find { it.id == ingredient?.purchasableInfo?.categoryId }?.name ?: ""
   var categoryName by remember(ingredient) { mutableStateOf(initialCatName) }
 
   var preferredUnitId by remember(ingredient) { mutableStateOf(ingredient?.preferredUnitId) }
@@ -225,14 +196,14 @@ fun IngredientForm(
   var packages by
       remember(ingredient) {
         mutableStateOf(
-            if (ingredient != null) allPackages.filter { it.ingredientId == ingredient.id }
+            if (ingredient != null) allPackages.filter { it.foodItemId == ingredient.id }
             else emptyList()
         )
       }
   var bridges by
       remember(ingredient) {
         mutableStateOf(
-            if (ingredient != null) allBridges.filter { it.ingredientId == ingredient.id }
+            if (ingredient != null) allBridges.filter { it.foodItemId == ingredient.id }
             else emptyList()
         )
       }
@@ -241,16 +212,19 @@ fun IngredientForm(
   val tabs = listOf("General", "Purchase Options", "Conversions")
 
   io.github.and19081.mealplanner.uicomponents.MpDetailScaffold(
-      title = if (ingredient == null) "Add Ingredient" else "Edit Ingredient",
+      title = if (ingredient == null) "Add FoodItem" else "Edit FoodItem",
       onClose = onDismiss,
       onSave = {
         val catId = allCategories.find { it.name == categoryName }?.id ?: Uuid.random()
         val finalIngredient =
-            Ingredient(
+            FoodItem(
                 id = ingredientId,
                 name = name,
-                categoryId = catId,
                 preferredUnitId = preferredUnitId,
+                purchasableInfo = io.github.and19081.mealplanner.domain.PurchasableInfo(
+                    expectedPriceCents = ingredient?.purchasableInfo?.expectedPriceCents ?: 0,
+                    categoryId = catId
+                )
             )
         onSave(finalIngredient, packages, bridges)
       },
@@ -270,7 +244,7 @@ fun IngredientForm(
       onTabSelected = { selectedTabIndex = it },
   ) {
     when (selectedTabIndex) {
-      0 -> { // General Tab
+      0 -> { // General
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
           MpOutlinedTextField(
               value = name,
@@ -285,45 +259,61 @@ fun IngredientForm(
               selectedOption = categoryName,
               onOptionSelected = { categoryName = it },
               onAddOption = onAddCategory,
-              onDeleteOption = onDeleteCategory,
-              deleteWarningMessage = "Deleting this category will remove ALL ingredients in it.",
-          )
-
-          val unitOptions = listOf("None") + allUnits.map { it.abbreviation }
-          val selectedUnitAbbreviation =
-              allUnits.find { it.id == preferredUnitId }?.abbreviation ?: "None"
-
-          SearchableDropdown(
-              label = "Preferred Base Unit (Pantry/Shopping List Display)",
-              options = unitOptions,
-              selectedOption = selectedUnitAbbreviation,
-              onOptionSelected = {
-                preferredUnitId = if (it == "None") null else allUnits.find { u -> u.abbreviation == it }?.id
+              onDeleteOption = { name ->
+                allCategories.find { it.name == name }?.let { onDeleteCategory(it.id) }
               },
-              onAddOption = {},
-              onDeleteOption = {},
-              deleteWarningMessage = "",
+              deleteWarningMessage =
+                  "Deleting this category will remove ALL ingredients in it. Are you sure?",
           )
+
+          Box {
+            var unitExpanded by remember { mutableStateOf(false) }
+            val unitName = allUnits.find { it.id == preferredUnitId }?.displayName ?: "None"
+            OutlinedButton(
+                onClick = { unitExpanded = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+              Text("Preferred Unit: $unitName")
+            }
+            DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
+              DropdownMenuItem(
+                  text = { Text("None") },
+                  onClick = {
+                    preferredUnitId = null
+                    unitExpanded = false
+                  },
+              )
+              allUnits.forEach { unit ->
+                DropdownMenuItem(
+                    text = { Text(unit.displayName) },
+                    onClick = {
+                      preferredUnitId = unit.id
+                      unitExpanded = false
+                    },
+                )
+              }
+            }
+          }
         }
       }
 
-      1 -> { // Purchase Options Tab
-        PurchaseOptionsEditor(
-            ingredientId = ingredientId,
-            options = packages,
+      1 -> { // Purchase Options
+        PackageOptionEditor(
+            currentPackages = packages,
             allStores = allStores,
             allUnits = allUnits,
-            onUpdateOptions = { packages = it },
+            foodItemId = ingredientId,
+            onUpdate = { packages = it },
             onAddStore = onAddStore,
             onDeleteStore = onDeleteStore,
         )
       }
 
-      2 -> { // Conversions Tab
-        ConversionBridgesEditor(
-            ingredientId = ingredientId,
+      2 -> { // Conversions
+        ConversionEditor(
             currentBridges = bridges,
             allUnits = allUnits,
+            foodItemId = ingredientId,
             onUpdate = { bridges = it },
         )
       }
@@ -335,7 +325,7 @@ fun IngredientForm(
 fun IngredientListPane(
     uiState: IngredientsUiState,
     viewModel: IngredientsViewModel,
-    onIngredientClick: (Ingredient) -> Unit,
+    onIngredientClick: (FoodItem) -> Unit,
     onAddClick: () -> Unit,
 ) {
   Scaffold(
@@ -343,7 +333,7 @@ fun IngredientListPane(
         ListControlToolbar(
             searchQuery = uiState.searchQuery,
             onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-            searchPlaceholder = "Search Ingredients...",
+            searchPlaceholder = "Search ingredients...",
             isSortByPrimary = uiState.isSortByCategory,
             onToggleSort = { viewModel.toggleSortMode() },
             onAddClick = onAddClick,
@@ -354,22 +344,13 @@ fun IngredientListPane(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
         contentPadding = PaddingValues(bottom = 80.dp),
     ) {
-      // Create New Option
-      if (uiState.searchQuery.isNotBlank() && !uiState.doesExactMatchExist) {
-        item {
-          CreateNewItemRow(searchQuery = uiState.searchQuery, onClick = onAddClick)
-          HorizontalDivider()
-        }
-      }
-
-      uiState.groupedIngredients.forEach { (header, ingredients) ->
-        stickyHeader { ListSectionHeader(text = header) }
-
+      uiState.groupedIngredients.forEach { (category, ingredients) ->
+        stickyHeader { ListSectionHeader(category) }
         items(ingredients) { ingredient ->
           IngredientRow(
               ingredient = ingredient,
-              categoryName = header,
-              packages = uiState.allPackages.filter { it.ingredientId == ingredient.id },
+              categoryName = category,
+              packages = uiState.allPackages.filter { it.foodItemId == ingredient.id },
               allStores = uiState.allStores,
               allUnits = uiState.allUnits,
               allBridges = uiState.allBridges,
@@ -378,29 +359,29 @@ fun IngredientListPane(
           HorizontalDivider()
         }
       }
-    }
-  }
-}
 
-@Composable
-fun EmptyDetailPlaceholder() {
-  Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      Icon(
-          Icons.Default.ShoppingCart,
-          null,
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.outline,
-      )
-      Spacer(modifier = Modifier.height(8.dp))
-      Text("Select an ingredient to view details", color = MaterialTheme.colorScheme.outline)
+      if (uiState.groupedIngredients.isEmpty()) {
+        item {
+          EmptyListMessage(
+              message =
+                  if (uiState.searchQuery.isBlank())
+                      "No ingredients found. Add your first ingredient!"
+                  else "No ingredients match your search.",
+              modifier = Modifier.padding(32.dp),
+          )
+        }
+      }
+
+      if (uiState.searchQuery.isNotBlank() && !uiState.doesExactMatchExist) {
+        item { CreateNewItemRow(searchQuery = uiState.searchQuery, onClick = onAddClick) }
+      }
     }
   }
 }
 
 @Composable
 fun IngredientRow(
-    ingredient: Ingredient,
+    ingredient: FoodItem,
     categoryName: String,
     packages: List<Package>,
     allStores: List<Store>,
@@ -408,247 +389,164 @@ fun IngredientRow(
     allBridges: List<BridgeConversion>,
     onEditClick: () -> Unit,
 ) {
-  // Calculate Best Price
-  val bestOption =
-      packages.minByOrNull {
-        if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
+  val priceRange =
+      if (packages.isEmpty()) "No price data"
+      else {
+        val min = packages.minOf { it.priceCents.toDouble() / it.quantity }
+        val max = packages.maxOf { it.priceCents.toDouble() / it.quantity }
+        if (min == max) "$${String.format("%.2f", min / 100.0)} / unit"
+        else
+            "$${String.format("%.2f", min / 100.0)} - $${String.format("%.2f", max / 100.0)} / unit"
       }
 
-  val preferredUnit = ingredient.preferredUnitId?.let { id -> allUnits.find { it.id == id } }
-
-  val bestPriceString =
-      if (bestOption != null) {
-        val store = allStores.find { it.id == bestOption.storeId }?.name ?: "Unknown"
-        val price = bestOption.priceCents / 100.0
-
-        if (preferredUnit != null) {
-          val qtyInPreferred =
-              UnitConverter.convert(
-                  bestOption.quantity,
-                  bestOption.unitId,
-                  preferredUnit.id,
-                  allUnits.associateBy { it.id },
-                  allBridges,
-              ) ?: 0.0
-          if (qtyInPreferred > 0) {
-            val pricePerPreferred = price / qtyInPreferred
-            val rounded = String.format("%.2f", pricePerPreferred)
-            "Best: $store - $$rounded/${preferredUnit.abbreviation}"
-          } else {
-            // Fallback to option unit if no conversion possible
-            val perUnit = if (bestOption.quantity > 0) price / bestOption.quantity else 0.0
-            val rounded = String.format("%.2f", perUnit)
-            val unitName = allUnits.find { it.id == bestOption.unitId }?.abbreviation ?: "?"
-            "Best: $store - $$rounded/$unitName"
+  ExpandableListItem(
+      title = ingredient.name,
+      subtitle = "$categoryName • $priceRange",
+      onEditClick = onEditClick,
+  ) {
+    if (packages.isNotEmpty()) {
+      Text("Best prices:", style = MaterialTheme.typography.labelSmall)
+      packages
+          .sortedBy { it.priceCents.toDouble() / it.quantity }
+          .take(3)
+          .forEach { pkg ->
+            val store = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown Store"
+            val unit = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
+            Text(
+                "• $store: $${String.format("%.2f", pkg.priceCents / 100.0)} for ${pkg.quantity} $unit",
+                style = MaterialTheme.typography.bodySmall,
+            )
           }
-        } else {
-          val perUnit = if (bestOption.quantity > 0) price / bestOption.quantity else 0.0
-          val rounded = String.format("%.2f", perUnit)
-          val unitName = allUnits.find { it.id == bestOption.unitId }?.abbreviation ?: "?"
-          "Best: $store - $$rounded/$unitName"
-        }
-      } else {
-        "No prices"
-      }
+    }
 
-  val subtitle = "$categoryName • ${packages.size} options • $bestPriceString"
-
-  ExpandableListItem(title = ingredient.name, subtitle = subtitle, onEditClick = onEditClick) {
-    Text("Category: $categoryName", style = MaterialTheme.typography.bodyMedium)
-    Spacer(modifier = Modifier.height(4.dp))
-
-    if (packages.isEmpty()) {
-      Text(
-          "No purchase options listed.",
-          style = MaterialTheme.typography.bodySmall,
-          fontStyle = FontStyle.Italic,
-      )
-    } else {
-      Text("Purchase Options:", style = MaterialTheme.typography.labelMedium)
-      packages.forEach { opt ->
-        val storeName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown Store"
-        val unitName = allUnits.find { it.id == opt.unitId }?.abbreviation ?: "?"
-        Text(
-            "• $storeName: $${opt.priceCents / 100.0} for ${opt.quantity} $unitName",
-            style = MaterialTheme.typography.bodySmall,
-        )
-      }
+    if (allBridges.any { it.foodItemId == ingredient.id }) {
+      Spacer(modifier = Modifier.height(8.dp))
+      Text("Conversions:", style = MaterialTheme.typography.labelSmall)
+      allBridges
+          .filter { it.foodItemId == ingredient.id }
+          .forEach { bridge ->
+            val fromUnit = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
+            val toUnit = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
+            Text(
+                "• ${bridge.fromQuantity} $fromUnit = ${bridge.toQuantity} $toUnit",
+                style = MaterialTheme.typography.bodySmall,
+            )
+          }
     }
   }
 }
 
 @Composable
-fun PurchaseOptionsEditor(
-    ingredientId: Uuid,
-    options: List<Package>,
+fun PackageOptionEditor(
+    currentPackages: List<Package>,
     allStores: List<Store>,
     allUnits: List<UnitModel>,
-    onUpdateOptions: (List<Package>) -> Unit,
+    foodItemId: Uuid,
+    onUpdate: (List<Package>) -> Unit,
     onAddStore: (String) -> Unit,
-    onDeleteStore: (String) -> Unit,
+    onDeleteStore: (Uuid) -> Unit,
 ) {
   var isAdding by remember { mutableStateOf(false) }
-  var editingOption by remember { mutableStateOf<Package?>(null) }
-
-  var storeName by remember { mutableStateOf("") }
+  var selectedStoreName by remember { mutableStateOf("") }
   var priceStr by remember { mutableStateOf("") }
-  var qtyStr by remember { mutableStateOf("") }
+  var quantityStr by remember { mutableStateOf("") }
+  var selectedUnitAbbr by remember { mutableStateOf("") }
 
-  // Default unit or first available
-  var selectedUnitName by remember { mutableStateOf("") }
-
-  fun startEditing(opt: Package?) {
-    if (opt != null) {
-      val store = allStores.find { it.id == opt.storeId }
-      val unit = allUnits.find { it.id == opt.unitId }
-      storeName = store?.name ?: ""
-      priceStr = (opt.priceCents / 100.0).toString()
-      qtyStr = opt.quantity.toString()
-      selectedUnitName = unit?.abbreviation ?: ""
-      editingOption = opt
-      isAdding = true
-    } else {
-      storeName = ""
-      priceStr = ""
-      qtyStr = ""
-      selectedUnitName = ""
-      editingOption = null
-      isAdding = true
-    }
-  }
-
-  Column {
-    if (options.isEmpty() && !isAdding) {
-      Text(
-          "No options added yet.",
-          style = MaterialTheme.typography.bodySmall,
-          fontStyle = FontStyle.Italic,
-      )
-    } else if (!isAdding) {
-      Column {
-        options.forEach { opt ->
-          val sName = allStores.find { it.id == opt.storeId }?.name ?: "Unknown"
-          val uName = allUnits.find { it.id == opt.unitId }?.abbreviation ?: "?"
-          Row(
-              modifier =
-                  Modifier.fillMaxWidth().clickable { startEditing(opt) }.padding(vertical = 4.dp),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text(
-                "$sName: $${opt.priceCents / 100.0} / ${opt.quantity} $uName",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            IconButton(
-                onClick = { onUpdateOptions(options - opt) },
-                modifier = Modifier.size(24.dp),
-            ) {
-              Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
-            }
-          }
-          HorizontalDivider()
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    currentPackages.forEach { pkg ->
+      val storeName = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown"
+      val unitAbbr = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(storeName, style = MaterialTheme.typography.bodyMedium)
+          Text(
+              "$${String.format("%.2f", pkg.priceCents / 100.0)} for ${pkg.quantity} $unitAbbr",
+              style = MaterialTheme.typography.bodySmall,
+          )
+        }
+        IconButton(onClick = { onUpdate(currentPackages - pkg) }) {
+          Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
         }
       }
+      HorizontalDivider()
     }
 
-    Spacer(modifier = Modifier.height(8.dp))
-
     if (!isAdding) {
-      Button(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
-        Text("Add Purchase Option")
+      Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Add Package Option")
       }
     } else {
-      Card(
-          colors =
-              CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-      ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Text(
-              if (editingOption == null) "New Option" else "Edit Option",
-              style = MaterialTheme.typography.labelMedium,
-          )
-
+      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           SearchableDropdown(
               label = "Store",
               options = allStores.map { it.name },
-              selectedOption = storeName,
-              onOptionSelected = { storeName = it },
+              selectedOption = selectedStoreName,
+              onOptionSelected = { selectedStoreName = it },
               onAddOption = onAddStore,
-              onDeleteOption = onDeleteStore,
-              deleteWarningMessage =
-                  "This will remove this store and ALL associated prices from ALL ingredients.",
+              onDeleteOption = { name ->
+                allStores.find { it.name == name }?.let { onDeleteStore(it.id) }
+              },
+              deleteWarningMessage = "Delete this store? This will affect other items too.",
           )
-
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MpOutlinedTextField(
                 value = priceStr,
                 onValueChange = { priceStr = it },
                 label = { Text("Price ($)") },
-                modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
             )
-
-            // Qty + Unit
-            Column(modifier = Modifier.weight(1.5f)) {
-              MpOutlinedTextField(
-                  value = qtyStr,
-                  onValueChange = { qtyStr = it },
-                  label = { Text("Qty") },
-                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                  modifier = Modifier.fillMaxWidth(),
-              )
-              SearchableDropdown(
-                  label = "Unit",
-                  options = allUnits.map { it.abbreviation },
-                  selectedOption = selectedUnitName,
-                  onOptionSelected = { selectedUnitName = it },
-                  onAddOption = {},
-                  onDeleteOption = {},
-                  deleteWarningMessage = "",
-              )
-            }
+            MpOutlinedTextField(
+                value = quantityStr,
+                onValueChange = { quantityStr = it },
+                label = { Text("Quantity") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
+            )
           }
-
+          SearchableDropdown(
+              label = "Unit",
+              options = allUnits.map { it.abbreviation },
+              selectedOption = selectedUnitAbbr,
+              onOptionSelected = { selectedUnitAbbr = it },
+              onAddOption = {},
+              onDeleteOption = {},
+              deleteWarningMessage = "",
+          )
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = { isAdding = false }) { Text("Cancel") }
             Button(
                 onClick = {
-                  val store = allStores.find { it.name == storeName }
-                  val unit = allUnits.find { it.abbreviation == selectedUnitName }
-                  val price = priceStr.toDoubleOrNull()
-                  val qty = qtyStr.toDoubleOrNull()
-
+                  val store = allStores.find { it.name == selectedStoreName }
+                  val unit = allUnits.find { it.abbreviation == selectedUnitAbbr }
+                  val price = (priceStr.toDoubleOrNull()?.let { it * 100 })?.toInt()
+                  val qty = quantityStr.toDoubleOrNull()
                   if (store != null && unit != null && price != null && qty != null) {
-                    val newOpt =
-                        Package(
-                            id = editingOption?.id ?: Uuid.random(),
-                            ingredientId = ingredientId,
-                            storeId = store.id,
-                            priceCents = (price * 100).toInt(),
-                            quantity = qty,
-                            unitId = unit.id,
-                        )
-                    val newList =
-                        editingOption?.let { existing ->
-                          options.map { if (it.id == existing.id) newOpt else it }
-                        } ?: (options + newOpt)
-                    onUpdateOptions(newList)
+                    onUpdate(
+                        currentPackages +
+                            Package(
+                                foodItemId = foodItemId,
+                                storeId = store.id,
+                                priceCents = price,
+                                quantity = qty,
+                                unitId = unit.id,
+                            )
+                    )
                     isAdding = false
+                    selectedStoreName = ""
+                    priceStr = ""
+                    quantityStr = ""
+                    selectedUnitAbbr = ""
                   }
                 },
                 enabled =
-                    storeName.isNotBlank() &&
+                    selectedStoreName.isNotBlank() &&
                         priceStr.isNotBlank() &&
-                        qtyStr.isNotBlank() &&
-                        selectedUnitName.isNotBlank(),
+                        quantityStr.isNotBlank() &&
+                        selectedUnitAbbr.isNotBlank(),
             ) {
-              Text("Save")
+              Text("Add")
             }
           }
         }
@@ -658,173 +556,102 @@ fun PurchaseOptionsEditor(
 }
 
 @Composable
-fun ConversionBridgesEditor(
-    ingredientId: Uuid,
+fun ConversionEditor(
     currentBridges: List<BridgeConversion>,
     allUnits: List<UnitModel>,
+    foodItemId: Uuid,
     onUpdate: (List<BridgeConversion>) -> Unit,
 ) {
   var isAdding by remember { mutableStateOf(false) }
-  var editingBridge by remember { mutableStateOf<BridgeConversion?>(null) }
-
-  var fromQtyStr by remember { mutableStateOf("1") }
-  var fromUnitName by remember { mutableStateOf("") }
-
+  var fromQtyStr by remember { mutableStateOf("") }
   var toQtyStr by remember { mutableStateOf("") }
+  var fromUnitName by remember { mutableStateOf("") }
   var toUnitName by remember { mutableStateOf("") }
 
-  fun startEditing(bridge: BridgeConversion?) {
-    if (bridge != null) {
-      fromQtyStr = bridge.fromQuantity.toString()
-      fromUnitName = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
-      toQtyStr = bridge.toQuantity.toString()
-      toUnitName = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
-      editingBridge = bridge
-      isAdding = true
-    } else {
-      fromQtyStr = "1"
-      fromUnitName = ""
-      toQtyStr = ""
-      toUnitName = ""
-      editingBridge = null
-      isAdding = true
-    }
-  }
-
-  Column {
-    if (currentBridges.isEmpty() && !isAdding) {
-      Text(
-          "No conversions defined.",
-          style = MaterialTheme.typography.bodySmall,
-          fontStyle = FontStyle.Italic,
-      )
-    } else if (!isAdding) {
-      Column {
-        currentBridges.forEach { bridge ->
-          val fName = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: "?"
-          val tName = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: "?"
-          Row(
-              modifier =
-                  Modifier.fillMaxWidth()
-                      .clickable { startEditing(bridge) }
-                      .padding(vertical = 4.dp),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Text(
-                "${bridge.fromQuantity} $fName = ${bridge.toQuantity} $tName",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            IconButton(
-                onClick = { onUpdate(currentBridges - bridge) },
-                modifier = Modifier.size(24.dp),
-            ) {
-              Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
-            }
-          }
-          HorizontalDivider()
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    currentBridges.forEach { bridge ->
+      val fromU = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
+      val toU = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "${bridge.fromQuantity} $fromU = ${bridge.toQuantity} $toU",
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = { onUpdate(currentBridges - bridge) }) {
+          Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
         }
       }
+      HorizontalDivider()
     }
 
-    Spacer(modifier = Modifier.height(8.dp))
-
     if (!isAdding) {
-      Button(onClick = { startEditing(null) }, modifier = Modifier.fillMaxWidth()) {
-        Text("Add Conversion")
+      Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Add Conversion Bridge")
       }
     } else {
-      Card(
-          colors =
-              CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-      ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Text(
-              if (editingBridge == null) "New Conversion" else "Edit Conversion",
-              style = MaterialTheme.typography.labelMedium,
-          )
-
-          // FROM
-          Row {
+      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MpOutlinedTextField(
                 value = fromQtyStr,
                 onValueChange = { fromQtyStr = it },
-                label = { Text("Qty") },
-                modifier = Modifier.weight(1f),
+                label = { Text("From Qty") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(8.dp))
-
             Box(modifier = Modifier.weight(1f)) {
               SearchableDropdown(
-                  label = "Unit",
+                  label = "From Unit",
                   options = allUnits.map { it.abbreviation },
                   selectedOption = fromUnitName,
                   onOptionSelected = { fromUnitName = it },
-                  onAddOption = {},
-                  onDeleteOption = {},
-                  deleteWarningMessage = "",
+                  onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
               )
             }
           }
-
-          Text(
-              "EQUALS",
-              style = MaterialTheme.typography.labelSmall,
-              modifier = Modifier.align(Alignment.CenterHorizontally),
-          )
-
-          // TO
-          Row {
+          Icon(Icons.Default.SyncAlt, null, modifier = Modifier.align(Alignment.CenterHorizontally))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MpOutlinedTextField(
                 value = toQtyStr,
                 onValueChange = { toQtyStr = it },
-                label = { Text("Qty") },
-                modifier = Modifier.weight(1f),
+                label = { Text("To Qty") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(8.dp))
             Box(modifier = Modifier.weight(1f)) {
               SearchableDropdown(
-                  label = "Unit",
+                  label = "To Unit",
                   options = allUnits.map { it.abbreviation },
                   selectedOption = toUnitName,
                   onOptionSelected = { toUnitName = it },
-                  onAddOption = {},
-                  onDeleteOption = {},
-                  deleteWarningMessage = "",
+                  onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
               )
             }
           }
-
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = { isAdding = false }) { Text("Cancel") }
             Button(
                 onClick = {
-                  val fq = fromQtyStr.toDoubleOrNull()
-                  val tq = toQtyStr.toDoubleOrNull()
-                  val fUnit = allUnits.find { it.abbreviation == fromUnitName }
-                  val tUnit = allUnits.find { it.abbreviation == toUnitName }
-
-                  if (fq != null && tq != null && fUnit != null && tUnit != null) {
-                    val newBridge =
-                        BridgeConversion(
-                            id = editingBridge?.id ?: Uuid.random(),
-                            ingredientId = ingredientId,
-                            fromUnitId = fUnit.id,
-                            fromQuantity = fq,
-                            toUnitId = tUnit.id,
-                            toQuantity = tq,
-                        )
-                    val newList =
-                        editingBridge?.let { existing ->
-                          currentBridges.map { if (it.id == existing.id) newBridge else it }
-                        } ?: (currentBridges + newBridge)
-                    onUpdate(newList)
+                  val fromU = allUnits.find { it.abbreviation == fromUnitName }
+                  val toU = allUnits.find { it.abbreviation == toUnitName }
+                  val fQty = fromQtyStr.toDoubleOrNull()
+                  val tQty = toQtyStr.toDoubleOrNull()
+                  if (fromU != null && toU != null && fQty != null && tQty != null) {
+                    onUpdate(
+                        currentBridges +
+                            BridgeConversion(
+                                foodItemId = foodItemId,
+                                fromUnitId = fromU.id,
+                                toUnitId = toU.id,
+                                fromQuantity = fQty,
+                                toQuantity = tQty,
+                            )
+                    )
                     isAdding = false
+                    fromQtyStr = ""
+                    toQtyStr = ""
+                    fromUnitName = ""
+                    toUnitName = ""
                   }
                 },
                 enabled =
@@ -833,7 +660,7 @@ fun ConversionBridgesEditor(
                         fromUnitName.isNotBlank() &&
                         toUnitName.isNotBlank(),
             ) {
-              Text("Save")
+              Text("Add")
             }
           }
         }

@@ -1,11 +1,12 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.ShoppingListItemRepository
+import io.github.and19081.mealplanner.UnitRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
-import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
-import io.github.and19081.mealplanner.data.toModel
+import io.github.and19081.mealplanner.data.*
 import io.github.and19081.mealplanner.shoppinglist.ShoppingListItem
+import io.github.and19081.mealplanner.ShoppingListItemRepository
+import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -14,41 +15,52 @@ class RoomShoppingListItemRepository(
     private val db: MealPlannerDatabase,
     private val scope: CoroutineScope,
 ) : ShoppingListItemRepository {
-
-  private val shoppingDao = db.shoppingListDao()
+  private val dao = db.shoppingListDao()
 
   override val items: StateFlow<List<ShoppingListItem>> =
-      shoppingDao
-          .observeAllWithDetails()
-          .map { list: List<ShoppingCartItemWithDetails> -> list.map { it.toModel() } }
+      dao.observeAllWithDetails()
+          .map { list -> list.map { it.toModel() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
   override suspend fun addItem(item: ShoppingListItem) {
-    val anyStoreId = Uuid.parse("00000000-0000-0000-0000-000000000000")
-    shoppingDao.upsert(
+    dao.upsert(
         ShoppingCartItemEntity(
             id = item.id,
-            ingredientId = item.ingredientId,
-            customShoppingItemId = null,
-            storeId = if (item.storeId == anyStoreId) null else item.storeId,
+            foodItemId = item.foodItemId ?: Uuid.NIL,
+            storeId = if (item.storeId == Uuid.NIL) null else item.storeId,
             unitId = item.unitId ?: Uuid.NIL,
             packageOptionId = item.packageId,
             customName = item.customName,
-            neededQuantity = item.neededQuantity ?: 1.0,
+            neededQuantity = item.neededQuantity ?: 0.0,
             isPurchased = item.isPurchased,
             isPantryItem = item.isPantryItem,
         )
     )
   }
 
-  override suspend fun removeItem(id: Uuid) {
-    shoppingDao.deleteById(id)
+  override suspend fun toggleItem(id: Uuid) {
+    val existing = items.value.find { it.id == id }
+    if (existing != null) {
+      dao.setPurchased(id, !existing.isPurchased)
+    }
   }
 
-  override suspend fun toggleItem(id: Uuid) {
-    val item = items.value.find { it.id == id }
-    if (item != null) {
-      shoppingDao.setPurchased(id, !item.isPurchased)
+  override suspend fun removeItem(id: Uuid) {
+    val existing = dao.observeAllWithDetails().first().find { it.cartItem.id == id }
+    if (existing != null) {
+      dao.delete(existing.cartItem)
     }
   }
 }
+private fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
+    ShoppingListItem(
+        id = cartItem.id,
+        foodItemId = cartItem.foodItemId,
+        customName = cartItem.customName,
+        storeId = cartItem.storeId ?: Uuid.parse("00000000-0000-0000-0000-000000000000"),
+        neededQuantity = cartItem.neededQuantity,
+        unitId = cartItem.unitId,
+        packageId = cartItem.packageOptionId,
+        isPurchased = cartItem.isPurchased,
+        isPantryItem = cartItem.isPantryItem,
+    )

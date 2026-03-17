@@ -19,9 +19,9 @@ enum class TransactionDirection {
 
 @Serializable
 data class InventoryChange(
-    val ingredientId: Uuid,
+    val foodItemId: Uuid,
     val ingredientName: String,
-    val quantity: Double,
+    val quantity: Double?,
     val unitId: Uuid?,
     val unitAbbreviation: String,
     val direction: TransactionDirection,

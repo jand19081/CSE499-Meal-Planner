@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.UnitModel
-import io.github.and19081.mealplanner.ingredients.Ingredient
+import io.github.and19081.mealplanner.domain.FoodItem
 import io.github.and19081.mealplanner.settings.Mode
 import io.github.and19081.mealplanner.uicomponents.EmptyListMessage
 import io.github.and19081.mealplanner.uicomponents.ListControlToolbar
@@ -36,7 +36,7 @@ fun PantryView(
     viewModel: PantryViewModel,
     mode: Mode,
     isExpanded: Boolean,
-    onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
+    onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
 ) {
   val uiState by viewModel.uiState.collectAsState()
 
@@ -296,12 +296,12 @@ fun PantryItemRow(item: PantryItemUi, onEditClick: () -> Unit) {
 @Composable
 fun PantryForm(
     item: PantryItemUi?,
-    allIngredients: List<Ingredient>,
+    allIngredients: List<FoodItem>,
     allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
     onSave: (Uuid, Double, Uuid) -> Unit,
     onDelete: (() -> Unit)? = null,
-    onAddIngredient: (String, (Ingredient) -> Unit) -> Unit,
+    onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
 ) {
   var selectedIngName by remember(item) { mutableStateOf(item?.name ?: "") }
   var quantityStr by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "") }
@@ -329,7 +329,7 @@ fun PantryForm(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
       if (item == null) {
         SearchableDropdown(
-            label = "Ingredient",
+            label = "FoodItem",
             options = allIngredients.map { it.name },
             selectedOption = selectedIngName,
             onOptionSelected = { selectedIngName = it },

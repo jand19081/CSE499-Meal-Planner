@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 @OptIn(ExperimentalUuidApi::class)
 data class ShoppingListOverride(
-    val ingredientId: Uuid,
+    val foodItemId: Uuid,
     val forceStoreId: Uuid? = null, // If set, force this store.
     val inPantry: Boolean = false,
 )
@@ -17,22 +17,22 @@ class ShoppingListRepository {
   private val _overrides = MutableStateFlow<Map<Uuid, ShoppingListOverride>>(emptyMap())
   val overrides = _overrides
 
-  fun setStoreOverride(ingredientId: Uuid, storeId: Uuid) {
+  fun setStoreOverride(foodItemId: Uuid, storeId: Uuid) {
     val current = _overrides.value.toMutableMap()
-    current[ingredientId] =
-        ShoppingListOverride(ingredientId, forceStoreId = storeId, inPantry = false)
+    current[foodItemId] =
+        ShoppingListOverride(foodItemId, forceStoreId = storeId, inPantry = false)
     _overrides.value = current
   }
 
-  fun markInPantry(ingredientId: Uuid) {
+  fun markInPantry(foodItemId: Uuid) {
     val current = _overrides.value.toMutableMap()
-    current[ingredientId] = ShoppingListOverride(ingredientId, inPantry = true)
+    current[foodItemId] = ShoppingListOverride(foodItemId, inPantry = true)
     _overrides.value = current
   }
 
-  fun clearOverride(ingredientId: Uuid) {
+  fun clearOverride(foodItemId: Uuid) {
     val current = _overrides.value.toMutableMap()
-    current.remove(ingredientId)
+    current.remove(foodItemId)
     _overrides.value = current
   }
 }

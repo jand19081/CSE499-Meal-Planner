@@ -3,7 +3,7 @@ package io.github.and19081.mealplanner.data
 import io.github.and19081.mealplanner.*
 import io.github.and19081.mealplanner.data.db.entity.*
 import io.github.and19081.mealplanner.data.db.relation.*
-import io.github.and19081.mealplanner.ingredients.*
+import io.github.and19081.mealplanner.domain.*
 import io.github.and19081.mealplanner.settings.AppSettings
 import io.github.and19081.mealplanner.settings.DashboardConfig as UiDashboardConfig
 import io.github.and19081.mealplanner.shoppinglist.ReceiptHistory
@@ -36,31 +36,62 @@ fun UnitModel.toEntity(): UnitEntity =
 
 // --- Category Mappers ---
 fun CategoryEntity.toModel(): Category = Category(id = id, name = name)
-
 fun Category.toEntity(): CategoryEntity = CategoryEntity(id = id, name = name)
 
 // --- Store Mappers ---
 fun StoreEntity.toModel(): Store = Store(id = id, name = name)
-
 fun Store.toEntity(): StoreEntity = StoreEntity(id = id, name = name)
 
-// --- Ingredient Mappers ---
-fun IngredientWithCategories.toModel(): Ingredient =
-    Ingredient(
-        id = ingredient.id,
-        name = ingredient.name,
-        categoryId = categories.firstOrNull()?.id ?: Uuid.NIL,
-        preferredUnitId = ingredient.preferredUnitId,
+// --- Food Item Mappers (ECS) ---
+fun ComposedFoodItemRelation.toDomainModel(): FoodItem =
+    FoodItem(
+        id = item.id,
+        name = item.name,
+        preferredUnitId = item.preferredUnitId,
+        purchasableInfo = purchasable?.let {
+            PurchasableInfo(
+                expectedPriceCents = it.expectedPriceCents,
+                categoryId = it.categoryId
+            )
+        },
+        recipeInfo = recipe?.let {
+            RecipeInfo(
+                description = it.description,
+                instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
+                servings = it.servings,
+                mealType = it.mealType,
+                prepTimeMinutes = it.prepTimeMinutes,
+                cookTimeMinutes = it.cookTimeMinutes,
+                requirements = requirementGroups.flatMap { group ->
+                    group.requirements.map { req ->
+                        FoodItemRequirement(
+                            id = req.id,
+                            foodItemId = req.foodItemId,
+                            quantity = req.quantity,
+                            unitId = req.unitId,
+                            isPrimary = req.isPrimary
+                        )
+                    }
+                }
+            )
+        },
+        leftoverInfo = leftover?.let {
+            LeftoverInfo(
+                remainingServings = it.remainingServings,
+                dateAdded = it.dateAdded,
+                expirationDate = it.expirationDate
+            )
+        }
     )
 
-fun Ingredient.toEntity(): IngredientEntity =
-    IngredientEntity(id = id, name = name, preferredUnitId = preferredUnitId)
+fun FoodItem.toEntity(): FoodItemEntity =
+    FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId)
 
 // --- Package Mappers ---
 fun PackageOptionEntity.toModel(): Package =
     Package(
         id = id,
-        ingredientId = ingredientId,
+        foodItemId = foodItemId,
         storeId = storeId,
         priceCents = priceCents ?: 0,
         quantity = quantity ?: 0.0,
@@ -71,7 +102,7 @@ fun Package.toEntity(): PackageOptionEntity =
     PackageOptionEntity(
         id = id,
         storeId = storeId,
-        ingredientId = ingredientId,
+        foodItemId = foodItemId,
         unitId = unitId,
         priceCents = priceCents,
         quantity = quantity,
@@ -81,77 +112,23 @@ fun Package.toEntity(): PackageOptionEntity =
 fun UnitConversionBridgeEntity.toModel(): BridgeConversion =
     BridgeConversion(
         id = id,
-        ingredientId = ingredientId,
+        foodItemId = foodItemId,
         fromUnitId = fromUnitId,
         fromQuantity = fromQuantity,
         toUnitId = toUnitId,
         toQuantity = toQuantity,
     )
 
-// --- Recipe Mappers ---
-fun RecipeWithDetails.toModel(): Recipe =
-    Recipe(
-        id = recipe.id,
-        name = recipe.name,
-        description = recipe.description,
-        instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
-        servings = recipe.servings ?: 1.0,
-        mealType = recipe.mealType ?: RecipeMealType.Other,
-        prepTimeMinutes = recipe.prepTimeMinutes ?: 0,
-        cookTimeMinutes = recipe.cookTimeMinutes ?: 0,
-        producesIngredientId = recipe.producesIngredientId,
-        amountPerServing = recipe.amountPerServing,
-        requirementGroups =
-            requirementGroups
-                .sortedBy { it.group.sortOrder }
-                .map { groupWithReqs ->
-                  RecipeRequirementGroup(
-                      id = groupWithReqs.group.id,
-                      requirements =
-                          groupWithReqs.requirements.map { req ->
-                            RecipeRequirement(
-                                id = req.id,
-                                ingredientId = req.ingredientId,
-                                subRecipeId = req.subRecipeId,
-                                quantity = req.quantity,
-                                unitId = req.unitId,
-                                isPrimary = req.isPrimary,
-                            )
-                          },
-                  )
-                },
-    )
-
 // --- Pantry Mappers ---
 fun PantryInventoryWithDetails.toModel(): PantryItem =
     PantryItem(
         id = pantryItem.id,
-        ingredientId = pantryItem.ingredientId,
+        foodItemId = pantryItem.foodItemId,
         quantity = pantryItem.quantity,
         unitId = pantryItem.unitId,
     )
 
-// --- Leftover Mappers ---
-fun LeftoverInventoryEntity.toModel(): LeftoverItem =
-    LeftoverItem(
-        id = id,
-        recipeId = recipeId,
-        remainingServings = remainingServings,
-        dateAdded = dateAdded,
-        expirationDate = expirationDate,
-    )
-
-// --- Meal Mappers ---
-fun PrePlannedMealWithRecipes.toModel(): PrePlannedMeal =
-    PrePlannedMeal(
-        id = meal.id,
-        name = meal.name,
-        mealType = meal.mealType,
-        recipes = recipes.map { it.id },
-        independentIngredients =
-            independentIngredients.map { MealIngredient(it.ingredientId, it.quantity, it.unitId) },
-    )
-
+// --- Scheduled Meal Mappers ---
 fun ScheduledMealWithSource.toModel(): ScheduledMeal =
     ScheduledMeal(
         id = scheduledMeal.id,
@@ -167,10 +144,10 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal =
             } catch (e: Exception) {
               LocalTime(12, 0)
             },
-        mealType = scheduledMeal.mealType ?: RecipeMealType.Other,
-        prePlannedMealId = scheduledMeal.prePlannedMealId,
+        mealType = scheduledMeal.mealType,
+        prePlannedMealId = scheduledMeal.foodItemId,
         restaurantId = scheduledMeal.restaurantId,
-        peopleCount = scheduledMeal.peopleCount ?: 1,
+        peopleCount = scheduledMeal.peopleCount,
         isConsumed = scheduledMeal.isConsumed,
         anticipatedCostCents = scheduledMeal.anticipatedCostCents,
     )
@@ -179,7 +156,7 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal =
 fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
     ShoppingListItem(
         id = cartItem.id,
-        ingredientId = cartItem.ingredientId,
+        foodItemId = cartItem.foodItemId,
         customName = cartItem.customName,
         storeId = cartItem.storeId ?: Uuid.parse("00000000-0000-0000-0000-000000000000"),
         neededQuantity = cartItem.neededQuantity,
@@ -219,8 +196,8 @@ fun ReceiptLineItemEntity.toModel(): io.github.and19081.mealplanner.shoppinglist
     io.github.and19081.mealplanner.shoppinglist.ReceiptLineItem(
         id = id,
         receiptId = receiptId,
-        ingredientId = ingredientId,
-        unitId = unitId,
+        foodItemId = foodItemId ?: Uuid.NIL,
+        unitId = unitId ?: Uuid.NIL,
         customName = customName,
         quantityBought = quantityBought,
         pricePaidCents = pricePaidCents,
@@ -230,7 +207,7 @@ fun io.github.and19081.mealplanner.shoppinglist.ReceiptLineItem.toEntity(): Rece
     ReceiptLineItemEntity(
         id = id,
         receiptId = receiptId,
-        ingredientId = ingredientId,
+        foodItemId = foodItemId,
         unitId = unitId,
         customName = customName,
         quantityBought = quantityBought,

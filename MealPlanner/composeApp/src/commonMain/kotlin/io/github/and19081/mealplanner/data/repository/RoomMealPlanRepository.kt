@@ -6,96 +6,100 @@ import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
-import io.github.and19081.mealplanner.data.toModel
+import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
+import kotlinx.datetime.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
+import kotlin.time.Clock
 
 class RoomMealPlanRepository(
     private val db: MealPlannerDatabase,
     private val scope: CoroutineScope,
 ) : MealPlanRepository {
-
-  private val scheduledMealDao = db.scheduledMealDao()
+  private val dao = db.scheduledMealDao()
 
   override val entries: StateFlow<List<ScheduledMeal>> =
-      scheduledMealDao
-          .observeInRangeWithSource("1900-01-01", "2100-12-31")
-          .map { list -> list.map { it.toModel() } }
+      dao.observeInRangeWithSource("0000-00-00", "9999-99-99")
+          .map { list -> list.map { it.toDomain() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
   override suspend fun addPlan(entry: ScheduledMeal) {
-    val anyId = Uuid.parse("00000000-0000-0000-0000-000000000000")
-    scheduledMealDao.upsert(
-        ScheduledMealEntity(
-            id = entry.id,
-            date = entry.date.toString(),
-            time = entry.time.toString(),
-            mealType = entry.mealType,
-            peopleCount = entry.peopleCount,
-            isConsumed = entry.isConsumed,
-            prePlannedMealId = if (entry.prePlannedMealId == anyId) null else entry.prePlannedMealId,
-            restaurantId = if (entry.restaurantId == anyId) null else entry.restaurantId,
-            anticipatedCostCents = entry.anticipatedCostCents,
-        )
-    )
+    dao.upsert(entry.toEntity())
   }
 
-  override suspend fun removePlan(entryId: Uuid) {
-    val entity = scheduledMealDao.getWithSource(entryId)?.scheduledMeal
-    if (entity != null) scheduledMealDao.delete(entity)
+  override suspend fun removePlan(id: Uuid) {
+    val existing = dao.getWithSource(id)
+    if (existing != null) {
+      dao.delete(existing.scheduledMeal)
+    }
   }
 
-  override suspend fun setConsumedStatus(entryId: Uuid, consumed: Boolean) {
-    scheduledMealDao.setConsumed(entryId, consumed)
-  }
-
-  private suspend fun markConsumed(entryId: Uuid) {
-    setConsumedStatus(entryId, true)
+  override suspend fun setConsumedStatus(id: Uuid, consumed: Boolean) {
+    dao.setConsumed(id, consumed)
   }
 
   override suspend fun addReceipt(
-      mealId: Uuid,
-      actualTotalCents: Int,
+      entryId: Uuid,
+      totalCents: Int,
       taxCents: Int,
-      lineItems: List<Triple<String, Double, Int>>,
+      lineItems: List<Triple<String, Double, Int>>
   ) {
-    val entry = scheduledMealDao.getWithSource(mealId)?.scheduledMeal ?: return
-
-    val anyId = Uuid.parse("00000000-0000-0000-0000-000000000000")
     val receiptId = Uuid.random()
-    val receipt =
-        StoreReceiptEntity(
-            id = receiptId,
-            name = "Restaurant Meal",
-            date = entry.date,
-            time = entry.time,
-            restaurantId = if (entry.restaurantId == anyId) null else entry.restaurantId,
-            scheduledMealId = mealId,
-            actualTotalCents = actualTotalCents,
-            taxPaidCents = taxCents,
+    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
+
+    val receiptEntity = StoreReceiptEntity(
+        id = receiptId,
+        name = "Meal Receipt",
+        date = today.toString(),
+        time = now.toString(),
+        scheduledMealId = entryId,
+        actualTotalCents = totalCents,
+        taxPaidCents = taxCents
+    )
+
+    val lineItemEntities = lineItems.map { (name, qty, price) ->
+        ReceiptLineItemEntity(
+            receiptId = receiptId,
+            customName = name,
+            quantityBought = qty,
+            pricePaidCents = price
         )
-
-    db.receiptDao().upsertReceipt(receipt)
-
-    if (lineItems.isNotEmpty()) {
-      val entities =
-          lineItems.map { (name: String, qty: Double, price: Int) ->
-            ReceiptLineItemEntity(
-                receiptId = receiptId,
-                customName = name,
-                quantityBought = qty,
-                pricePaidCents = price,
-            )
-          }
-      db.receiptDao().upsertLineItems(entities)
     }
 
-    // Also mark as consumed if it wasn't
-    markConsumed(mealId)
+    db.receiptDao().upsertReceiptWithDetails(receiptEntity, lineItemEntities)
   }
 
   override suspend fun clearAll() {
-    scheduledMealDao.clearAll()
+    dao.clearAll()
   }
+
+  private fun ScheduledMealWithSource.toDomain(): ScheduledMeal =
+      ScheduledMeal(
+          id = scheduledMeal.id,
+          date = try { LocalDate.parse(scheduledMeal.date) } catch (e: Exception) { Clock.System.todayIn(TimeZone.currentSystemDefault()) },
+          time = try { LocalTime.parse(scheduledMeal.time) } catch (e: Exception) { LocalTime(12, 0) },
+          mealType = scheduledMeal.mealType,
+          prePlannedMealId = scheduledMeal.foodItemId,
+          restaurantId = scheduledMeal.restaurantId,
+          peopleCount = scheduledMeal.peopleCount,
+          isConsumed = scheduledMeal.isConsumed,
+          anticipatedCostCents = scheduledMeal.anticipatedCostCents,
+      )
+
+  private fun ScheduledMeal.toEntity(): ScheduledMealEntity =
+      ScheduledMealEntity(
+          id = id,
+          date = date.toString(),
+          time = time.toString(),
+          mealType = mealType,
+          foodItemId = prePlannedMealId,
+          restaurantId = restaurantId,
+          peopleCount = peopleCount,
+          isConsumed = isConsumed,
+          anticipatedCostCents = anticipatedCostCents
+      )
 }
