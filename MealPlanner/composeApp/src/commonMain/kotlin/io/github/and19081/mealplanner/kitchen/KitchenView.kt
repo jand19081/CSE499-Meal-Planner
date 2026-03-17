@@ -36,6 +36,7 @@ sealed class KitchenModal {
 @Composable
 fun KitchenView(
     diContainer: DependencyInjectionContainer,
+    mainViewModel: io.github.and19081.mealplanner.main.MainViewModel,
     mode: Mode,
     isExpanded: Boolean,
     pushModal: (KitchenModal) -> Unit = {},
@@ -48,6 +49,14 @@ fun KitchenView(
   val mealsViewModel: MealsViewModel = viewModel { diContainer.viewModelFactory.createMealsViewModel() }
   val recipesViewModel: RecipesViewModel = viewModel { diContainer.viewModelFactory.createRecipesViewModel() }
   val ingredientsViewModel: IngredientsViewModel = viewModel { diContainer.viewModelFactory.createIngredientsViewModel() }
+
+  LaunchedEffect(mainViewModel.shouldActivateCanMakeNowFilter.value) {
+    if (mainViewModel.shouldActivateCanMakeNowFilter.value) {
+      selectedTab = 1
+      recipesViewModel.setCanMakeNowFilter(true)
+      mainViewModel.setActivateCanMakeNowFilter(false)
+    }
+  }
 
   Column(modifier = Modifier.fillMaxSize()) {
     PrimaryTabRow(selectedTabIndex = selectedTab) {

@@ -168,14 +168,26 @@ fun RecipeListPane(
 ) {
   Scaffold(
       topBar = {
-        ListControlToolbar(
-            searchQuery = uiState.searchQuery,
-            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-            searchPlaceholder = "Search recipes...",
-            isSortByPrimary = uiState.isCanMakeNowFilterActive,
-            onToggleSort = { viewModel.toggleCanMakeNowFilter() },
-            onAddClick = onAddClick,
-        )
+        Column {
+            ListControlToolbar(
+                searchQuery = uiState.searchQuery,
+                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                searchPlaceholder = "Search recipes...",
+                isSortByPrimary = uiState.isSortByAlpha,
+                onToggleSort = { viewModel.toggleSortMode() },
+                onAddClick = onAddClick,
+            )
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                FilterChip(
+                    selected = uiState.isCanMakeNowFilterActive,
+                    onClick = { viewModel.toggleCanMakeNowFilter() },
+                    label = { Text("Can Make Now") },
+                    leadingIcon = if (uiState.isCanMakeNowFilterActive) {
+                        { Icon(androidx.compose.material.icons.Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp)) }
+                    } else null
+                )
+            }
+        }
       }
   ) { innerPadding ->
     LazyColumn(

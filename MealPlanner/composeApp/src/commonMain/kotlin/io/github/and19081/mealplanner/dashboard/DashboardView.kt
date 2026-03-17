@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.RestaurantMenu
 import io.github.and19081.mealplanner.settings.Mode
 import io.github.and19081.mealplanner.uicomponents.MpValidationWarning
 import kotlin.time.Clock
@@ -30,7 +32,12 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
 @Composable
-fun DashboardView(viewModel: DashboardViewModel, mode: Mode, isExpanded: Boolean) {
+fun DashboardView(
+    viewModel: DashboardViewModel, 
+    mode: Mode, 
+    isExpanded: Boolean,
+    onCanMakeNowClick: () -> Unit = {}
+) {
   val uiState by viewModel.uiState.collectAsState()
   val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
 
@@ -54,7 +61,7 @@ fun DashboardView(viewModel: DashboardViewModel, mode: Mode, isExpanded: Boolean
         ) {
           DashboardHeader(today)
           MpValidationWarning(warnings = uiState.warnings)
-          DashboardStats(uiState)
+          DashboardStats(uiState, onCanMakeNowClick)
         }
 
         VerticalDivider(modifier = Modifier.width(1.dp).padding(vertical = 16.dp))
@@ -75,7 +82,7 @@ fun DashboardView(viewModel: DashboardViewModel, mode: Mode, isExpanded: Boolean
       ) {
         item { DashboardHeader(today) }
         item { MpValidationWarning(warnings = uiState.warnings) }
-        item { DashboardStats(uiState) }
+        item { DashboardStats(uiState, onCanMakeNowClick) }
         dashboardMealPlanContent(uiState, viewModel)
       }
     }
@@ -101,7 +108,10 @@ fun DashboardHeader(today: kotlinx.datetime.LocalDate) {
 }
 
 @Composable
-fun DashboardStats(uiState: DashboardViewModel.DashboardUiState) {
+fun DashboardStats(
+    uiState: DashboardViewModel.DashboardUiState,
+    onCanMakeNowClick: () -> Unit = {}
+) {
   Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
     // Weekly Cost (If Enabled)
     if (uiState.dashboardConfig.showWeeklyCost) {
@@ -136,6 +146,16 @@ fun DashboardStats(uiState: DashboardViewModel.DashboardUiState) {
         )
       }
     }
+
+    // Shortcut Card
+    DashboardStatCard(
+        modifier = Modifier.fillMaxWidth().clickable { onCanMakeNowClick() },
+        title = "Shortcut",
+        value = "Can Make Now",
+        icon = Icons.Default.RestaurantMenu,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
   }
 }
 

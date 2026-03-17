@@ -20,6 +20,7 @@ data class RecipesUiState(
     val allPackages: List<Package>,
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
+    val isSortByAlpha: Boolean,
     val isCanMakeNowFilterActive: Boolean,
     val errorMessage: String? = null,
     val recipeWarnings: Map<Uuid, List<DataWarning>> = emptyMap(),
@@ -111,7 +112,10 @@ class RecipesViewModel(
                       .groupBy { if (it.name.isNotEmpty()) it.name.first().uppercase() else "?" }
                       .toSortedMap()
                 } else {
-                  mapOf("All Recipes" to filtered.sortedBy { it.name })
+                  filtered
+                      .sortedBy { it.name }
+                      .groupBy { it.recipeInfo?.mealType?.name ?: "Uncategorized" }
+                      .toSortedMap()
                 }
 
             RecipesUiState(
@@ -124,6 +128,7 @@ class RecipesViewModel(
                 allPackages = packages,
                 allBridges = bridges,
                 allUnits = allUnits,
+                isSortByAlpha = isAlpha,
                 isCanMakeNowFilterActive = canMakeNow,
                 errorMessage = error,
                 recipeWarnings = warningsMap,
@@ -133,7 +138,7 @@ class RecipesViewModel(
           .stateIn(
               viewModelScope,
               SharingStarted.WhileSubscribed(5000),
-              RecipesUiState(emptyMap(), emptyList(), "", false, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), false, null, emptyMap()),
+              RecipesUiState(emptyMap(), emptyList(), "", false, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), true, false, null, emptyMap()),
           )
 
   fun onSearchQueryChange(query: String) {
@@ -143,6 +148,14 @@ class RecipesViewModel(
 
   fun toggleCanMakeNowFilter() {
     _filterCanMakeNow.update { !it }
+  }
+
+  fun setCanMakeNowFilter(active: Boolean) {
+    _filterCanMakeNow.value = active
+  }
+
+  fun toggleSortMode() {
+    _sortByAlpha.update { !it }
   }
 
   fun clearError() {

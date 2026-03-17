@@ -34,6 +34,13 @@ class MainViewModel : ViewModel() {
   private val _modalStack = MutableStateFlow<List<KitchenModal>>(emptyList())
   val modalStack = _modalStack
 
+  var shouldActivateCanMakeNowFilter = mutableStateOf(false)
+    private set
+
+  fun setActivateCanMakeNowFilter(active: Boolean) {
+    shouldActivateCanMakeNowFilter.value = active
+  }
+
   fun pushModal(modal: KitchenModal) {
     _modalStack.update { it + modal }
   }

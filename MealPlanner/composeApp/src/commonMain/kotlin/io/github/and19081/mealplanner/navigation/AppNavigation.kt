@@ -48,7 +48,15 @@ fun AppNavigation(
   ) {
     composable<DashboardRoute> {
       val vm = viewModel { factory.createDashboardViewModel() }
-      DashboardView(vm, mode = mode, isExpanded = isExpanded)
+      DashboardView(
+          viewModel = vm, 
+          mode = mode, 
+          isExpanded = isExpanded,
+          onCanMakeNowClick = {
+              mainViewModel.setActivateCanMakeNowFilter(true)
+              navController.navigate(KitchenRoute)
+          }
+      )
     }
     composable<CalendarRoute> {
       val vm = viewModel { factory.createCalendarViewModel(mainViewModel.currentMonth) }
@@ -69,6 +77,7 @@ fun AppNavigation(
     composable<KitchenRoute> {
       KitchenView(
           diContainer = diContainer,
+          mainViewModel = mainViewModel,
           mode = mode,
           isExpanded = isExpanded,
           pushModal = { mainViewModel.pushModal(it) },
