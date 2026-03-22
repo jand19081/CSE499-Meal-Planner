@@ -59,33 +59,6 @@ class RoomFoodItemRepository(
         instructions: List<String>,
         requirementGroups: List<FoodItemRequirementGroup>
     ) {
-        val entity = item.toEntity()
-        val purchasable = item.purchasableInfo?.let {
-            PurchasableComponentEntity(
-                foodItemId = item.id,
-                expectedPriceCents = it.expectedPriceCents,
-                categoryId = it.categoryId
-            )
-        }
-        val recipe = item.recipeInfo?.let {
-            RecipeComponentEntity(
-                foodItemId = item.id,
-                description = it.description,
-                servings = it.servings,
-                mealType = it.mealType,
-                prepTimeMinutes = it.prepTimeMinutes,
-                cookTimeMinutes = it.cookTimeMinutes
-            )
-        }
-        val leftover = item.leftoverInfo?.let {
-            LeftoverComponentEntity(
-                foodItemId = item.id,
-                remainingServings = it.remainingServings,
-                dateAdded = it.dateAdded,
-                expirationDate = it.expirationDate
-            )
-        }
-
         val instructionEntities = instructions.mapIndexed { index, text ->
             RecipeInstructionEntity(
                 foodItemId = item.id,
@@ -94,35 +67,16 @@ class RoomFoodItemRepository(
             )
         }
 
-        val groupEntities = requirementGroups.map { group ->
-            RecipeRequirementGroupEntity(
-                id = group.id,
-                foodItemId = item.id,
-                sortOrder = group.sortOrder
-            )
-        }
-
-        val requirementEntities = requirementGroups.flatMap { group ->
-            group.requirements.map { req ->
-                RecipeRequirementEntity(
-                    id = req.id,
-                    groupId = group.id,
-                    foodItemId = req.foodItemId,
-                    unitId = req.unitId,
-                    quantity = req.quantity,
-                    isPrimary = req.isPrimary
-                )
-            }
-        }
-
         foodItemDao.upsertFoodItem(
-            item = entity,
-            purchasable = purchasable,
-            recipe = recipe,
-            leftover = leftover,
+            item = item.toEntity(),
+            purchasable = item.purchasableInfo?.toEntity(item.id),
+            recipe = item.recipeInfo?.toEntity(item.id),
+            leftover = item.leftoverInfo?.toEntity(item.id),
             instructions = instructionEntities,
-            requirementGroups = groupEntities,
-            requirements = requirementEntities
+            requirementGroups = requirementGroups.map { it.toEntity(item.id) },
+            requirements = requirementGroups.flatMap { group -> 
+                group.requirements.map { it.toEntity(group.id) } 
+            }
         )
     }
 

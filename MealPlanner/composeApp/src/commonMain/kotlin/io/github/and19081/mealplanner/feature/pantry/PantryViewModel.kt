@@ -46,8 +46,8 @@ class PantryViewModel(
 
             val joinedPantry =
                 pantryItems.mapNotNull { item ->
-                  val foodItem = itemsMap[item.foodItemId]
-                  val unit = unitMap[item.unitId]
+                  val foodItem = itemsMap[item.measurement.foodItemId]
+                  val unit = unitMap[item.measurement.unitId]
                   if (foodItem != null && unit != null) {
                     val catId = foodItem.purchasableInfo?.categoryId
                     val catName = categoryMap[catId]?.name ?: "Uncategorized"
@@ -56,18 +56,18 @@ class PantryViewModel(
                     val displayQty =
                         if (displayUnit.id != unit.id) {
                           UnitConverter.convert(
-                              item.quantity,
+                              item.measurement.quantity,
                               unit.id,
                               displayUnit.id,
                               unitMap,
                               bridges,
                           ) ?: 0.0
                         } else {
-                          item.quantity
+                          item.measurement.quantity
                         }
 
                     PantryItemUi(
-                        id = item.foodItemId,
+                        id = item.measurement.foodItemId ?: kotlin.uuid.Uuid.NIL,
                         batchId = item.id,
                         name = foodItem.name,
                         category = catName,

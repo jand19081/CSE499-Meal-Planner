@@ -31,6 +31,7 @@ import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.model.RecipeInfo
 import io.github.and19081.mealplanner.ui.components.CreateNewItemRow
@@ -254,7 +255,7 @@ fun RecipeItemRow(
     onMakeClick: () -> Unit,
 ) {
     val recipeInfo = recipe.recipeInfo
-    val ingredientCount = recipeInfo?.requirements?.size ?: 0
+    val ingredientCount = recipeInfo?.requirementGroups?.sumOf { it.requirements.size } ?: 0
     val costCents = 0L // Placeholder
     val costStr = if (costCents > 0) "$${String.format("%.2f", costCents / 100.0)}" else "---"
     val perPersonStr =
@@ -331,7 +332,7 @@ fun RecipeForm(
                         mealType = draftState.mealType,
                         prepTimeMinutes = draftState.prepTimeStr.toIntOrNull() ?: 0,
                         cookTimeMinutes = draftState.cookTimeStr.toIntOrNull() ?: 0,
-                        requirements = draftState.requirementGroups.flatMap { it.requirements }
+                        requirementGroups = draftState.requirementGroups
                     )
                 )
             onSave(finalRecipe)
@@ -628,8 +629,11 @@ fun RecipeIngredientsEditor(
                         onUpdate(requirementGroups.mapIndexed { i, g ->
                             if (i == groupIndex) g.copy(
                                 requirements = g.requirements + FoodItemRequirement(
-                                    foodItemId = Uuid.NIL,
-                                    quantity = 0.0,
+                                    measurement = ItemMeasurement(
+                                        foodItemId = Uuid.NIL,
+                                        quantity = 0.0,
+                                        unitId = null
+                                    ),
                                     isPrimary = false
                                 )
                             ) else g
@@ -646,7 +650,14 @@ fun RecipeIngredientsEditor(
                 onUpdate(
                     requirementGroups + FoodItemRequirementGroup(
                         requirements = listOf(
-                            FoodItemRequirement(foodItemId = Uuid.NIL, quantity = 0.0, isPrimary = true)
+                            FoodItemRequirement(
+                                measurement = ItemMeasurement(
+                                    foodItemId = Uuid.NIL,
+                                    quantity = 0.0,
+                                    unitId = null
+                                ),
+                                isPrimary = true
+                            )
                         )
                     )
                 )
@@ -671,16 +682,16 @@ fun IngredientRequirementRow(
     onRemove: () -> Unit,
     onAddIngredient: (String, (FoodItem) -> Unit) -> Unit
 ) {
-    var isEditing by remember { mutableStateOf(req.foodItemId == Uuid.NIL) }
+    var isEditing by remember { mutableStateOf(req.measurement.foodItemId == Uuid.NIL) }
 
     // Add a local string state to buffer the raw text input (allows typing decimals safely)
     var qtyText by remember {
-        mutableStateOf(if (req.quantity == 0.0) "" else req.quantity.toString())
+        mutableStateOf(if (req.measurement.quantity == 0.0) "" else req.measurement.quantity.toString())
     }
 
-    val selectedItem = allItems.find { it.id == req.foodItemId }
+    val selectedItem = allItems.find { it.id == req.measurement.foodItemId }
     val selectedItemName = (if (selectedItem?.isRecipe == true) "[Recipe] " else "") + (selectedItem?.name ?: "")
-    val selectedUnitName = allUnits.find { it.id == req.unitId }?.abbreviation ?: ""
+    val selectedUnitName = allUnits.find { it.id == req.measurement.unitId }?.abbreviation ?: ""
 
     if (isEditing) {
         Row(
@@ -702,11 +713,11 @@ fun IngredientRequirementRow(
                         val isRecipe = option.startsWith("[Recipe] ")
                         val cleanName = if (isRecipe) option.removePrefix("[Recipe] ") else option
                         val found = allItems.find { it.name == cleanName && it.isRecipe == isRecipe }
-                        onUpdateReq(req.copy(foodItemId = found?.id ?: Uuid.NIL))
+                        onUpdateReq(req.copy(measurement = req.measurement.copy(foodItemId = found?.id ?: Uuid.NIL)))
                     },
                     onAddOption = { name ->
                         onAddIngredient(name) { newIng ->
-                            onUpdateReq(req.copy(foodItemId = newIng.id))
+                            onUpdateReq(req.copy(measurement = req.measurement.copy(foodItemId = newIng.id)))
                         }
                     },
                     onDeleteOption = {},
@@ -719,7 +730,7 @@ fun IngredientRequirementRow(
                     onValueChange = { newText ->
                         qtyText = newText // Update the raw text immediately so decimals don't disappear
                         // Silently parse and update the Double state in the background
-                        onUpdateReq(req.copy(quantity = newText.toDoubleOrNull() ?: 0.0))
+                        onUpdateReq(req.copy(measurement = req.measurement.copy(quantity = newText.toDoubleOrNull() ?: 0.0)))
                     },
                     label = { Text("Qty") },
                     modifier = Modifier.width(80.dp),
@@ -732,7 +743,7 @@ fun IngredientRequirementRow(
                     selectedOption = selectedUnitName,
                     onOptionSelected = { abbr ->
                         val unit = allUnits.find { it.abbreviation == abbr }
-                        onUpdateReq(req.copy(unitId = unit?.id))
+                        onUpdateReq(req.copy(measurement = req.measurement.copy(unitId = unit?.id)))
                     },
                     onAddOption = {},
                     onDeleteOption = {},
@@ -758,7 +769,7 @@ fun IngredientRequirementRow(
             RadioButton(selected = isPrimary, onClick = onMakePrimary)
             Spacer(modifier = Modifier.width(8.dp))
 
-            val qtyString = if (req.quantity > 0.0) req.quantity.toString() else ""
+            val qtyString = if (req.measurement.quantity > 0.0) req.measurement.quantity.toString() else ""
             val displayText = listOf(selectedItemName, ":", qtyString, selectedUnitName )
                 .filter { it.isNotBlank() }
                 .joinToString(" ")

@@ -230,7 +230,7 @@ fun IngredientForm(
                     name = name,
                     preferredUnitId = preferredUnitId,
                     purchasableInfo = PurchasableInfo(
-                        expectedPriceCents = ingredient?.purchasableInfo?.expectedPriceCents ?: 0,
+                        expectedPriceCents = ingredient?.purchasableInfo?.expectedPriceCents,
                         categoryId = catId
                     )
                 )

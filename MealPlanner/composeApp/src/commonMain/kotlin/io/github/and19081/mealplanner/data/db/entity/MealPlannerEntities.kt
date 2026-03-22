@@ -19,6 +19,12 @@ data class DashboardConfig(
     @ColumnInfo(name = "show_meal_plan") val showMealPlan: Boolean = false,
 )
 
+data class ItemMeasurement(
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid?,
+    @ColumnInfo(name = "unit_id") val unitId: Uuid?,
+    @ColumnInfo(name = "quantity") val quantity: Double
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LOOKUP / REFERENCE NODES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +110,7 @@ data class FoodItemEntity(
 )
 data class PurchasableComponentEntity(
     @PrimaryKey @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
-    @ColumnInfo(name = "expected_price_cents") val expectedPriceCents: Int = 0,
+    @ColumnInfo(name = "expected_price_cents") val expectedPriceCents: Int? = null,
     @ColumnInfo(name = "category_id") val categoryId: Uuid? = null,
 )
 
@@ -129,8 +135,8 @@ data class RecipeComponentEntity(
     @ColumnInfo(name = "description") val description: String? = null,
     @ColumnInfo(name = "servings") val servings: Double = 1.0,
     @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
-    @ColumnInfo(name = "prep_time_minutes") val prepTimeMinutes: Int = 0,
-    @ColumnInfo(name = "cook_time_minutes") val cookTimeMinutes: Int = 0,
+    @ColumnInfo(name = "prep_time_minutes") val prepTimeMinutes: Int? = null,
+    @ColumnInfo(name = "cook_time_minutes") val cookTimeMinutes: Int? = null,
 )
 
 /**
@@ -214,13 +220,7 @@ data class ScheduledMealEntity(
     @ColumnInfo(name = "anticipated_cost_cents") val anticipatedCostCents: Int? = null,
     @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
     @ColumnInfo(name = "restaurant_id") val restaurantId: Uuid? = null,
-) {
-    init {
-        require((foodItemId != null) xor (restaurantId != null)) {
-            "A ScheduledMeal must reference exactly one of foodItemId or restaurantId."
-        }
-    }
-}
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // APP SETTINGS
@@ -229,6 +229,7 @@ data class ScheduledMealEntity(
 @Entity(tableName = "app_settings")
 data class AppSettingsEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: String = SINGLETON_ID,
+    @ColumnInfo(name = "is_first_launch") val isFirstLaunch: Boolean = true,
     @ColumnInfo(name = "notification_delay_minutes") val notificationDelayMinutes: Int? = null,
     @ColumnInfo(name = "default_tax_rate_percentage") val defaultTaxRatePercentage: Double? = null,
     @ColumnInfo(name = "app_mode") val appMode: Mode = Mode.AUTO,
@@ -336,9 +337,7 @@ data class RecipeRequirementGroupEntity(
 data class RecipeRequirementEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "group_id") val groupId: Uuid,
-    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid? = null,
-    @ColumnInfo(name = "quantity") val quantity: Double,
+    @Embedded val measurement: ItemMeasurement,
     @ColumnInfo(name = "is_primary") val isPrimary: Boolean = true,
 )
 
@@ -353,9 +352,7 @@ data class RecipeRequirementEntity(
 )
 data class PantryInventoryEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid,
-    @ColumnInfo(name = "quantity") val quantity: Double = 0.0,
+    @Embedded val measurement: ItemMeasurement
 )
 
 @Entity(
@@ -371,12 +368,10 @@ data class PantryInventoryEntity(
 )
 data class ShoppingCartItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "store_id") val storeId: Uuid? = null,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid,
     @ColumnInfo(name = "package_option_id") val packageOptionId: Uuid? = null,
     @ColumnInfo(name = "custom_name") val customName: String? = null,
-    @ColumnInfo(name = "needed_quantity") val neededQuantity: Double,
+    @Embedded val measurement: ItemMeasurement,
     @ColumnInfo(name = "is_purchased") val isPurchased: Boolean = false,
     @ColumnInfo(name = "is_pantry_item") val isPantryItem: Boolean = true,
 )
@@ -394,9 +389,7 @@ data class ShoppingCartItemEntity(
 data class ReceiptLineItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "receipt_id") val receiptId: Uuid,
-    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid? = null,
     @ColumnInfo(name = "custom_name") val customName: String? = null,
-    @ColumnInfo(name = "quantity_bought") val quantityBought: Double,
+    @Embedded val measurement: ItemMeasurement,
     @ColumnInfo(name = "price_paid_cents") val pricePaidCents: Int,
 )

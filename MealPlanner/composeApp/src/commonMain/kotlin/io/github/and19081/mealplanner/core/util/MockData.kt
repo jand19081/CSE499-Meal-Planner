@@ -3,8 +3,10 @@ package io.github.and19081.mealplanner.core.util
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
+import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
@@ -14,6 +16,7 @@ import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
+import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlin.uuid.Uuid
 import kotlinx.datetime.*
@@ -64,9 +67,17 @@ object MockData {
       foodItemRepository: FoodItemRepository,
       mealPlanRepository: MealPlanRepository,
       restaurantRepository: RestaurantRepository,
+      settingsRepository: SettingsRepository,
   ) =
       withContext(Dispatchers.IO) {
-        // Use first() to wait for the database hit if needed
+        // Use setting to ensure we only ever run this once
+        val settings = settingsRepository.appSettings.first()
+        if (!settings.isFirstLaunch) return@withContext
+
+        // Mark as initialized first to prevent race conditions
+        settingsRepository.updateSettings { it.copy(isFirstLaunch = false) }
+
+        // Double check: if data already exists, don't double-insert
         val existingItems = foodItemRepository.foodItems.first()
         if (existingItems.isNotEmpty()) return@withContext
 
@@ -214,9 +225,11 @@ object MockData {
         fun req(idString: String, item: FoodItem, qty: Double, unit: UnitModel) =
             FoodItemRequirement(
                 id = Uuid.parse(idString),
-                foodItemId = item.id,
-                quantity = qty,
-                unitId = unit.id
+                measurement = ItemMeasurement(
+                    foodItemId = item.id,
+                    unitId = unit.id,
+                    quantity = qty
+                )
             )
 
         val rPancakes = FoodItem(
@@ -226,12 +239,16 @@ object MockData {
                 servings = 4.0,
                 mealType = RecipeMealType.Breakfast,
                 instructions = listOf("Mix dry.", "Add wet.", "Cook."),
-                requirements = listOf(
-                    req("00000000-0000-0000-0007-000000000001", iEggs, 6.0, uEach),
-                    req("00000000-0000-0000-0007-000000000002", iMilk, 1.0, uCup),
-                    req("00000000-0000-0000-0007-000000000003", iRiceFlour, 0.5, uCup),
-                    req("00000000-0000-0000-0007-000000000004", iTapiocaStarch, 0.5, uCup),
-                    req("00000000-0000-0000-0007-000000000005", iButter, 0.25, uEach)
+                requirementGroups = listOf(
+                    FoodItemRequirementGroup(
+                        requirements = listOf(
+                            req("00000000-0000-0000-0007-000000000001", iEggs, 6.0, uEach),
+                            req("00000000-0000-0000-0007-000000000002", iMilk, 1.0, uCup),
+                            req("00000000-0000-0000-0007-000000000003", iRiceFlour, 0.5, uCup),
+                            req("00000000-0000-0000-0007-000000000004", iTapiocaStarch, 0.5, uCup),
+                            req("00000000-0000-0000-0007-000000000005", iButter, 0.25, uEach)
+                        )
+                    )
                 )
             )
         )
@@ -243,17 +260,27 @@ object MockData {
                 servings = 6.0,
                 mealType = RecipeMealType.Dinner,
                 instructions = listOf("Cook chicken.", "Roll.", "Bake."),
-                requirements = listOf(
-                    req("00000000-0000-0000-0008-000000000001", iCornTortillas, 18.0, uEach),
-                    req("00000000-0000-0000-0008-000000000002", iChicken, 3.0, uEach),
-                    req("00000000-0000-0000-0008-000000000003", iEnchiladaSauce, 2.0, uEach),
-                    req("00000000-0000-0000-0008-000000000004", iCheese, 3.0, uCup),
-                    req("00000000-0000-0000-0008-000000000005", iRefriedBeans, 0.5, uEach)
+                requirementGroups = listOf(
+                    FoodItemRequirementGroup(
+                        requirements = listOf(
+                            req("00000000-0000-0000-0008-000000000001", iCornTortillas, 18.0, uEach),
+                            req("00000000-0000-0000-0008-000000000002", iChicken, 3.0, uEach),
+                            req("00000000-0000-0000-0008-000000000003", iEnchiladaSauce, 2.0, uEach),
+                            req("00000000-0000-0000-0008-000000000004", iCheese, 3.0, uCup),
+                            req("00000000-0000-0000-0008-000000000005", iRefriedBeans, 0.5, uEach)
+                        )
+                    )
                 )
             )
         )
 
-        listOf(rPancakes, rEnchiladas).forEach { foodItemRepository.saveFoodItem(it) }
+        listOf(rPancakes, rEnchiladas).forEach { recipe ->
+            foodItemRepository.saveFoodItem(
+                item = recipe,
+                instructions = recipe.recipeInfo?.instructions ?: emptyList(),
+                requirementGroups = recipe.recipeInfo?.requirementGroups ?: emptyList()
+            )
+        }
 
         // --- Mock Meal Plan ---
         mealPlanRepository.clearAll()

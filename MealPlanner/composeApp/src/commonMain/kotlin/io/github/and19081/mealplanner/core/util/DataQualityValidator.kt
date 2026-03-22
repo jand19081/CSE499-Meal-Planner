@@ -2,6 +2,7 @@ package io.github.and19081.mealplanner.core.util
 
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import kotlin.uuid.Uuid
 
@@ -38,48 +39,50 @@ object DataQualityValidator {
     val newPath = currentPath + item.id
     val recipeInfo = item.recipeInfo ?: return emptyList()
 
-    for (req in recipeInfo.requirements) {
-      val subItem = allItemsMap[req.foodItemId] ?: continue
-      
-      if (subItem.isRecipe) {
-        warnings.addAll(
-            validateFoodItem(
-                item = subItem,
-                allItemsMap = allItemsMap,
-                allPackages = allPackages,
-                allBridges = allBridges,
-                allUnits = allUnits,
-                currentPath = newPath
-            )
-        )
-        continue
-      }
+    for (group in recipeInfo.requirementGroups) {
+      for (req in group.requirements) {
+        val subItem = allItemsMap[req.measurement.foodItemId] ?: continue
+        
+        if (subItem.isRecipe) {
+          warnings.addAll(
+              validateFoodItem(
+                  item = subItem,
+                  allItemsMap = allItemsMap,
+                  allPackages = allPackages,
+                  allBridges = allBridges,
+                  allUnits = allUnits,
+                  currentPath = newPath
+              )
+          )
+          continue
+        }
 
-      // It's an ingredient (purchasable)
-      val packages = allPackages.filter { it.foodItemId == subItem.id }
-      val bridges = allBridges.filter { it.foodItemId == subItem.id }
+        // It's an ingredient (purchasable)
+        val packages = allPackages.filter { it.foodItemId == subItem.id }
+        val bridges = allBridges.filter { it.foodItemId == subItem.id }
 
-      if (packages.isEmpty()) {
-        warnings.add(DataWarning.MissingPackage(subItem.name))
-        continue
-      }
+        if (packages.isEmpty()) {
+          warnings.add(DataWarning.MissingPackage(subItem.name))
+          continue
+        }
 
-      val reqUnit = allUnits.find { it.id == req.unitId }
-      if (req.unitId == null || reqUnit == null) {
-        warnings.add(DataWarning.MissingUnit(subItem.name))
-        continue
-      }
+        val reqUnit = allUnits.find { it.id == req.measurement.unitId }
+        if (req.measurement.unitId == null || reqUnit == null) {
+          warnings.add(DataWarning.MissingUnit(subItem.name))
+          continue
+        }
 
-      val canConvert =
-          packages.any { pkg ->
-            hasConversionPath(pkg.unitId, req.unitId!!, bridges, allUnits)
-          }
+        val canConvert =
+            packages.any { pkg ->
+              hasConversionPath(pkg.unitId, req.measurement.unitId!!, bridges, allUnits)
+            }
 
-      if (!canConvert) {
-        val reqUnitName = reqUnit.abbreviation
-        val pkgUnitName =
-            allUnits.find { it.id == packages.first().unitId }?.abbreviation ?: "Unknown"
-        warnings.add(DataWarning.MissingBridge(subItem.name, reqUnitName, pkgUnitName))
+        if (!canConvert) {
+          val reqUnitName = reqUnit.abbreviation
+          val pkgUnitName =
+              allUnits.find { it.id == packages.first().unitId }?.abbreviation ?: "Unknown"
+          warnings.add(DataWarning.MissingBridge(subItem.name, reqUnitName, pkgUnitName))
+        }
       }
     }
 

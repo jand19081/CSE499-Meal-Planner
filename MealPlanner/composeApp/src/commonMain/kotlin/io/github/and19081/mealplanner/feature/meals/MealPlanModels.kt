@@ -1,12 +1,15 @@
 package io.github.and19081.mealplanner.feature.meals
 
 import io.github.and19081.mealplanner.core.util.RecipeMealType
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.domain.model.NamedReference
 import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.serialization.Serializable
 
-@Serializable data class Restaurant(val id: Uuid, val name: String)
+@Serializable
+data class Restaurant(override val id: Uuid, override val name: String) : NamedReference
 
 @Serializable
 data class ScheduledMeal(
@@ -24,9 +27,7 @@ data class ScheduledMeal(
 @Serializable
 data class PantryItem(
     val id: Uuid,
-    val foodItemId: Uuid,
-    val quantity: Double,
-    val unitId: Uuid,
+    val measurement: ItemMeasurement,
 )
 
 @Serializable

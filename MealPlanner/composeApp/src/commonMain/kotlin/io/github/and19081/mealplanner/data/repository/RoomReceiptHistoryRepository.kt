@@ -3,6 +3,8 @@ package io.github.and19081.mealplanner.data.repository
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.domain.repository.ReceiptHistoryRepository
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptLineItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
@@ -80,10 +82,12 @@ class RoomReceiptHistoryRepository(
       ReceiptLineItem(
           id = id,
           receiptId = receiptId,
-          foodItemId = foodItemId ?: Uuid.NIL,
-          unitId = unitId ?: Uuid.NIL,
+          measurement = ItemMeasurement(
+              foodItemId = measurement.foodItemId ?: Uuid.NIL,
+              unitId = measurement.unitId ?: Uuid.NIL,
+              quantity = measurement.quantity
+          ),
           customName = customName,
-          quantityBought = quantityBought,
           pricePaidCents = pricePaidCents,
       )
 
@@ -104,10 +108,12 @@ class RoomReceiptHistoryRepository(
       ReceiptLineItemEntity(
           id = id,
           receiptId = receiptId,
-          foodItemId = foodItemId,
-          unitId = unitId,
+          measurement = EntityMeasurement(
+              foodItemId = measurement.foodItemId,
+              unitId = measurement.unitId,
+              quantity = measurement.quantity
+          ),
           customName = customName,
-          quantityBought = quantityBought,
           pricePaidCents = pricePaidCents
       )
 }

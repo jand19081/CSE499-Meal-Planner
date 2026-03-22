@@ -4,9 +4,23 @@ import io.github.and19081.mealplanner.core.util.RecipeMealType
 import kotlin.uuid.Uuid
 import kotlinx.serialization.Serializable
 
-@Serializable data class Category(val id: Uuid = Uuid.random(), val name: String)
+interface NamedReference {
+    val id: Uuid
+    val name: String
+}
 
-@Serializable data class Store(val id: Uuid = Uuid.random(), val name: String)
+@Serializable
+data class Category(override val id: Uuid = Uuid.random(), override val name: String) : NamedReference
+
+@Serializable
+data class Store(override val id: Uuid = Uuid.random(), override val name: String) : NamedReference
+
+@Serializable
+data class ItemMeasurement(
+    val foodItemId: Uuid?,
+    val unitId: Uuid? = null,
+    val quantity: Double = 0.0,
+)
 
 @Serializable
 data class Package(
@@ -44,7 +58,7 @@ data class FoodItem(
 
 @Serializable
 data class PurchasableInfo(
-    val expectedPriceCents: Int = 0,
+    val expectedPriceCents: Int? = null,
     val categoryId: Uuid? = null,
 )
 
@@ -54,17 +68,15 @@ data class RecipeInfo(
     val instructions: List<String> = emptyList(),
     val servings: Double = 1.0,
     val mealType: RecipeMealType = RecipeMealType.Other,
-    val prepTimeMinutes: Int = 0,
-    val cookTimeMinutes: Int = 0,
-    val requirements: List<FoodItemRequirement> = emptyList(),
+    val prepTimeMinutes: Int? = null,
+    val cookTimeMinutes: Int? = null,
+    val requirementGroups: List<FoodItemRequirementGroup> = emptyList(),
 )
 
 @Serializable
 data class FoodItemRequirement(
     val id: Uuid = Uuid.random(),
-    val foodItemId: Uuid,
-    val quantity: Double,
-    val unitId: Uuid? = null,
+    val measurement: ItemMeasurement,
     val isPrimary: Boolean = true,
 )
 

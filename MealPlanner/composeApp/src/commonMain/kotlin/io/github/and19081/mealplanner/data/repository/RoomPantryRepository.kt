@@ -4,10 +4,14 @@ import io.github.and19081.mealplanner.feature.meals.PantryItem
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.core.util.toDomain
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
+
+import io.github.and19081.mealplanner.domain.repository.PantryUpdate
 
 class RoomPantryRepository(
     private val db: MealPlannerDatabase,
@@ -17,30 +21,22 @@ class RoomPantryRepository(
 
   override val pantryItems: StateFlow<List<PantryItem>> =
       dao.observeAllWithDetails()
-          .map { list -> list.map { it.toDomain() } }
+          .map { list -> list.map { it.toModel() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
   override suspend fun updateQuantity(foodItemId: Uuid, quantity: Double, unitId: Uuid) {
-    val existing = dao.observeAllWithDetails().first().find { it.pantryItem.foodItemId == foodItemId }
-    if (existing != null) {
-      if (quantity <= 0) {
-        dao.delete(existing.pantryItem)
-      } else {
-        dao.upsert(existing.pantryItem.copy(quantity = quantity, unitId = unitId))
-      }
-    } else if (quantity > 0) {
-      dao.upsert(
-          PantryInventoryEntity(
-              foodItemId = foodItemId,
-              quantity = quantity,
-              unitId = unitId,
-          )
-      )
-    }
+    updateQuantities(listOf(PantryUpdate(foodItemId, quantity, unitId)))
+  }
+
+  override suspend fun updateQuantities(updates: List<PantryUpdate>) {
+    dao.updateQuantities(updates)
   }
 
   override suspend fun remove(foodItemId: Uuid, unitId: Uuid) {
-      val existing = dao.observeAllWithDetails().first().find { it.pantryItem.foodItemId == foodItemId && it.pantryItem.unitId == unitId }
+      val existing = dao.observeAllWithDetails().first().find { 
+          it.pantryItem.measurement.foodItemId == foodItemId && 
+          it.pantryItem.measurement.unitId == unitId 
+      }
       if (existing != null) {
           dao.delete(existing.pantryItem)
       }
@@ -54,14 +50,12 @@ class RoomPantryRepository(
   }
 
   override suspend fun setPantryItems(newItems: List<PantryItem>) {
-    newItems.forEach { updateQuantity(it.foodItemId, it.quantity, it.unitId) }
+    updateQuantities(newItems.map { PantryUpdate(it.measurement.foodItemId ?: Uuid.NIL, it.measurement.quantity, it.measurement.unitId ?: Uuid.NIL) })
   }
 
-  private fun PantryInventoryWithDetails.toDomain(): PantryItem =
+  private fun PantryInventoryWithDetails.toModel(): PantryItem =
       PantryItem(
           id = pantryItem.id,
-          foodItemId = pantryItem.foodItemId,
-          quantity = pantryItem.quantity,
-          unitId = pantryItem.unitId,
+          measurement = pantryItem.measurement.toDomain(),
       )
 }

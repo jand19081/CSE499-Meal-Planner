@@ -1,5 +1,6 @@
 package io.github.and19081.mealplanner.feature.shoppinglist
 
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -8,11 +9,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ShoppingListItem(
     val id: Uuid = Uuid.random(),
-    val foodItemId: Uuid? = null,
     val customName: String? = null,
     val storeId: Uuid,
-    val neededQuantity: Double? = null,
-    val unitId: Uuid? = null,
+    val measurement: ItemMeasurement,
     val packageId: Uuid? = null,
     val isPurchased: Boolean = false,
     val isPantryItem: Boolean = true,
@@ -35,10 +34,8 @@ data class ReceiptHistory(
 data class ReceiptLineItem(
     val id: Uuid = Uuid.random(),
     val receiptId: Uuid,
-    val foodItemId: Uuid? = null,
-    val unitId: Uuid? = null,
     val customName: String? = null,
-    val quantityBought: Double,
+    val measurement: ItemMeasurement,
     val pricePaidCents: Int,
 )
 

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.and19081.mealplanner.core.util.UnitModel
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 
 @Composable
 fun TransactionReviewSheet(
@@ -131,10 +132,10 @@ fun TransactionLineItem(
                 // Simplified quantity adjustment for now - in a real app this would be a text field
                 // but for this prototype, we'll keep it simple or use a basic text field
                 OutlinedTextField(
-                    value = if (change.quantity == 0.0) "" else change.quantity.toString(),
+                    value = if (change.measurement.quantity == 0.0) "" else change.measurement.quantity.toString(),
                     onValueChange = { 
                         val qty = it.toDoubleOrNull() ?: 0.0
-                        onUpdate(change.copy(quantity = qty, isAdjusted = true))
+                        onUpdate(change.copy(measurement = change.measurement.copy(quantity = qty), isAdjusted = true))
                     },
                     modifier = Modifier.width(80.dp),
                     textStyle = MaterialTheme.typography.bodyMedium,

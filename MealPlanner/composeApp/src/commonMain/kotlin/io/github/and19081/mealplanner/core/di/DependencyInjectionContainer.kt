@@ -22,6 +22,7 @@ import io.github.and19081.mealplanner.domain.repository.ShoppingListItemReposito
 import io.github.and19081.mealplanner.domain.repository.ShoppingListRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
 import io.github.and19081.mealplanner.core.util.UnitRepository
+import io.github.and19081.mealplanner.data.export.DataTransferService
 import io.github.and19081.mealplanner.notification.createNotificationScheduler
 import kotlinx.coroutines.CoroutineScope
 
@@ -34,6 +35,7 @@ class DependencyInjectionContainer(
   val unitRepository: UnitRepository = RoomUnitRepository(db, scope)
   val storeRepository: StoreRepository = RoomStoreRepository(db, scope)
   val restaurantRepository: RestaurantRepository = RoomRestaurantRepository(db, scope)
+  val dataTransferService = DataTransferService(db)
   
   // ECS Unified Repository
   val foodItemRepository: FoodItemRepository = RoomFoodItemRepository(db, scope)
@@ -55,7 +57,8 @@ class DependencyInjectionContainer(
         storeRepository,
         foodItemRepository,
         mealPlanRepository,
-        restaurantRepository
+        restaurantRepository,
+        settingsRepository
     )
   }
 }

@@ -10,6 +10,7 @@ import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.Store
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
@@ -188,9 +189,11 @@ class IngredientsViewModel(
     viewModelScope.launch {
         shoppingListItemRepository.addItem(
             ShoppingListItem(
-                foodItemId = ingredient.id,
-                neededQuantity = quantity,
-                unitId = unitId,
+                measurement = ItemMeasurement(
+                    foodItemId = ingredient.id,
+                    quantity = quantity,
+                    unitId = unitId
+                ),
                 storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
                 isPurchased = false,
                 isPantryItem = true

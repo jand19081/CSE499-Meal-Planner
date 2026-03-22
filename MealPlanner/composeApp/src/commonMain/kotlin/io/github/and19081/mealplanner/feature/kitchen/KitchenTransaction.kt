@@ -1,5 +1,6 @@
 package io.github.and19081.mealplanner.feature.kitchen
 
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import kotlin.uuid.Uuid
 import kotlinx.serialization.Serializable
 
@@ -18,10 +19,8 @@ enum class TransactionDirection {
 
 @Serializable
 data class InventoryChange(
-    val foodItemId: Uuid,
+    val measurement: ItemMeasurement,
     val ingredientName: String,
-    val quantity: Double?,
-    val unitId: Uuid?,
     val unitAbbreviation: String,
     val direction: TransactionDirection,
     val priceCents: Long? = null,

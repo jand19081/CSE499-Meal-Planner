@@ -11,9 +11,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.room.Room
 import io.github.and19081.mealplanner.App
+import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 class MainActivity : ComponentActivity() {
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -33,6 +39,8 @@ class MainActivity : ComponentActivity() {
                 context = applicationContext,
                 name = dbFile.absolutePath,
             )
+        val db = MealPlannerDatabase.getDatabase(builder)
+        val diContainer = DependencyInjectionContainer(db, appScope, applicationContext)
 
         // Handle possible deep link from notification
         val verifyMealId = intent.getStringExtra("VERIFY_MEAL_ID")
@@ -40,7 +48,12 @@ class MainActivity : ComponentActivity() {
             // In a more complex app, we'd navigate to the verification screen
         }
 
-        setContent { App(builder, applicationContext) }
+        setContent { App(diContainer) }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        appScope.cancel()
     }
 
     private fun askNotificationPermission() {

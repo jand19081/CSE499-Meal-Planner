@@ -11,6 +11,7 @@ import io.github.and19081.mealplanner.core.util.Validators
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
@@ -23,6 +24,12 @@ import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+import io.github.and19081.mealplanner.domain.repository.PantryUpdate
+
+import io.github.and19081.mealplanner.core.util.RecipeMealType
+import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
+import io.github.and19081.mealplanner.domain.model.RecipeInfo
+
 data class MealsUiState(
     val groupedMeals: Map<String, List<FoodItem>>,
     val searchQuery: String,
@@ -32,6 +39,19 @@ data class MealsUiState(
     val allUnits: List<UnitModel>,
     val errorMessage: String? = null,
     val mealWarnings: Map<Uuid, List<DataWarning>> = emptyMap(),
+)
+
+private data class CoreDataState(
+    val items: List<FoodItem>,
+    val packages: List<Package>,
+    val bridges: List<BridgeConversion>,
+    val units: List<UnitModel>
+)
+
+private data class FilterState(
+    val query: String,
+    val isAlpha: Boolean,
+    val error: String?
 )
 
 class MealsViewModel(
@@ -44,67 +64,93 @@ class MealsViewModel(
   private val _sortByAlpha = MutableStateFlow(true)
   private val _errorMessage = MutableStateFlow<String?>(null)
 
-  val uiState =
-      combine(
-              foodItemRepository.foodItems,
-              foodItemRepository.packages,
-              foodItemRepository.conversions,
-              unitRepository.units,
-              _searchQuery,
-              _sortByAlpha,
-              _errorMessage,
-          ) { args: Array<Any?> ->
-            val allItems = args[0] as List<FoodItem>
-            val packages = args[1] as List<Package>
-            val bridges = args[2] as List<BridgeConversion>
-            val units = args[3] as List<UnitModel>
-            val query = args[4] as String
-            val isAlpha = args[5] as Boolean
-            val error = args[6] as String?
-            
-            val allMeals = allItems.filter { it.isRecipe }
-            val itemsById = allItems.associateBy { it.id }
+  // Draft Form State
+  private val _draftMealId = MutableStateFlow<Uuid?>(null)
+  val draftName = MutableStateFlow("")
+  val draftMealType = MutableStateFlow(RecipeMealType.Other)
+  val draftRequirements = MutableStateFlow<List<FoodItemRequirement>>(emptyList())
 
-            val warningsMap =
-                allMeals.associate { meal ->
-                  meal.id to
-                      DataQualityValidator.validateFoodItem(
-                          meal,
-                          itemsById,
-                          packages,
-                          bridges,
-                          units,
-                      )
-                }
+  fun initializeDraft(meal: FoodItem?) {
+      _draftMealId.value = meal?.id ?: Uuid.random()
+      draftName.value = meal?.name ?: ""
+      draftMealType.value = meal?.recipeInfo?.mealType ?: RecipeMealType.Other
+      draftRequirements.value = meal?.recipeInfo?.requirementGroups?.flatMap { it.requirements } ?: emptyList()
+  }
 
-            val filtered =
-                if (query.isBlank()) allMeals
-                else {
-                  allMeals.filter { it.name.contains(query, ignoreCase = true) }
-                }
+  fun updateDraftName(name: String) {
+      draftName.value = name
+  }
 
-            val sorted =
-                if (isAlpha) filtered.sortedBy { it.name }
-                else filtered.sortedByDescending { it.name }
+  fun updateDraftMealType(type: RecipeMealType) {
+      draftMealType.value = type
+  }
 
-            val grouped = mapOf("All Meals" to sorted)
+  fun updateDraftRequirements(requirements: List<FoodItemRequirement>) {
+      draftRequirements.value = requirements
+  }
 
-            MealsUiState(
-                groupedMeals = grouped,
-                searchQuery = query,
-                allItems = allItems,
-                allPackages = packages,
-                allBridges = bridges,
-                allUnits = units,
-                errorMessage = error,
-                mealWarnings = warningsMap,
-            )
-          }
-          .stateIn(
-              viewModelScope,
-              SharingStarted.WhileSubscribed(5000),
-              MealsUiState(emptyMap(), "", emptyList(), emptyList(), emptyList(), emptyList(), null, emptyMap()),
+  fun saveDraft() {
+      val mealId = _draftMealId.value ?: return
+      val finalMeal = FoodItem(
+          id = mealId,
+          name = draftName.value,
+          recipeInfo = RecipeInfo(
+              mealType = draftMealType.value,
+              requirementGroups = listOf(FoodItemRequirementGroup(requirements = draftRequirements.value))
           )
+      )
+      saveMeal(finalMeal)
+  }
+
+  private val coreDataFlow = combine(
+      foodItemRepository.foodItems,
+      foodItemRepository.packages,
+      foodItemRepository.conversions,
+      unitRepository.units
+  ) { items, packages, bridges, units ->
+      CoreDataState(items, packages, bridges, units)
+  }
+
+  private val filterFlow = combine(
+      _searchQuery,
+      _sortByAlpha,
+      _errorMessage
+  ) { query, isAlpha, error ->
+      FilterState(query, isAlpha, error)
+  }
+
+  val uiState = combine(coreDataFlow, filterFlow) { data, filter ->
+      val allMeals = data.items.filter { it.isRecipe }
+      val itemsById = data.items.associateBy { it.id }
+
+      val warningsMap = allMeals.associate { meal ->
+          meal.id to DataQualityValidator.validateFoodItem(
+              meal, itemsById, data.packages, data.bridges, data.units
+          )
+      }
+
+      val filtered = if (filter.query.isBlank()) allMeals else {
+          allMeals.filter { it.name.contains(filter.query, ignoreCase = true) }
+      }
+
+      val sorted = if (filter.isAlpha) filtered.sortedBy { it.name } else filtered.sortedByDescending { it.name }
+      val grouped = mapOf("All Meals" to sorted)
+
+      MealsUiState(
+          groupedMeals = grouped,
+          searchQuery = filter.query,
+          allItems = data.items,
+          allPackages = data.packages,
+          allBridges = data.bridges,
+          allUnits = data.units,
+          errorMessage = filter.error,
+          mealWarnings = warningsMap,
+      )
+  }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(5000),
+      MealsUiState(emptyMap(), "", emptyList(), emptyList(), emptyList(), emptyList(), null, emptyMap())
+  )
 
   fun onSearchQueryChange(query: String) {
     _searchQuery.value = query
@@ -124,15 +170,15 @@ class MealsViewModel(
 
     _errorMessage.value = null
     viewModelScope.launch { 
-        foodItemRepository.saveFoodItem(
-            meal,
-            instructions = meal.recipeInfo?.instructions ?: emptyList(),
-            requirementGroups = listOf(
-                FoodItemRequirementGroup(
-                    requirements = meal.recipeInfo?.requirements ?: emptyList()
-                )
-            )
-        ) 
+        try {
+            foodItemRepository.saveFoodItem(
+                meal,
+                instructions = meal.recipeInfo?.instructions ?: emptyList(),
+                requirementGroups = meal.recipeInfo?.requirementGroups ?: emptyList()
+            ) 
+        } catch (e: Exception) {
+            _errorMessage.value = "Failed to save meal: ${e.message}"
+        }
     }
   }
 
@@ -162,10 +208,12 @@ class MealsViewModel(
                 val unit = allUnits.find { it.id == unitId }
                 changes.add(
                     InventoryChange(
-                        foodItemId = itemId,
+                        measurement = ItemMeasurement(
+                            foodItemId = itemId,
+                            quantity = qty,
+                            unitId = unitId ?: item.preferredUnitId
+                        ),
                         ingredientName = item.name,
-                        quantity = qty,
-                        unitId = unitId ?: item.preferredUnitId,
                         unitAbbreviation = unit?.abbreviation ?: "?",
                         direction = TransactionDirection.OUT
                     )
@@ -173,8 +221,8 @@ class MealsViewModel(
             }
         }
 
-        recipeInfo.requirements.forEach { req ->
-            addChange(req.foodItemId, req.quantity * multiplier, req.unitId)
+        recipeInfo.requirementGroups.flatMap { it.requirements }.forEach { req ->
+            addChange(req.measurement.foodItemId ?: Uuid.NIL, req.measurement.quantity * multiplier, req.measurement.unitId)
         }
 
         if (yieldFoodItemId != null && yieldQuantity != null) {
@@ -183,10 +231,12 @@ class MealsViewModel(
                 val yieldUnit = allUnits.find { it.id == yieldUnitId }
                 changes.add(
                     InventoryChange(
-                        foodItemId = yieldFoodItemId,
+                        measurement = ItemMeasurement(
+                            foodItemId = yieldFoodItemId,
+                            quantity = yieldQuantity,
+                            unitId = yieldUnit?.id
+                        ),
                         ingredientName = producedItem.name,
-                        quantity = yieldQuantity,
-                        unitId = yieldUnit?.id,
                         unitAbbreviation = yieldUnit?.abbreviation ?: "each",
                         direction = TransactionDirection.IN
                     )
@@ -206,15 +256,15 @@ class MealsViewModel(
       val allUnits = uiState.value.allUnits
       val pantryItems = pantryRepository.pantryItems.value
 
-      transaction.changes.forEach { change ->
-        val currentPantryItem = pantryItems.find { it.foodItemId == change.foodItemId }
-        val currentQty = currentPantryItem?.quantity ?: 0.0
-        val currentUnitId = currentPantryItem?.unitId ?: change.unitId
+      val updates = transaction.changes.mapNotNull { change ->
+        val currentPantryItem = pantryItems.find { it.measurement.foodItemId == change.measurement.foodItemId }
+        val currentQty = currentPantryItem?.measurement?.quantity ?: 0.0
+        val currentUnitId = currentPantryItem?.measurement?.unitId ?: change.measurement.unitId
 
         if (currentUnitId != null) {
             val convertedChangeQty = UnitConverter.convert(
-                amount = change.quantity ?: 0.0,
-                fromUnitId = change.unitId ?: Uuid.NIL,
+                amount = change.measurement.quantity,
+                fromUnitId = change.measurement.unitId ?: Uuid.NIL,
                 toUnitId = currentUnitId,
                 allUnits = allUnits.associateBy { it.id }
             ) ?: 0.0
@@ -224,12 +274,13 @@ class MealsViewModel(
             } else {
                 max(0.0, currentQty - convertedChangeQty)
             }
+            PantryUpdate(change.measurement.foodItemId ?: Uuid.NIL, newQty, currentUnitId)
+        } else null
+      }
 
-            pantryRepository.updateQuantity(change.foodItemId, newQty, currentUnitId)
-        }
+      if (updates.isNotEmpty()) {
+          pantryRepository.updateQuantities(updates)
       }
     }
   }
 }
-
-

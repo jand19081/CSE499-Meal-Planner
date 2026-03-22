@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -28,9 +29,11 @@ import androidx.compose.ui.unit.dp
 import io.github.and19081.mealplanner.core.util.DataWarning
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.core.util.UnitModel
+import io.github.and19081.mealplanner.domain.logic.PriceCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.RecipeInfo
 import io.github.and19081.mealplanner.feature.recipes.PrepareBatchDialog
@@ -68,11 +71,14 @@ fun MealsView(
 
     val onMealClick: (FoodItem) -> Unit = {
         selectedMealId = it.id.toString()
+        viewModel.initializeDraft(it)
         isAdding = false
     }
 
     val onAddClick: () -> Unit = {
         selectedMealId = null
+        viewModel.initializeDraft(null)
+        viewModel.updateDraftName(uiState.searchQuery)
         isAdding = true
     }
 
@@ -120,8 +126,8 @@ fun MealsView(
       Box(modifier = Modifier.weight(0.6f)) {
         if (selectedMeal != null || isAdding) {
           MealForm(
+              viewModel = viewModel,
               meal = selectedMeal,
-              initialName = if (isAdding) uiState.searchQuery else "",
               allItems = allItems,
               allRecipes = allRecipes,
               allIngredients = allIngredients,
@@ -129,7 +135,7 @@ fun MealsView(
               warnings = selectedMeal?.let { uiState.mealWarnings[it.id] } ?: emptyList(),
               onDismiss = onDismissDetail,
               onSave = {
-                viewModel.saveMeal(it)
+                viewModel.saveDraft()
                 onDismissDetail()
               },
               onDelete = selectedMeal?.let { m -> { viewModel.deleteMeal(m) } },
@@ -144,8 +150,8 @@ fun MealsView(
   } else {
     if (selectedMeal != null || isAdding) {
       MealForm(
+          viewModel = viewModel,
           meal = selectedMeal,
-          initialName = if (isAdding) uiState.searchQuery else "",
           allItems = allItems,
           allRecipes = allRecipes,
           allIngredients = allIngredients,
@@ -153,7 +159,7 @@ fun MealsView(
           warnings = selectedMeal?.let { uiState.mealWarnings[it.id] } ?: emptyList(),
           onDismiss = onDismissDetail,
           onSave = {
-            viewModel.saveMeal(it)
+            viewModel.saveDraft()
             onDismissDetail()
           },
           onDelete = selectedMeal?.let { m -> { viewModel.deleteMeal(m) } },
@@ -176,27 +182,22 @@ fun MealsView(
 
 @Composable
 fun MealForm(
+    viewModel: MealsViewModel,
     meal: FoodItem?,
-    initialName: String,
     allItems: List<FoodItem>,
     allRecipes: List<FoodItem>,
     allIngredients: List<FoodItem>,
     allUnits: List<UnitModel>,
     warnings: List<DataWarning>,
     onDismiss: () -> Unit,
-    onSave: (FoodItem) -> Unit,
+    onSave: () -> Unit,
     onDelete: (() -> Unit)? = null,
     onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
     onAddRecipe: (String, (FoodItem) -> Unit) -> Unit,
 ) {
-  var name by remember(meal) { mutableStateOf(meal?.name ?: initialName) }
-  var mealType by remember(meal) { mutableStateOf(meal?.recipeInfo?.mealType ?: RecipeMealType.Other) }
-
-  val mealId = remember(meal) { meal?.id ?: Uuid.random() }
-
-  var requirements by remember(meal) { 
-      mutableStateOf(meal?.recipeInfo?.requirements ?: emptyList()) 
-  }
+  val name by viewModel.draftName.collectAsState()
+  val mealType by viewModel.draftMealType.collectAsState()
+  val requirements by viewModel.draftRequirements.collectAsState()
 
   var selectedTabIndex by remember { mutableIntStateOf(0) }
   val tabs = listOf("General", "Contents")
@@ -204,18 +205,7 @@ fun MealForm(
     MpDetailScaffold(
         title = if (meal == null) "New Meal" else "Edit Meal",
         onClose = onDismiss,
-        onSave = {
-            val finalMeal =
-                FoodItem(
-                    id = mealId,
-                    name = name,
-                    recipeInfo = RecipeInfo(
-                        mealType = mealType,
-                        requirements = requirements
-                    )
-                )
-            onSave(finalMeal)
-        },
+        onSave = onSave,
         saveEnabled = name.isNotBlank(),
         onDelete = onDelete,
         tabs = tabs,
@@ -229,7 +219,7 @@ fun MealForm(
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     MpOutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = { viewModel.updateDraftName(it) },
                         label = { Text("Name") },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -250,7 +240,7 @@ fun MealForm(
                                 DropdownMenuItem(
                                     text = { Text(type.name) },
                                     onClick = {
-                                        mealType = type
+                                        viewModel.updateDraftMealType(type)
                                         expandedMealType = false
                                     },
                                 )
@@ -266,7 +256,7 @@ fun MealForm(
                     allRecipes = allRecipes,
                     allIngredients = allIngredients,
                     allUnits = allUnits,
-                    onUpdateRequirements = { requirements = it },
+                    onUpdateRequirements = { viewModel.updateDraftRequirements(it) },
                     onAddIngredient = onAddIngredient,
                     onAddRecipe = onAddRecipe,
                 )
@@ -300,7 +290,6 @@ fun MealListPane(
   ) { innerPadding ->
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
-        contentPadding = PaddingValues(bottom = 80.dp),
     ) {
       // Create New Option
       if (
@@ -342,7 +331,7 @@ fun EmptyDetailPlaceholder() {
   Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
       Icon(
-          Icons.Default.SortByAlpha,
+          Icons.Default.Restaurant,
           null,
           modifier = Modifier.size(48.dp),
           tint = MaterialTheme.colorScheme.outline,
@@ -365,20 +354,30 @@ fun MealRow(
     onEditClick: () -> Unit,
     onMakeClick: () -> Unit,
 ) {
-  val requirements = meal.recipeInfo?.requirements ?: emptyList()
+  val requirements = meal.recipeInfo?.requirementGroups?.flatMap { it.requirements } ?: emptyList()
   val recipeNames = requirements
-      .filter { req -> allRecipes.any { it.id == req.foodItemId } }
-      .mapNotNull { req -> allRecipes.find { it.id == req.foodItemId }?.name }
+      .filter { req -> allRecipes.any { it.id == req.measurement.foodItemId } }
+      .mapNotNull { req -> allRecipes.find { it.id == req.measurement.foodItemId }?.name }
   val ingredientNames = requirements
-      .filter { req -> allIngredients.any { it.id == req.foodItemId } }
-      .mapNotNull { req -> allIngredients.find { it.id == req.foodItemId }?.name }
+      .filter { req -> allIngredients.any { it.id == req.measurement.foodItemId } }
+      .mapNotNull { req -> allIngredients.find { it.id == req.measurement.foodItemId }?.name }
 
   val allNames = recipeNames + ingredientNames
 
-  val costCents = 0L // Placeholder
+  val costCents = PriceCalculator.calculateFoodItemCost(
+      item = meal,
+      allItemsMap = (allRecipes + allIngredients).associateBy { it.id },
+      packagesByIngredient = allPackages.groupBy { it.foodItemId },
+      bridgesByIngredient = allBridges.groupBy { it.foodItemId },
+      allUnits = allUnits.associateBy { it.id },
+  )
 
   val costStr =
-      if (costCents > 0) "$${String.format("%.2f", costCents / 100.0)}" else "No price data"
+      when {
+          costCents == null -> "Circular Dependency"
+          costCents > 0 -> "$${String.format("%.2f", costCents / 100.0)}"
+          else -> "No price data"
+      }
 
   val subtitle =
       if (allNames.isEmpty()) "Empty Meal"
@@ -454,16 +453,16 @@ fun MealContentsEditor(
     } else {
       Column {
         currentRequirements.forEach { req ->
-          val item = (allRecipes + allIngredients).find { it.id == req.foodItemId }
+          val item = (allRecipes + allIngredients).find { it.id == req.measurement.foodItemId }
           val name = item?.name ?: "Unknown Item"
-          val uName = allUnits.find { it.id == req.unitId }?.abbreviation ?: ""
+          val uName = allUnits.find { it.id == req.measurement.unitId }?.abbreviation ?: ""
           Row(
               modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
               horizontalArrangement = Arrangement.SpaceBetween,
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-                "${if (item?.isRecipe == true) "Recipe" else "Ing"}: $name ${if (req.quantity > 0) "${req.quantity} $uName" else ""}", 
+                "${if (item?.isRecipe == true) "Recipe" else "Ing"}: $name ${if (req.measurement.quantity > 0) "${req.measurement.quantity} $uName" else ""}", 
                 style = MaterialTheme.typography.bodySmall
             )
             IconButton(onClick = { onUpdateRequirements(currentRequirements - req) }) {
@@ -566,9 +565,11 @@ fun MealContentsEditor(
                     val unit = allUnits.find { it.abbreviation == selectedUnitName }
                     val qty = quantityStr.toDoubleOrNull() ?: 0.0
                     onUpdateRequirements(currentRequirements + FoodItemRequirement(
-                        foodItemId = found.id,
-                        quantity = if (selectedType == "Ingredient") qty else 1.0,
-                        unitId = if (selectedType == "Ingredient") unit?.id else null
+                        measurement = ItemMeasurement(
+                            foodItemId = found.id,
+                            quantity = if (selectedType == "Ingredient") qty else 1.0,
+                            unitId = if (selectedType == "Ingredient") unit?.id else null
+                        )
                     )
                     )
                     isAdding = false

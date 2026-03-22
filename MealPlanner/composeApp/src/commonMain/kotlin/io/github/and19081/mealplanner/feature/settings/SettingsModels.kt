@@ -13,6 +13,7 @@ enum class Mode {
 @Serializable
 data class AppSettings(
     val id: Uuid = Uuid.random(),
+    val isFirstLaunch: Boolean = true,
     val mealConsumedNotificationDelayMinutes: Int = 30,
     val defaultTaxRatePercentage: Double = 0.0,
     val view: Mode = Mode.AUTO,

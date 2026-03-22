@@ -3,6 +3,7 @@ package io.github.and19081.mealplanner.data.repository
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
@@ -65,7 +66,11 @@ class RoomMealPlanRepository(
         ReceiptLineItemEntity(
             receiptId = receiptId,
             customName = name,
-            quantityBought = qty,
+            measurement = ItemMeasurement(
+                foodItemId = null,
+                unitId = null,
+                quantity = qty
+            ),
             pricePaidCents = price
         )
     }

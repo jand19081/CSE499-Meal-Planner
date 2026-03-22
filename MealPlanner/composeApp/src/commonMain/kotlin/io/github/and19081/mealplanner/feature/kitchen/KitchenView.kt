@@ -127,7 +127,7 @@ fun KitchenView(
             text = {
               Column {
                 modal.transaction.changes.forEach { change ->
-                  Text("${if (change.direction == TransactionDirection.IN) "+" else "-"} ${change.quantity} ${change.unitAbbreviation} ${change.ingredientName}")
+                  Text("${if (change.direction == TransactionDirection.IN) "+" else "-"} ${change.measurement.quantity} ${change.unitAbbreviation} ${change.ingredientName}")
                 }
               }
             },

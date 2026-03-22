@@ -11,6 +11,7 @@ import io.github.and19081.mealplanner.domain.logic.ConsumeMealUseCase
 import io.github.and19081.mealplanner.domain.logic.CookingTimeCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
@@ -260,8 +261,8 @@ class CalendarViewModel(
                 val startMillis = CookingTimeCalculator.calculateStartCookingTimestampMillis(
                     scheduledDate = date,
                     scheduledTime = time,
-                    prepTimeMinutes = recipeInfo.prepTimeMinutes,
-                    cookTimeMinutes = recipeInfo.cookTimeMinutes
+                    prepTimeMinutes = recipeInfo.prepTimeMinutes ?: 0,
+                    cookTimeMinutes = recipeInfo.cookTimeMinutes ?: 0
                 )
                 notificationScheduler.scheduleStartCookingNotification(newEntry.id, title, startMillis)
             }
@@ -315,24 +316,29 @@ class CalendarViewModel(
 
     fun addRequirementsRecursive(item: FoodItem, multiplier: Double) {
         val info = item.recipeInfo ?: return
-        info.requirements.forEach { req ->
-            val subItem = itemsMap[req.foodItemId] ?: return@forEach
-            if (subItem.isRecipe) {
-                val subRecipeInfo = subItem.recipeInfo!!
-                val scale = if (subRecipeInfo.servings > 0) req.quantity / subRecipeInfo.servings else 1.0
-                addRequirementsRecursive(subItem, multiplier * scale)
-            } else {
-                val unit = allUnits.find { it.id == req.unitId }
-                changes.add(
-                    InventoryChange(
-                        foodItemId = req.foodItemId,
-                        ingredientName = subItem.name,
-                        quantity = req.quantity * multiplier,
-                        unitId = req.unitId ?: subItem.preferredUnitId,
-                        unitAbbreviation = unit?.abbreviation ?: "?",
-                        direction = TransactionDirection.OUT
+        info.requirementGroups.forEach { group ->
+            val primaryReq = group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
+            primaryReq?.let { req ->
+                val subItem = itemsMap[req.measurement.foodItemId] ?: return@let
+                if (subItem.isRecipe) {
+                    val subRecipeInfo = subItem.recipeInfo!!
+                    val scale = if (subRecipeInfo.servings > 0) req.measurement.quantity / subRecipeInfo.servings else 1.0
+                    addRequirementsRecursive(subItem, multiplier * scale)
+                } else {
+                    val unit = allUnits.find { it.id == req.measurement.unitId }
+                    changes.add(
+                        InventoryChange(
+                            measurement = ItemMeasurement(
+                                foodItemId = req.measurement.foodItemId,
+                                unitId = req.measurement.unitId ?: subItem.preferredUnitId,
+                                quantity = req.measurement.quantity * multiplier
+                            ),
+                            ingredientName = subItem.name,
+                            unitAbbreviation = unit?.abbreviation ?: "?",
+                            direction = TransactionDirection.OUT
+                        )
                     )
-                )
+                }
             }
         }
     }

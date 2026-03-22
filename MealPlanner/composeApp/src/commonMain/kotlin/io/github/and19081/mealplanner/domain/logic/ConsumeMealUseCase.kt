@@ -11,6 +11,7 @@ import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.UnitType
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.LeftoverInfo
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
@@ -45,8 +46,8 @@ class ConsumeMealUseCase(
 
         // Apply changes to pantry
         transaction?.changes?.forEach { change ->
-            val item = allItems.find { it.id == change.foodItemId }
-            val unit = allUnits.find { it.id == change.unitId }
+            val item = allItems.find { it.id == change.measurement.foodItemId }
+            val unit = allUnits.find { it.id == change.measurement.unitId }
 
             if (item != null && unit != null) {
                 val targetUnitId = item.preferredUnitId ?: when (unit.type) {
@@ -56,20 +57,20 @@ class ConsumeMealUseCase(
                     else -> unit.id
                 }
 
-                val bridges = allBridges.filter { it.foodItemId == change.foodItemId }
+                val bridges = allBridges.filter { it.foodItemId == change.measurement.foodItemId }
                 val changeInTargetUnit = UnitConverter.convert(
-                    amount = change.quantity ?: 0.0,
-                    fromUnitId = change.unitId ?: Uuid.NIL,
+                    amount = change.measurement.quantity,
+                    fromUnitId = change.measurement.unitId ?: Uuid.NIL,
                     toUnitId = targetUnitId,
                     allUnits = allUnits.associateBy { it.id },
                     bridges = bridges
                 ) ?: 0.0
 
-                val currentPantryItem = pantryItems.find { it.foodItemId == change.foodItemId }
+                val currentPantryItem = pantryItems.find { it.measurement.foodItemId == change.measurement.foodItemId }
                 val currentQtyInTargetUnit = if (currentPantryItem != null) {
                     UnitConverter.convert(
-                        amount = currentPantryItem.quantity,
-                        fromUnitId = currentPantryItem.unitId,
+                        amount = currentPantryItem.measurement.quantity,
+                        fromUnitId = currentPantryItem.measurement.unitId ?: Uuid.NIL,
                         toUnitId = targetUnitId,
                         allUnits = allUnits.associateBy { it.id },
                         bridges = bridges
@@ -77,7 +78,7 @@ class ConsumeMealUseCase(
                 } else 0.0
 
                 val newQty = max(0.0, currentQtyInTargetUnit - changeInTargetUnit)
-                pantryRepository.updateQuantity(change.foodItemId, newQty, targetUnitId)
+                pantryRepository.updateQuantity(change.measurement.foodItemId ?: Uuid.NIL, newQty, targetUnitId)
             }
         }
 
@@ -114,24 +115,29 @@ class ConsumeMealUseCase(
 
         fun addRequirementsRecursive(item: FoodItem, multiplier: Double) {
             val info = item.recipeInfo ?: return
-            info.requirements.forEach { req ->
-                val subItem = itemsMap[req.foodItemId] ?: return@forEach
-                if (subItem.isRecipe) {
-                    val subRecipeInfo = subItem.recipeInfo!!
-                    val scale = if (subRecipeInfo.servings > 0) req.quantity / subRecipeInfo.servings else 1.0
-                    addRequirementsRecursive(subItem, multiplier * scale)
-                } else {
-                    val unit = allUnits.find { it.id == req.unitId }
-                    changes.add(
-                        InventoryChange(
-                            foodItemId = req.foodItemId,
-                            ingredientName = subItem.name,
-                            quantity = req.quantity * multiplier,
-                            unitId = req.unitId ?: subItem.preferredUnitId,
-                            unitAbbreviation = unit?.abbreviation ?: "?",
-                            direction = TransactionDirection.OUT
+            info.requirementGroups.forEach { group ->
+                val primaryReq = group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
+                primaryReq?.let { req ->
+                    val subItem = itemsMap[req.measurement.foodItemId] ?: return@let
+                    if (subItem.isRecipe) {
+                        val subRecipeInfo = subItem.recipeInfo!!
+                        val scale = if (subRecipeInfo.servings > 0) req.measurement.quantity / subRecipeInfo.servings else 1.0
+                        addRequirementsRecursive(subItem, multiplier * scale)
+                    } else {
+                        val unit = allUnits.find { it.id == req.measurement.unitId }
+                        changes.add(
+                            InventoryChange(
+                                measurement = ItemMeasurement(
+                                    foodItemId = req.measurement.foodItemId,
+                                    quantity = req.measurement.quantity * multiplier,
+                                    unitId = req.measurement.unitId ?: subItem.preferredUnitId
+                                ),
+                                ingredientName = subItem.name,
+                                unitAbbreviation = unit?.abbreviation ?: "?",
+                                direction = TransactionDirection.OUT
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

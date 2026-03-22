@@ -16,17 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 
 @OptIn(ExperimentalUuidApi::class)
 @Composable
-fun App(dbBuilder: RoomDatabase.Builder<MealPlannerDatabase>, platformContext: Any? = null) {
-  val appScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-  val db = remember { MealPlannerDatabase.getDatabase(dbBuilder) }
-  val dependencyInjectionContainer = remember {
-    DependencyInjectionContainer(
-      db,
-      appScope,
-      platformContext
-    )
-  }
-
+fun App(dependencyInjectionContainer: DependencyInjectionContainer) {
   LaunchedEffect(Unit) {
     try {
       dependencyInjectionContainer.initializeMockData()

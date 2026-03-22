@@ -14,6 +14,7 @@ import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
+import io.github.and19081.mealplanner.data.export.DataTransferService
 import io.github.and19081.mealplanner.feature.meals.Restaurant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,6 +28,7 @@ class SettingsViewModel(
     private val storeRepository: StoreRepository,
     private val restaurantRepository: RestaurantRepository,
     private val unitRepository: UnitRepository,
+    private val dataTransferService: DataTransferService,
 ) : ViewModel() {
 
   val uiState =
@@ -146,6 +148,30 @@ class SettingsViewModel(
 
   fun deleteUnit(id: Uuid) {
     viewModelScope.launch { unitRepository.deleteUnit(id) }
+  }
+
+  // --- Backup / Restore Actions ---
+
+  suspend fun exportDataSync(): String {
+    return dataTransferService.exportData()
+  }
+
+  suspend fun importDataSync(jsonString: String): Result<Unit> {
+    return dataTransferService.importData(jsonString)
+  }
+
+  fun exportData(onResult: (String) -> Unit) {
+    viewModelScope.launch {
+      val json = dataTransferService.exportData()
+      onResult(json)
+    }
+  }
+
+  fun importData(jsonString: String, onResult: (Result<Unit>) -> Unit) {
+    viewModelScope.launch {
+      val result = dataTransferService.importData(jsonString)
+      onResult(result)
+    }
   }
 }
 

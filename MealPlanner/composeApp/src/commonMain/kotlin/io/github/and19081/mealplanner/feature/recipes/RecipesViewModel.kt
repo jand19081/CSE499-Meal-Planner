@@ -14,6 +14,7 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -85,20 +86,20 @@ class RecipesViewModel(
         unitRepository.units,
         foodItemRepository.conversions
     ) { draft, allItems, pantryItems, allUnits, allBridges ->
-        val pantryByItem = pantryItems.groupBy { it.foodItemId }
+        val pantryByItem = pantryItems.groupBy { it.measurement.foodItemId }
 
         draft.requirementGroups.flatMap { it.requirements }.map { req ->
-            val item = allItems.find { it.id == req.foodItemId }
+            val item = allItems.find { it.id == req.measurement.foodItemId }
             val itemName = item?.name ?: "Unknown Item"
-            val pItems = pantryByItem[req.foodItemId] ?: emptyList()
-            val targetUnit = req.unitId ?: item?.preferredUnitId ?: Uuid.NIL
-            val unitAbbr = allUnits.find { it.id == req.unitId }?.abbreviation ?: ""
+            val pItems = pantryByItem[req.measurement.foodItemId] ?: emptyList()
+            val targetUnit = req.measurement.unitId ?: item?.preferredUnitId ?: Uuid.NIL
+            val unitAbbr = allUnits.find { it.id == req.measurement.unitId }?.abbreviation ?: ""
 
             var totalInStock = 0.0
             for (pItem in pItems) {
                 totalInStock += UnitConverter.convert(
-                    amount = pItem.quantity,
-                    fromUnitId = pItem.unitId,
+                    amount = pItem.measurement.quantity,
+                    fromUnitId = pItem.measurement.unitId ?: kotlin.uuid.Uuid.NIL,
                     toUnitId = targetUnit,
                     allUnits = allUnits.associateBy { it.id },
                     bridges = allBridges,
@@ -108,10 +109,10 @@ class RecipesViewModel(
             StockWarning(
                 itemName = itemName,
                 totalInStock = totalInStock,
-                requiredQuantity = req.quantity,
+                requiredQuantity = req.measurement.quantity,
                 unitAbbreviation = unitAbbr,
-                isSufficient = totalInStock >= req.quantity,
-                isPartial = totalInStock > 0 && totalInStock < req.quantity
+                isSufficient = totalInStock >= req.measurement.quantity,
+                isPartial = totalInStock > 0 && totalInStock < req.measurement.quantity
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -140,7 +141,7 @@ class RecipesViewModel(
 
             val allRecipes = allItems.filter { it.isRecipe }
             val itemsMap = allItems.associateBy { it.id }
-            val pantryMap = pantry.associateBy { it.foodItemId }
+            val pantryMap = pantry.associateBy { it.measurement.foodItemId }
 
             val warningsMap =
                 allRecipes.associate { recipe ->
@@ -163,22 +164,24 @@ class RecipesViewModel(
             if (canMakeNow) {
                 filtered =
                     filtered.filter { recipe ->
-                        val requirements = recipe.recipeInfo?.requirements ?: emptyList()
-                        requirements.all { req ->
-                            val subItem = itemsMap[req.foodItemId] ?: return@all true
-                            if (subItem.isRecipe) return@all true
+                        val groups = recipe.recipeInfo?.requirementGroups ?: emptyList()
+                        groups.all { group ->
+                            group.requirements.all { req ->
+                                val subItem = itemsMap[req.measurement.foodItemId] ?: return@all true
+                                if (subItem.isRecipe) return@all true
 
-                            val pantryItem = pantryMap[req.foodItemId] ?: return@all false
+                                val pantryItem = pantryMap[req.measurement.foodItemId] ?: return@all false
 
-                            val ingredientBridges = bridges.filter { it.foodItemId == req.foodItemId }
-                            val pantryInReqUnit = UnitConverter.convert(
-                                amount = pantryItem.quantity,
-                                fromUnitId = pantryItem.unitId,
-                                toUnitId = req.unitId ?: subItem.preferredUnitId ?: Uuid.NIL,
-                                allUnits = allUnits.associateBy { it.id },
-                                bridges = ingredientBridges
-                            ) ?: 0.0
-                            pantryInReqUnit >= req.quantity
+                                val ingredientBridges = bridges.filter { it.foodItemId == req.measurement.foodItemId }
+                                val pantryInReqUnit = UnitConverter.convert(
+                                    amount = pantryItem.measurement.quantity,
+                                    fromUnitId = pantryItem.measurement.unitId ?: kotlin.uuid.Uuid.NIL,
+                                    toUnitId = req.measurement.unitId ?: subItem.preferredUnitId ?: Uuid.NIL,
+                                    allUnits = allUnits.associateBy { it.id },
+                                    bridges = ingredientBridges
+                                ) ?: 0.0
+                                pantryInReqUnit >= req.measurement.quantity
+                            }
                         }
                     }
             }
@@ -233,9 +236,7 @@ class RecipesViewModel(
                 cookTimeStr = recipe.recipeInfo?.cookTimeMinutes?.toString() ?: "0",
                 description = recipe.recipeInfo?.description ?: "",
                 mealType = recipe.recipeInfo?.mealType ?: RecipeMealType.Dinner,
-                requirementGroups = recipe.recipeInfo?.requirements?.let {
-                    listOf(FoodItemRequirementGroup(requirements = it))
-                } ?: emptyList(),
+                requirementGroups = recipe.recipeInfo?.requirementGroups ?: emptyList(),
                 instructions = recipe.recipeInfo?.instructions ?: emptyList()
             )
         }
@@ -278,11 +279,13 @@ class RecipesViewModel(
         val recipeInfo = item.recipeInfo ?: return false
         if (visited.contains(item.id)) return true
         val newVisited = visited + item.id
-        for (req in recipeInfo.requirements) {
-            val subItem = allItemsMap[req.foodItemId]
-            if (subItem != null && subItem.isRecipe) {
-                if (hasCircularDependency(subItem, allItemsMap, newVisited)) {
-                    return true
+        for (group in recipeInfo.requirementGroups) {
+            for (req in group.requirements) {
+                val subItem = allItemsMap[req.measurement.foodItemId]
+                if (subItem != null && subItem.isRecipe) {
+                    if (hasCircularDependency(subItem, allItemsMap, newVisited)) {
+                        return true
+                    }
                 }
             }
         }
@@ -314,11 +317,7 @@ class RecipesViewModel(
             foodItemRepository.saveFoodItem(
                 recipe,
                 instructions = recipe.recipeInfo?.instructions ?: emptyList(),
-                requirementGroups = listOf(
-                    FoodItemRequirementGroup(
-                        requirements = recipe.recipeInfo?.requirements ?: emptyList()
-                    )
-                )
+                requirementGroups = recipe.recipeInfo?.requirementGroups ?: emptyList()
             )
         }
     }
@@ -350,10 +349,15 @@ class RecipesViewModel(
         viewModelScope.launch {
             shoppingListItemRepository.addItem(
                 ShoppingListItem(
-                    foodItemId = recipe.id,
-                    neededQuantity = batches,
-                    unitId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
+                    id = Uuid.random(),
+                    customName = null,
                     storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
+                    measurement = ItemMeasurement(
+                        foodItemId = recipe.id,
+                        unitId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
+                        quantity = batches
+                    ),
+                    packageId = null,
                     isPurchased = false,
                     isPantryItem = true
                 )

@@ -17,12 +17,20 @@ interface PantryRepository {
       unitId: Uuid,
   )
 
+  suspend fun updateQuantities(updates: List<PantryUpdate>)
+
   suspend fun setPantryItems(items: List<PantryItem>)
 
   suspend fun remove(foodItemId: Uuid, unitId: Uuid)
 
   suspend fun removeBatch(batchId: Uuid)
 }
+
+data class PantryUpdate(
+    val foodItemId: Uuid,
+    val newQuantity: Double,
+    val unitId: Uuid
+)
 
 interface LeftoverRepository {
   val leftovers: StateFlow<List<LeftoverItem>>

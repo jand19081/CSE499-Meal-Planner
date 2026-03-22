@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -31,12 +34,15 @@ import io.github.and19081.mealplanner.ui.components.HorizontalNumericUpDownContr
 import io.github.and19081.mealplanner.ui.components.MpDetailScaffold
 import io.github.and19081.mealplanner.ui.components.MpOutlinedTextField
 import io.github.and19081.mealplanner.ui.components.SearchableDropdown
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 @Composable
 fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
   val uiState by viewModel.uiState.collectAsState()
   var showManager by remember { mutableStateOf<String?>(null) }
+  val snackbarHostState = remember { SnackbarHostState() }
+  val scope = rememberCoroutineScope()
 
   val actualIsExpanded =
       when (uiState.appMode) {
@@ -45,7 +51,9 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
         Mode.MOBILE -> false
       }
 
-  Scaffold { innerPadding ->
+  Scaffold(
+      snackbarHost = { SnackbarHost(snackbarHostState) }
+  ) { innerPadding ->
     if (actualIsExpanded) {
       Row(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
         // Settings List
@@ -53,7 +61,22 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
             modifier = Modifier.weight(0.4f),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-          item { SettingsContent(uiState, viewModel, onShowManager = { showManager = it }) }
+          item { 
+            SettingsContent(
+                uiState, 
+                viewModel, 
+                onShowManager = { showManager = it },
+                onImportResult = { result ->
+                    scope.launch {
+                        if (result.isSuccess) {
+                            snackbarHostState.showSnackbar("Data imported successfully.")
+                        } else {
+                            snackbarHostState.showSnackbar("Import failed: ${result.exceptionOrNull()?.message}")
+                        }
+                    }
+                }
+            ) 
+          }
         }
 
         VerticalDivider(modifier = Modifier.width(1.dp).padding(horizontal = 16.dp))
@@ -78,7 +101,22 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
             modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-          item { SettingsContent(uiState, viewModel, onShowManager = { showManager = it }) }
+          item { 
+            SettingsContent(
+                uiState, 
+                viewModel, 
+                onShowManager = { showManager = it },
+                onImportResult = { result ->
+                    scope.launch {
+                        if (result.isSuccess) {
+                            snackbarHostState.showSnackbar("Data imported successfully.")
+                        } else {
+                            snackbarHostState.showSnackbar("Import failed: ${result.exceptionOrNull()?.message}")
+                        }
+                    }
+                }
+            ) 
+          }
         }
       }
     }
@@ -90,7 +128,30 @@ fun SettingsContent(
     uiState: SettingsUiState,
     viewModel: SettingsViewModel,
     onShowManager: (String) -> Unit,
+    onImportResult: (Result<Unit>) -> Unit = {}
 ) {
+  var showClearConfirm by remember { mutableStateOf(false) }
+
+  if (showClearConfirm) {
+    AlertDialog(
+        onDismissRequest = { showClearConfirm = false },
+        title = { Text("Clear All Data") },
+        text = { Text("Are you sure you want to delete ALL data? This cannot be undone.") },
+        confirmButton = {
+          Button(
+              onClick = {
+                viewModel.importData("{}") { onImportResult(it) }
+                showClearConfirm = false
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+          ) {
+            Text("Delete Everything")
+          }
+        },
+        dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") } },
+    )
+  }
+
   Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
     // Appearance Section
     Column {
@@ -236,6 +297,31 @@ fun SettingsContent(
               Text("%")
           }
       }
+
+    // Backup & Restore Section
+    Column {
+      HorizontalDivider()
+      SectionHeader("Backup & Restore")
+
+      io.github.and19081.mealplanner.core.util.FileTransferButtons(
+          onExport = { viewModel.exportDataSync() },
+          onImport = { 
+              val res = viewModel.importDataSync(it)
+              onImportResult(res)
+          },
+          modifier = Modifier.fillMaxWidth()
+      )
+
+      Spacer(modifier = Modifier.height(8.dp))
+
+      Button(
+          onClick = { showClearConfirm = true },
+          modifier = Modifier.fillMaxWidth(),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+      ) {
+        Text("Clear All Data")
+      }
+    }
 
     Spacer(modifier = Modifier.height(80.dp))
   }

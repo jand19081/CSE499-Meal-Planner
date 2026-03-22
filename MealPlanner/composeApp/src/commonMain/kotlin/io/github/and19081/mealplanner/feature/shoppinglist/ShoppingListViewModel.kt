@@ -11,6 +11,7 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.UnitType
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -146,8 +147,12 @@ class ShoppingListViewModel(
           if (item.isRecipe) {
               val recipeInfo = item.recipeInfo!!
               val scale = if (recipeInfo.servings > 0) (qty * multiplier) / recipeInfo.servings else 1.0
-              recipeInfo.requirements.forEach { req ->
-                  addRecursive(req.foodItemId, req.quantity, req.unitId, scale)
+              recipeInfo.requirementGroups.forEach { group ->
+                  val primaryReq = group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
+                  primaryReq?.let { req ->
+                      val reqFoodId = req.measurement.foodItemId ?: return@let
+                      addRecursive(reqFoodId, req.measurement.quantity, req.measurement.unitId, scale)
+                  }
               }
           } else {
               val unit = unitsMap[unitId ?: item.preferredUnitId] ?: return
@@ -177,20 +182,20 @@ class ShoppingListViewModel(
         val remainingCustomTextItems = mutableListOf<ShoppingListItem>()
 
         customItems.filter { !it.isPurchased }.forEach { customItem ->
-            val linkedFoodItem = itemsMap[customItem.foodItemId]
+            val linkedFoodItem = itemsMap[customItem.measurement.foodItemId]
             
             if (linkedFoodItem != null) {
                 // SCENARIO A: It's a real item from the database
                 if (linkedFoodItem.isRecipe) {
                     // It's an ad-hoc recipe! Run it through the recursive engine.
-                    val batches = customItem.neededQuantity ?: 1.0
+                    val batches = customItem.measurement.quantity
                     val defaultServings = linkedFoodItem.recipeInfo?.servings ?: 1.0
                     addRecursive(linkedFoodItem.id, defaultServings, null, batches)
                 } else {
                     // It's an ad-hoc raw ingredient! Add it directly to the math pile.
-                    val unit = unitsMap[customItem.unitId ?: linkedFoodItem.preferredUnitId]
+                    val unit = unitsMap[customItem.measurement.unitId ?: linkedFoodItem.preferredUnitId]
                     if (unit != null) {
-                        val (baseQty, _) = UnitConverter.toStandard(customItem.neededQuantity ?: 1.0, unit, unitsMap)
+                        val (baseQty, _) = UnitConverter.toStandard(customItem.measurement.quantity, unit, unitsMap)
                         val types = grossRequirementsByType.getOrPut(linkedFoodItem.id) { mutableMapOf() }
                         types[unit.type] = (types[unit.type] ?: 0.0) + baseQty
                     }
@@ -249,14 +254,14 @@ class ShoppingListViewModel(
 
         grossRequirements.forEach { (itemId, reqQty) ->
           val item = itemsMap[itemId] ?: return@forEach
-          val pantryItem = pantryItems.find { it.foodItemId == itemId }
+          val pantryItem = pantryItems.find { it.measurement.foodItemId == itemId }
 
           val preferredType = item.preferredUnitId?.let { pid -> unitsMap[pid]?.type }
           val grossRequirementsTargetType = preferredType ?: (grossRequirementsByType[itemId]?.maxBy { it.value }?.key ?: UnitType.Count)
 
           val ownedQty =
               if (pantryItem != null) {
-                val pUnit = unitsMap[pantryItem.unitId]
+                val pUnit = unitsMap[pantryItem.measurement.unitId]
                 if (pUnit != null) {
                     val targetBaseUnitId = when (grossRequirementsTargetType) {
                         UnitType.Mass -> SystemUnits.Gram.id
@@ -264,7 +269,7 @@ class ShoppingListViewModel(
                         UnitType.Count -> SystemUnits.Each.id
                         else -> null
                     }
-                    UnitConverter.convert(pantryItem.quantity, pUnit.id, targetBaseUnitId, unitsMap, allBridges) ?: 0.0
+                    UnitConverter.convert(pantryItem.measurement.quantity, pUnit.id, targetBaseUnitId, unitsMap, allBridges) ?: 0.0
                 }
                 else 0.0
               } else 0.0
@@ -380,13 +385,13 @@ class ShoppingListViewModel(
         }
 
         remainingCustomTextItems.forEach { custom ->
-            val unit = unitsMap[custom.unitId]
+            val unit = unitsMap[custom.measurement.unitId]
             val item =
                 ShoppingListItemUi(
                     id = custom.id,
                     name = custom.customName ?: "Unknown",
-                    quantity = custom.neededQuantity ?: 0.0,
-                    requiredQuantity = custom.neededQuantity ?: 0.0,
+                    quantity = custom.measurement.quantity,
+                    requiredQuantity = custom.measurement.quantity,
                     unit = unit?.abbreviation ?: "?",
                     priceCents = 0,
                     isOwned = false,
@@ -418,14 +423,14 @@ class ShoppingListViewModel(
               } else null
             } +
                 customItems
-                    .filter { it.isPurchased && itemsMap[it.foodItemId] == null }
+                    .filter { it.isPurchased && itemsMap[it.measurement.foodItemId] == null }
                     .map { item ->
-                      val unit = unitsMap[item.unitId]
+                      val unit = unitsMap[item.measurement.unitId]
                       ShoppingListItemUi(
                           id = item.id,
                           name = item.customName ?: "Unknown Item",
-                          quantity = item.neededQuantity ?: 0.0,
-                          requiredQuantity = item.neededQuantity ?: 0.0,
+                          quantity = item.measurement.quantity,
+                          requiredQuantity = item.measurement.quantity,
                           unit = unit?.abbreviation ?: "?",
                           priceCents = 0,
                           isOwned = true,
@@ -507,10 +512,12 @@ class ShoppingListViewModel(
     val changes = itemsInCart.map { item ->
         val unit = uiState.value.allUnits.find { it.abbreviation == item.unit }
         InventoryChange(
-            foodItemId = item.id,
+            measurement = ItemMeasurement(
+                foodItemId = item.id,
+                unitId = unit?.id ?: Uuid.NIL,
+                quantity = item.quantity
+            ),
             ingredientName = item.name,
-            quantity = item.quantity,
-            unitId = unit?.id ?: Uuid.NIL,
             unitAbbreviation = item.unit,
             direction = TransactionDirection.IN
         )
@@ -529,20 +536,20 @@ class ShoppingListViewModel(
       val pantryItems = pantryRepository.pantryItems.value
 
       transaction.changes.forEach { change ->
-        val currentPantryItem = pantryItems.find { it.foodItemId == change.foodItemId }
-        val currentQty = currentPantryItem?.quantity ?: 0.0
-        val currentUnitId = currentPantryItem?.unitId ?: change.unitId
+        val currentPantryItem = pantryItems.find { it.measurement.foodItemId == change.measurement.foodItemId }
+        val currentQty = currentPantryItem?.measurement?.quantity ?: 0.0
+        val currentUnitId = currentPantryItem?.measurement?.unitId ?: change.measurement.unitId
 
-        if (currentUnitId != null) {
+        if (currentUnitId != null && change.measurement.foodItemId != null) {
             val convertedChangeQty = UnitConverter.convert(
-                amount = change.quantity ?: 0.0,
-                fromUnitId = change.unitId ?: Uuid.NIL,
+                amount = change.measurement.quantity,
+                fromUnitId = change.measurement.unitId ?: Uuid.NIL,
                 toUnitId = currentUnitId,
                 allUnits = allUnits.associateBy { it.id }
             ) ?: 0.0
 
             val newQty = currentQty + convertedChangeQty
-            pantryRepository.updateQuantity(change.foodItemId, newQty, currentUnitId)
+            pantryRepository.updateQuantity(change.measurement.foodItemId, newQty, currentUnitId)
         }
       }
 
@@ -555,7 +562,7 @@ class ShoppingListViewModel(
           shoppingListItemRepository.toggleItem(customItem.id)
       }
 
-      val processedIds = transaction.changes.map { it.foodItemId }.toSet() + customItemsInCart.map { it.id }.toSet()
+      val processedIds = transaction.changes.mapNotNull { it.measurement.foodItemId }.toSet() + customItemsInCart.map { it.id }.toSet()
       _inCartItems.update { it - processedIds }
     }
   }
@@ -627,11 +634,13 @@ class ShoppingListViewModel(
           val lineItems = itemsInCart.map { item ->
               ReceiptLineItem(
                   receiptId = receiptId,
-                  foodItemId = if (item.isCustom) null else item.id,
+                  measurement = ItemMeasurement(
+                      foodItemId = if (item.isCustom) Uuid.NIL else item.id,
+                      unitId = uiState.value.allUnits.find { it.abbreviation == item.unit }?.id,
+                      quantity = item.quantity
+                  ),
                   customName = if (item.isCustom) item.name else null,
-                  quantityBought = item.quantity,
                   pricePaidCents = item.priceCents.toInt(),
-                  unitId = uiState.value.allUnits.find { it.abbreviation == item.unit }?.id
               )
           }
 
@@ -662,12 +671,12 @@ class ShoppingListViewModel(
           val (baseQtyToAdd, _) = UnitConverter.toStandard(converted, unit, allUnits.associateBy { it.id })
 
           val currentPantryItem =
-              pantryRepository.pantryItems.value.find { it.foodItemId == item.id }
+              pantryRepository.pantryItems.value.find { it.measurement.foodItemId == item.id }
           val currentBaseQty =
               if (currentPantryItem != null) {
-                val pUnit = allUnits.find { it.id == currentPantryItem.unitId }
+                val pUnit = allUnits.find { it.id == currentPantryItem.measurement.unitId }
                 if (pUnit != null)
-                    UnitConverter.toStandard(currentPantryItem.quantity, pUnit, allUnits.associateBy { it.id }).first
+                    UnitConverter.toStandard(currentPantryItem.measurement.quantity, pUnit, allUnits.associateBy { it.id }).first
                 else 0.0
               } else 0.0
 
@@ -699,8 +708,11 @@ class ShoppingListViewModel(
       shoppingListItemRepository.addItem(
           ShoppingListItem(
               customName = name,
-              neededQuantity = qty,
-              unitId = unitId,
+              measurement = ItemMeasurement(
+                  foodItemId = Uuid.NIL,
+                  unitId = unitId,
+                  quantity = qty
+              ),
               storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
               isPurchased = false,
               isPantryItem = isPantry,

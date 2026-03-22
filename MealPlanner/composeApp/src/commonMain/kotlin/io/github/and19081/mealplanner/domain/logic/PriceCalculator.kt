@@ -5,6 +5,7 @@ import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import kotlin.collections.get
 import kotlin.uuid.Uuid
@@ -18,57 +19,75 @@ object PriceCalculator {
       bridgesByIngredient: Map<Uuid, List<BridgeConversion>>,
       allUnits: Map<Uuid, UnitModel>,
       visited: Set<Uuid> = emptySet(),
-  ): Long {
+  ): Long? {
     if (visited.contains(item.id)) {
-      throw IllegalArgumentException("Circular dependency detected in item: ${item.id}")
+      return null // Circular dependency
     }
     val newVisited = visited + item.id
     var totalCents = 0L
 
     val recipeInfo = item.recipeInfo ?: return 0L
 
-    for (req in recipeInfo.requirements) {
-      val subItem = allItemsMap[req.foodItemId] ?: continue
-      
-      if (subItem.isRecipe) {
-        // Recursive Call for Sub-Recipe
-        val subRecipeBaseCost =
-            calculateFoodItemCost(
-                subItem,
-                allItemsMap,
-                packagesByIngredient,
-                bridgesByIngredient,
-                allUnits,
-                newVisited,
-            )
+    for (group in recipeInfo.requirementGroups) {
+      val primaryReq = group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
+      primaryReq?.let { req ->
+        val subItem = allItemsMap[req.measurement.foodItemId] ?: return@let
+        
+        if (subItem.isRecipe) {
+          // Recursive Call for Sub-Recipe
+          val subRecipeBaseCost =
+              calculateFoodItemCost(
+                  subItem,
+                  allItemsMap,
+                  packagesByIngredient,
+                  bridgesByIngredient,
+                  allUnits,
+                  newVisited,
+              ) ?: return null
 
-        // For sub-recipes, req.quantity is assumed to be the number of servings needed
-        totalCents += (subRecipeBaseCost * req.quantity).toLong()
-        continue
-      }
+          val recipeServings = subItem.recipeInfo?.servings?.takeIf { it > 0.0 } ?: 1.0
+          val costPerServing = subRecipeBaseCost.toDouble() / recipeServings
 
-      // It's an ingredient (purchasable)
-      val packages = packagesByIngredient[subItem.id] ?: emptyList()
-      val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
+          // Convert the required quantity into the recipe's base unit (servings)
+          val preferredUnitId = subItem.preferredUnitId ?: io.github.and19081.mealplanner.core.util.SystemUnits.Each.id
+          val reqUnitId = req.measurement.unitId ?: preferredUnitId
+          val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
 
-      val bestOption =
-          packages.minByOrNull {
-            if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
+          val servingsNeeded = io.github.and19081.mealplanner.core.util.UnitConverter.convert(
+              amount = req.measurement.quantity,
+              fromUnitId = reqUnitId,
+              toUnitId = preferredUnitId,
+              allUnits = allUnits,
+              bridges = bridges
+          ) ?: req.measurement.quantity // Fallback if no conversion exists
+
+          totalCents += (costPerServing * servingsNeeded).toLong()
+          return@let
+        }
+
+        // It's an ingredient (purchasable)
+        val packages = packagesByIngredient[subItem.id] ?: emptyList()
+        val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
+
+        val bestOption =
+            packages.minByOrNull {
+              if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
+            }
+
+        if (bestOption != null && bestOption.quantity > 0) {
+          val convertedReqQty =
+              UnitConverter.convert(
+                  amount = req.measurement.quantity,
+                  fromUnitId = req.measurement.unitId ?: subItem.preferredUnitId ?: Uuid.NIL,
+                  toUnitId = bestOption.unitId,
+                  allUnits = allUnits,
+                  bridges = bridges,
+              ) ?: 0.0
+
+          if (convertedReqQty > 0) {
+            val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
+            totalCents += (pricePerUnit * convertedReqQty).toLong()
           }
-
-      if (bestOption != null && bestOption.quantity > 0) {
-        val convertedReqQty =
-            UnitConverter.convert(
-                amount = req.quantity,
-                fromUnitId = req.unitId ?: subItem.preferredUnitId ?: Uuid.NIL,
-                toUnitId = bestOption.unitId,
-                allUnits = allUnits,
-                bridges = bridges,
-            ) ?: 0.0
-
-        if (convertedReqQty > 0) {
-          val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
-          totalCents += (pricePerUnit * convertedReqQty).toLong()
         }
       }
     }
@@ -108,7 +127,7 @@ object PriceCalculator {
         bridgesByIngredient,
         allUnits,
         emptySet()
-    )
+    ) ?: 0L
     
     return (baseCost * scale).toLong()
   }
@@ -122,19 +141,19 @@ object PriceCalculator {
       packagesByIngredient: Map<Uuid, List<Package>>,
       bridgesByIngredient: Map<Uuid, List<BridgeConversion>>,
       allUnits: Map<Uuid, UnitModel>,
-  ): Pair<Long, Long> {
+  ): Pair<Long?, Long?> {
     // 1. Cost to Make (Raw Materials)
     val costToMake =
         calculateFoodItemCost(recipe, allItemsMap, packagesByIngredient, bridgesByIngredient, allUnits)
 
     // 2. Cost to Buy (Equivalent Package Option)
-    var costToBuy = 0L
+    val costToBuy: Long? = null
     
     // In ECS, "produces ingredient" logic needs to be revisited.
     // For now, let's assume we look for a FoodItem that is an ingredient and matches the name?
     // Or add producesFoodItemId to RecipeInfo.
     
-    // For now, return 0 for costToBuy until schema updated or logic refined
+    // For now, return null for costToBuy until schema updated or logic refined
     return costToMake to costToBuy
   }
 }

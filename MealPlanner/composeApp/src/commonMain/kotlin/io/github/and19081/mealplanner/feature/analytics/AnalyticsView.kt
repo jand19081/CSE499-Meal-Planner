@@ -24,6 +24,7 @@ import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.ui.components.MpDetailScaffold
 import io.github.and19081.mealplanner.ui.components.MpOutlinedTextField
 import io.github.and19081.mealplanner.ui.components.MpValidationWarning
@@ -462,7 +463,8 @@ fun LazyListScope.analyticsListContent(
           ListItem(
               headlineContent = { Text(name) },
               trailingContent = {
-                Text("$${String.format("%.2f", cost / 100.0)}", fontWeight = FontWeight.Bold)
+                val costStr = if (cost != null) "$${String.format("%.2f", cost / 100.0)}" else "N/A"
+                Text(costStr, fontWeight = FontWeight.Bold)
               },
               colors = ListItemDefaults.colors(containerColor = Color.Transparent),
           )
@@ -547,7 +549,7 @@ fun ReceiptForm(
           Column(modifier = Modifier.padding(vertical = 8.dp)) {
             val name =
                 item.customName
-                    ?: allIngredients.find { it.id == item.foodItemId }?.name
+                    ?: allIngredients.find { it.id == item.measurement.foodItemId }?.name
                     ?: "Unknown"
             Row(verticalAlignment = Alignment.CenterVertically) {
               Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -557,12 +559,12 @@ fun ReceiptForm(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               MpOutlinedTextField(
-                  value = item.quantityBought.toString(),
+                  value = item.measurement.quantity.toString(),
                   onValueChange = { qty ->
                     val q = qty.toDoubleOrNull() ?: 0.0
                     lineItems =
                         lineItems.mapIndexed { i, old ->
-                          if (i == index) old.copy(quantityBought = q) else old
+                          if (i == index) old.copy(measurement = old.measurement.copy(quantity = q)) else old
                         }
                   },
                   label = { Text("Qty") },

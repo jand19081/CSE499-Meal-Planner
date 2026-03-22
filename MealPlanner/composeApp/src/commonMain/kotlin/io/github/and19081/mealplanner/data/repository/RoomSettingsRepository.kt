@@ -69,6 +69,7 @@ class RoomSettingsRepository(
       val model = update(current.toModel())
       dao.upsert(
           current.copy(
+              isFirstLaunch = model.isFirstLaunch,
               appMode = model.view,
               defaultTaxRatePercentage = model.defaultTaxRatePercentage,
               notificationDelayMinutes = model.mealConsumedNotificationDelayMinutes,

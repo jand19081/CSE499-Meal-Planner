@@ -228,7 +228,7 @@ class AnalyticsViewModel(
                           )
                       meal.name to cost
                     }
-                    .sortedByDescending { it.second }
+                    .sortedByDescending { it.second ?: 0L }
 
             AnalyticsUiState(
                 avgMealCostCents = avgMealCost.toLong(),
@@ -288,7 +288,7 @@ data class AnalyticsUiState(
     val avgCostPerPersonCents: Long = 0,
     val projectedTotalCents: Long = 0,
     val actualTotalCents: Long = 0,
-    val mostExpensiveMeals: List<Pair<String, Long>> = emptyList(),
+    val mostExpensiveMeals: List<Pair<String, Long?>> = emptyList(),
     val spendingByLocation: Map<String, Long> = emptyMap(),
     val recentShoppingTrips: List<ReceiptHistory> = emptyList(),
     val recentRestaurantMeals: List<ReceiptHistory> = emptyList(),

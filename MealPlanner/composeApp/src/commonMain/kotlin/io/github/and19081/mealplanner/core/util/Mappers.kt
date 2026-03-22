@@ -29,10 +29,19 @@ import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
 import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitEntity
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement as DomainMeasurement
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as UiDashboardConfig
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.datetime.*
+
+// --- Measurement Mappers ---
+fun EntityMeasurement.toDomain(): DomainMeasurement =
+    DomainMeasurement(foodItemId = foodItemId, unitId = unitId, quantity = quantity)
+
+fun DomainMeasurement.toEntity(): EntityMeasurement =
+    EntityMeasurement(foodItemId = foodItemId, unitId = unitId, quantity = quantity)
 
 // --- Unit Mappers ---
 fun UnitEntity.toModel(): UnitModel =
@@ -84,16 +93,18 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem =
                 mealType = it.mealType,
                 prepTimeMinutes = it.prepTimeMinutes,
                 cookTimeMinutes = it.cookTimeMinutes,
-                requirements = requirementGroups.flatMap { group ->
-                    group.requirements.map { req ->
-                        FoodItemRequirement(
-                            id = req.id,
-                            foodItemId = req.foodItemId,
-                            quantity = req.quantity,
-                            unitId = req.unitId,
-                            isPrimary = req.isPrimary
-                        )
-                    }
+                requirementGroups = requirementGroups.map { group ->
+                    io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup(
+                        id = group.group.id,
+                        sortOrder = group.group.sortOrder,
+                        requirements = group.requirements.map { req ->
+                            FoodItemRequirement(
+                                id = req.id,
+                                measurement = req.measurement.toDomain(),
+                                isPrimary = req.isPrimary
+                            )
+                        }
+                    )
                 }
             )
         },
@@ -108,6 +119,46 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem =
 
 fun FoodItem.toEntity(): FoodItemEntity =
     FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId)
+
+fun PurchasableInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity =
+    io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity(
+        foodItemId = foodItemId,
+        expectedPriceCents = expectedPriceCents,
+        categoryId = categoryId
+    )
+
+fun RecipeInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity =
+    io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity(
+        foodItemId = foodItemId,
+        description = description,
+        servings = servings,
+        mealType = mealType,
+        prepTimeMinutes = prepTimeMinutes,
+        cookTimeMinutes = cookTimeMinutes
+    )
+
+fun LeftoverInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity =
+    io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity(
+        foodItemId = foodItemId,
+        remainingServings = remainingServings,
+        dateAdded = dateAdded,
+        expirationDate = expirationDate
+    )
+
+fun io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity =
+    io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity(
+        id = id,
+        foodItemId = foodItemId,
+        sortOrder = sortOrder
+    )
+
+fun io.github.and19081.mealplanner.domain.model.FoodItemRequirement.toEntity(groupId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity =
+    io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity(
+        id = id,
+        groupId = groupId,
+        measurement = measurement.toEntity(),
+        isPrimary = isPrimary
+    )
 
 // --- Package Mappers ---
 fun PackageOptionEntity.toModel(): Package =
@@ -145,9 +196,7 @@ fun UnitConversionBridgeEntity.toModel(): BridgeConversion =
 fun PantryInventoryWithDetails.toModel(): PantryItem =
     PantryItem(
         id = pantryItem.id,
-        foodItemId = pantryItem.foodItemId,
-        quantity = pantryItem.quantity,
-        unitId = pantryItem.unitId,
+        measurement = pantryItem.measurement.toDomain(),
     )
 
 // --- Scheduled Meal Mappers ---
@@ -178,11 +227,9 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal =
 fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
     ShoppingListItem(
         id = cartItem.id,
-        foodItemId = cartItem.foodItemId,
         customName = cartItem.customName,
         storeId = cartItem.storeId ?: Uuid.parse("00000000-0000-0000-0000-000000000000"),
-        neededQuantity = cartItem.neededQuantity,
-        unitId = cartItem.unitId,
+        measurement = cartItem.measurement.toDomain(),
         packageId = cartItem.packageOptionId,
         isPurchased = cartItem.isPurchased,
         isPantryItem = cartItem.isPantryItem,
@@ -218,10 +265,8 @@ fun ReceiptLineItemEntity.toModel(): ReceiptLineItem =
     ReceiptLineItem(
         id = id,
         receiptId = receiptId,
-        foodItemId = foodItemId ?: Uuid.NIL,
-        unitId = unitId ?: Uuid.NIL,
         customName = customName,
-        quantityBought = quantityBought,
+        measurement = measurement.toDomain(),
         pricePaidCents = pricePaidCents,
     )
 
@@ -229,16 +274,19 @@ fun ReceiptLineItem.toEntity(): ReceiptLineItemEntity =
     ReceiptLineItemEntity(
         id = id,
         receiptId = receiptId,
-        foodItemId = foodItemId,
-        unitId = unitId,
         customName = customName,
-        quantityBought = quantityBought,
+        measurement = measurement.toEntity(),
         pricePaidCents = pricePaidCents,
     )
 
 // --- Settings Mappers ---
 fun AppSettingsEntity.toModel(): AppSettings =
-    AppSettings(view = appMode, defaultTaxRatePercentage = defaultTaxRatePercentage ?: 0.0)
+    AppSettings(
+        isFirstLaunch = isFirstLaunch,
+        view = appMode,
+        defaultTaxRatePercentage = defaultTaxRatePercentage ?: 0.0,
+        mealConsumedNotificationDelayMinutes = notificationDelayMinutes ?: 30
+    )
 
 fun UiDashboardConfig.toModel(): UiDashboardConfig =
     UiDashboardConfig(

@@ -71,9 +71,9 @@ data class ScheduledMealWithSource(
 data class ShoppingCartItemWithDetails(
     @Embedded val cartItem: ShoppingCartItemEntity,
     @Relation(parentColumn = "food_item_id", entityColumn = "id")
-    val foodItem: FoodItemEntity,
+    val foodItem: FoodItemEntity?,
     @Relation(parentColumn = "store_id", entityColumn = "id") val store: StoreEntity?,
-    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity?,
     @Relation(parentColumn = "package_option_id", entityColumn = "id")
     val packageOption: PackageOptionEntity?,
 )
@@ -85,8 +85,8 @@ data class ShoppingCartItemWithDetails(
 data class PantryInventoryWithDetails(
     @Embedded val pantryItem: PantryInventoryEntity,
     @Relation(parentColumn = "food_item_id", entityColumn = "id")
-    val foodItem: FoodItemEntity,
-    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity,
+    val foodItem: FoodItemEntity?,
+    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity?,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

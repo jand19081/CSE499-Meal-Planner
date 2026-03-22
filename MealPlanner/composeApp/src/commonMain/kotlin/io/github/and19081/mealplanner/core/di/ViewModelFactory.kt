@@ -50,6 +50,7 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
         di.storeRepository,
         di.restaurantRepository,
         di.unitRepository,
+        di.dataTransferService,
     )
 
     fun createIngredientsViewModel() = IngredientsViewModel(
