@@ -37,7 +37,7 @@ import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 
 /** Room database for the Meal Planner application with ECS architecture. */
 @Database(
-    version = 4,
+    version = 5,
     exportSchema = true,
     entities =
         [
@@ -77,53 +77,56 @@ import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 @ConstructedBy(MealPlannerDatabaseConstructor::class)
 abstract class MealPlannerDatabase : RoomDatabase() {
 
-  abstract fun unitDao(): UnitDao
+    abstract fun unitDao(): UnitDao
 
-  abstract fun categoryDao(): CategoryDao
+    abstract fun categoryDao(): CategoryDao
 
-  abstract fun storeDao(): StoreDao
+    abstract fun storeDao(): StoreDao
 
-  abstract fun restaurantDao(): RestaurantDao
+    abstract fun restaurantDao(): RestaurantDao
 
-  abstract fun foodItemDao(): FoodItemDao
+    abstract fun foodItemDao(): FoodItemDao
 
-  abstract fun scheduledMealDao(): ScheduledMealDao
+    abstract fun scheduledMealDao(): ScheduledMealDao
 
-  abstract fun packageOptionDao(): PackageOptionDao
+    abstract fun packageOptionDao(): PackageOptionDao
 
-  abstract fun pantryDao(): PantryDao
+    abstract fun pantryDao(): PantryDao
 
-  abstract fun shoppingListDao(): ShoppingListDao
+    abstract fun shoppingListDao(): ShoppingListDao
 
-  abstract fun receiptDao(): ReceiptDao
+    abstract fun receiptDao(): ReceiptDao
 
-  abstract fun appSettingsDao(): AppSettingsDao
+    abstract fun appSettingsDao(): AppSettingsDao
 
-  companion object {
-    fun getDatabase(builder: Builder<MealPlannerDatabase>): MealPlannerDatabase {
-      return builder
-          .setDriver(BundledSQLiteDriver())
-          .addCallback(MealPlannerCallback())
-          .fallbackToDestructiveMigration(true)
-          .build()
-    }
+    companion object {
 
-    class MealPlannerCallback : Callback() {
-      override fun onOpen(connection: SQLiteConnection) {
-        super.onOpen(connection)
-        val stmt = connection.prepare("PRAGMA foreign_keys = ON;")
-        try {
-          stmt.step()
-        } finally {
-          stmt.close()
+        class MealPlannerCallback : Callback() {
+            override fun onOpen(connection: SQLiteConnection) {
+                super.onOpen(connection)
+                val stmt = connection.prepare("PRAGMA foreign_keys = ON;")
+                try {
+                    stmt.step()
+                } finally {
+                    stmt.close()
+                }
+            }
         }
-      }
+
+
+
+        fun getDatabase(builder: Builder<MealPlannerDatabase>): MealPlannerDatabase {
+            return builder
+                .setDriver(BundledSQLiteDriver())
+                .addCallback(MealPlannerCallback())
+                .fallbackToDestructiveMigration(true)
+                .build()
+        }
     }
-  }
 }
 
 // The expect object that Room will use to construct the database implementation
 @Suppress("KotlinNoActualForExpect")
 expect object MealPlannerDatabaseConstructor : RoomDatabaseConstructor<MealPlannerDatabase> {
-  override fun initialize(): MealPlannerDatabase
+    override fun initialize(): MealPlannerDatabase
 }

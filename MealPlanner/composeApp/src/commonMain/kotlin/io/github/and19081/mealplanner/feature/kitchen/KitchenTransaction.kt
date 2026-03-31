@@ -34,5 +34,5 @@ data class KitchenTransaction(
     val type: TransactionType,
     val title: String,
     val changes: List<InventoryChange>,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 )

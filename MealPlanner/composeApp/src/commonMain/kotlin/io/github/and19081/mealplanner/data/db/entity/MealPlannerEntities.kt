@@ -82,7 +82,7 @@ data class FoodItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "preferred_unit_id") val preferredUnitId: Uuid? = null,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "created_at") val createdAt: Long? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long? = null,
 )
 
@@ -135,6 +135,7 @@ data class RecipeComponentEntity(
     @ColumnInfo(name = "description") val description: String? = null,
     @ColumnInfo(name = "servings") val servings: Double = 1.0,
     @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
+    @ColumnInfo(name = "is_meal") val isMeal: Boolean = false,
     @ColumnInfo(name = "prep_time_minutes") val prepTimeMinutes: Int? = null,
     @ColumnInfo(name = "cook_time_minutes") val cookTimeMinutes: Int? = null,
 )
@@ -188,26 +189,9 @@ data class RecipeInstructionEntity(
 
 @Entity(
     tableName = "scheduled_meals",
-    foreignKeys =
-        [
-            ForeignKey(
-                entity = FoodItemEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["food_item_id"],
-                onDelete = ForeignKey.CASCADE,
-            ),
-            ForeignKey(
-                entity = RestaurantEntity::class,
-                parentColumns = ["id"],
-                childColumns = ["restaurant_id"],
-                onDelete = ForeignKey.SET_NULL,
-            ),
-        ],
     indices =
         [
             Index(value = ["date"]),
-            Index(value = ["food_item_id"]),
-            Index(value = ["restaurant_id"]),
         ],
 )
 data class ScheduledMealEntity(
@@ -217,9 +201,10 @@ data class ScheduledMealEntity(
     @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
     @ColumnInfo(name = "people_count") val peopleCount: Int = 1,
     @ColumnInfo(name = "is_consumed") val isConsumed: Boolean = false,
+    @ColumnInfo(name = "meal_source") val mealSource: String,
     @ColumnInfo(name = "anticipated_cost_cents") val anticipatedCostCents: Int? = null,
-    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
-    @ColumnInfo(name = "restaurant_id") val restaurantId: Uuid? = null,
+    @ColumnInfo(name = "scheduled_quantity") val scheduledQuantity: Double? = null,
+    @ColumnInfo(name = "scheduled_quantity_unit_id") val scheduledQuantityUnitId: Uuid? = null,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,7 +238,12 @@ data class AppSettingsEntity(
         [
             ForeignKey(entity = StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.RESTRICT),
             ForeignKey(entity = RestaurantEntity::class, ["id"], ["restaurant_id"], onDelete = ForeignKey.RESTRICT),
-            ForeignKey(entity = ScheduledMealEntity::class, ["id"], ["scheduled_meal_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(
+                entity = ScheduledMealEntity::class,
+                ["id"],
+                ["scheduled_meal_id"],
+                onDelete = ForeignKey.CASCADE
+            ),
         ],
     indices = [Index(value = ["store_id"]), Index(value = ["restaurant_id"]), Index(value = ["scheduled_meal_id"])],
 )
@@ -328,7 +318,12 @@ data class RecipeRequirementGroupEntity(
     tableName = "recipe_requirements",
     foreignKeys =
         [
-            ForeignKey(entity = RecipeRequirementGroupEntity::class, ["id"], ["group_id"], onDelete = ForeignKey.CASCADE),
+            ForeignKey(
+                entity = RecipeRequirementGroupEntity::class,
+                ["id"],
+                ["group_id"],
+                onDelete = ForeignKey.CASCADE
+            ),
             ForeignKey(entity = FoodItemEntity::class, ["id"], ["food_item_id"], onDelete = ForeignKey.CASCADE),
             ForeignKey(entity = UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
         ],

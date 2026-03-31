@@ -4,6 +4,8 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.recipeInfo
 import kotlin.uuid.Uuid
 
 sealed class DataWarning(val message: String) {
@@ -43,7 +45,7 @@ object DataQualityValidator {
       for (req in group.requirements) {
         val subItem = allItemsMap[req.measurement.foodItemId] ?: continue
         
-        if (subItem.isRecipe) {
+        if (subItem.isRecipe()) {
           warnings.addAll(
               validateFoodItem(
                   item = subItem,

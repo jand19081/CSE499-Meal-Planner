@@ -42,19 +42,78 @@ data class BridgeConversion(
     val toQuantity: Double,
 )
 
-@Serializable
-data class FoodItem(
-    val id: Uuid = Uuid.random(),
-    val name: String,
-    val preferredUnitId: Uuid? = null,
-    val purchasableInfo: PurchasableInfo? = null,
-    val recipeInfo: RecipeInfo? = null,
-    val leftoverInfo: LeftoverInfo? = null,
-) {
-    val isIngredient: Boolean get() = purchasableInfo != null
-    val isRecipe: Boolean get() = recipeInfo != null
-    val isLeftover: Boolean get() = leftoverInfo != null
+/**
+ * Marker interface for all FoodItem types.
+ */
+interface FoodItem {
+    val id: Uuid
+    val name: String
+    val preferredUnitId: Uuid?
 }
+
+/**
+ * Variant for purchasable ingredients.
+ */
+@Serializable
+data class Ingredient(
+    override val id: Uuid = Uuid.random(),
+    override val name: String,
+    override val preferredUnitId: Uuid? = null,
+    val purchasableInfo: PurchasableInfo? = null,
+) : FoodItem
+
+/**
+ * Variant for recipe-based items (meals and recipes share storage).
+ */
+@Serializable
+data class Recipe(
+    override val id: Uuid = Uuid.random(),
+    override val name: String,
+    override val preferredUnitId: Uuid? = null,
+    val recipeInfo: RecipeInfo,
+) : FoodItem
+
+/**
+ * Variant for pre-planned meals (shares storage with Recipe but marked as meal).
+ */
+@Serializable
+data class Meal(
+    override val id: Uuid = Uuid.random(),
+    override val name: String,
+    override val preferredUnitId: Uuid? = null,
+    val recipeInfo: RecipeInfo,
+) : FoodItem
+
+/**
+ * Variant for leftover/prepared food items.
+ */
+@Serializable
+data class Leftover(
+    override val id: Uuid = Uuid.random(),
+    override val name: String,
+    override val preferredUnitId: Uuid? = null,
+    val leftoverInfo: LeftoverInfo,
+) : FoodItem
+
+// Extension functions for FoodItem type checking
+fun FoodItem.isIngredient(): Boolean = this is Ingredient
+fun FoodItem.isRecipe(): Boolean = this is Recipe
+fun FoodItem.isMeal(): Boolean = this is Meal
+fun FoodItem.isLeftover(): Boolean = this is Leftover
+
+// Extension properties to access type-specific info
+val FoodItem.purchasableInfo: PurchasableInfo?
+    get() = (this as? Ingredient)?.purchasableInfo
+
+val FoodItem.recipeInfo: RecipeInfo?
+    get() = when (this) {
+        is Recipe -> this.recipeInfo
+        is Meal -> this.recipeInfo
+        else -> null
+    }
+
+val FoodItem.leftoverInfo: LeftoverInfo?
+    get() = (this as? Leftover)?.leftoverInfo
 
 @Serializable
 data class PurchasableInfo(

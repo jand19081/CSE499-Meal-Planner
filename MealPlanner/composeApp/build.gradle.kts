@@ -17,7 +17,7 @@ room { schemaDirectory("$projectDir/schemas") }
 kotlin {
   sourceSets.all { languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi") }
 
-  androidLibrary {
+  android {
     namespace = "io.github.and19081.mealplanner"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()

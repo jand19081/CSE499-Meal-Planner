@@ -74,51 +74,98 @@ fun StoreEntity.toModel(): Store = Store(id = id, name = name)
 fun Store.toEntity(): StoreEntity = StoreEntity(id = id, name = name)
 
 // --- Food Item Mappers (ECS) ---
-fun ComposedFoodItemRelation.toDomainModel(): FoodItem =
-    FoodItem(
-        id = item.id,
-        name = item.name,
-        preferredUnitId = item.preferredUnitId,
-        purchasableInfo = purchasable?.let {
-            PurchasableInfo(
-                expectedPriceCents = it.expectedPriceCents,
-                categoryId = it.categoryId
+fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
+    val processedRecipeInfo = recipe?.let {
+        RecipeInfo(
+            description = it.description,
+            instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
+            servings = it.servings,
+            mealType = it.mealType,
+            prepTimeMinutes = it.prepTimeMinutes,
+            cookTimeMinutes = it.cookTimeMinutes,
+            requirementGroups = requirementGroups.map { group ->
+                io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup(
+                    id = group.group.id,
+                    sortOrder = group.group.sortOrder,
+                    requirements = group.requirements.map { req ->
+                        FoodItemRequirement(
+                            id = req.id,
+                            measurement = req.measurement.toDomain(),
+                            isPrimary = req.isPrimary
+                        )
+                    }
+                )
+            }
+        )
+    }
+
+    return when {
+        purchasable != null -> FoodItem.Ingredient(
+            id = item.id,
+            name = item.name,
+            preferredUnitId = item.preferredUnitId,
+            purchasableInfo = PurchasableInfo(
+                expectedPriceCents = purchasable.expectedPriceCents,
+                categoryId = purchasable.categoryId
             )
-        },
-        recipeInfo = recipe?.let {
-            RecipeInfo(
-                description = it.description,
-                instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
-                servings = it.servings,
-                mealType = it.mealType,
-                prepTimeMinutes = it.prepTimeMinutes,
-                cookTimeMinutes = it.cookTimeMinutes,
-                requirementGroups = requirementGroups.map { group ->
-                    io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup(
-                        id = group.group.id,
-                        sortOrder = group.group.sortOrder,
-                        requirements = group.requirements.map { req ->
-                            FoodItemRequirement(
-                                id = req.id,
-                                measurement = req.measurement.toDomain(),
-                                isPrimary = req.isPrimary
-                            )
-                        }
-                    )
-                }
+        )
+
+        processedRecipeInfo != null -> {
+            // Check the isMeal flag from the recipe component entity
+            if (recipe?.isMeal == true) {
+                FoodItem.Meal(
+                    id = item.id,
+                    name = item.name,
+                    preferredUnitId = item.preferredUnitId,
+                    recipeInfo = processedRecipeInfo
+                )
+            } else {
+                FoodItem.Recipe(
+                    id = item.id,
+                    name = item.name,
+                    preferredUnitId = item.preferredUnitId,
+                    recipeInfo = processedRecipeInfo
+                )
+            }
+        }
+
+        leftover != null -> FoodItem.Leftover(
+            id = item.id,
+            name = item.name,
+            preferredUnitId = item.preferredUnitId,
+            leftoverInfo = LeftoverInfo(
+                remainingServings = leftover.remainingServings,
+                dateAdded = leftover.dateAdded,
+                expirationDate = leftover.expirationDate
             )
-        },
-        leftoverInfo = leftover?.let {
-            LeftoverInfo(
-                remainingServings = it.remainingServings,
-                dateAdded = it.dateAdded,
-                expirationDate = it.expirationDate
+        )
+
+        else -> {
+            // No component - create a base Ingredient with no purchasable info
+            FoodItem.Ingredient(
+                id = item.id,
+                name = item.name,
+                preferredUnitId = item.preferredUnitId,
+                purchasableInfo = null
             )
         }
-    )
+    }
+}
 
 fun FoodItem.toEntity(): FoodItemEntity =
     FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId)
+
+// Extension function to get purchasableInfo from an Ingredient
+val FoodItem.purchasableInfo: PurchasableInfo?
+    get() = (this as? FoodItem.Ingredient)?.purchasableInfo
+
+// Extension function to get recipeInfo from Recipe or Meal variants
+val FoodItem.recipeInfoFromBase: RecipeInfo?
+    get() = when (this) {
+        is FoodItem.Recipe -> this.recipeInfo
+        is FoodItem.Meal -> this.recipeInfo
+        else -> null
+    }
 
 fun PurchasableInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity =
     io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity(
