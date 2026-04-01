@@ -12,6 +12,9 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.domain.logic.PriceCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.isMeal
+import io.github.and19081.mealplanner.domain.model.isIngredient
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -126,7 +129,7 @@ class AnalyticsViewModel(
             val restaurantMap = data.restaurants.associateBy { it.id }
 
             val globalWarnings =
-                data.allItems.filter { it.isRecipe }
+                data.allItems.filter { it.isRecipe() || it.isMeal() }
                     .flatMap { meal ->
                         DataQualityValidator.validateFoodItem(
                             meal,
@@ -217,7 +220,7 @@ class AnalyticsViewModel(
                     .toMap()
 
             val mealCosts =
-                data.allItems.filter { it.isRecipe }
+                data.allItems.filter { it.isRecipe() || it.isMeal() }
                     .map { meal ->
                         val cost =
                             PriceCalculator.calculateFoodItemCost(
@@ -359,7 +362,7 @@ class AnalyticsViewModel(
                         .sortedByDescending { it.date },
                 allStores = data.stores,
                 allRestaurants = data.restaurants,
-                allIngredients = data.allItems.filter { it.isIngredient },
+                allIngredients = data.allItems.filter { it.isIngredient() },
                 allUnits = data.allUnits,
                 warnings = globalWarnings,
                 currentFilter = data.filter,

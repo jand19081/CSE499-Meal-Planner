@@ -8,6 +8,8 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.isIngredient
+import io.github.and19081.mealplanner.domain.model.isLeftover
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import io.github.and19081.mealplanner.feature.meals.PantryItem
@@ -93,7 +95,7 @@ class PantryViewModel(
                 }
 
             val joinedLeftovers =
-                allItems.filter { it.isLeftover }.map { item ->
+                allItems.filter { it.isLeftover() }.map { item ->
                     val info = item.leftoverInfo!!
                     LeftoverItemUi(
                         id = item.id,
@@ -119,7 +121,7 @@ class PantryViewModel(
             PantryUiState(
                 items = filteredPantry.sortedBy { it.name },
                 leftovers = filteredLeftovers.sortedByDescending { it.dateAdded },
-                allIngredients = allItems.filter { it.isIngredient }.sortedBy { it.name },
+                allIngredients = allItems.filter { it.isIngredient() }.sortedBy { it.name },
                 allUnits = allUnits,
             )
         }

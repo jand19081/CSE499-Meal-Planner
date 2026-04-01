@@ -5,6 +5,10 @@ import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.UnitType
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Ingredient
+import io.github.and19081.mealplanner.domain.model.Leftover
+import io.github.and19081.mealplanner.domain.model.Meal
+import io.github.and19081.mealplanner.domain.model.Recipe
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.LeftoverInfo
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -79,7 +83,7 @@ class CommitConsumptionUseCase(
                 saveRestaurantReceipt(result)
                 if (result.leftoverServings > 0) {
                     val name = result.leftoverDescription ?: "Restaurant Meal"
-                    val leftover = FoodItem.Leftover(
+                    val leftover = Leftover(
                         name = "$name (Leftover)",
                         leftoverInfo = LeftoverInfo(
                             remainingServings = result.leftoverServings,
@@ -97,8 +101,8 @@ class CommitConsumptionUseCase(
 
     private suspend fun deductRecipeIngredients(item: FoodItem, servingsNeeded: Double) {
         val recipeInfo = when (item) {
-            is FoodItem.Recipe -> item.recipeInfo
-            is FoodItem.Meal -> item.recipeInfo
+            is Recipe -> item.recipeInfo
+            is Meal -> item.recipeInfo
             else -> return
         }
         val allItems = foodItemRepository.foodItems.first().associateBy { it.id }
@@ -108,8 +112,8 @@ class CommitConsumptionUseCase(
 
         fun deductRecursive(fi: FoodItem, multiplier: Double) {
             val info = when (fi) {
-                is FoodItem.Recipe -> fi.recipeInfo
-                is FoodItem.Meal -> fi.recipeInfo
+                is Recipe -> fi.recipeInfo
+                is Meal -> fi.recipeInfo
                 else -> return
             }
             val servingsPerBatch = if (info.servings > 0) info.servings else 1.0
@@ -118,10 +122,10 @@ class CommitConsumptionUseCase(
                     ?: group.requirements.firstOrNull() ?: return@forEach
                 val subItem = allItems[primary.measurement.foodItemId] ?: return@forEach
                 when (subItem) {
-                    is FoodItem.Recipe, is FoodItem.Meal -> {
+                    is Recipe, is Meal -> {
                         val subInfo = when (subItem) {
-                            is FoodItem.Recipe -> subItem.recipeInfo
-                            is FoodItem.Meal -> subItem.recipeInfo
+                            is Recipe -> subItem.recipeInfo
+                            is Meal -> subItem.recipeInfo
                             else -> return@forEach
                         }
                         val scale = if (subInfo.servings > 0)
@@ -129,7 +133,7 @@ class CommitConsumptionUseCase(
                         deductRecursive(subItem, multiplier * scale)
                     }
 
-                    is FoodItem.Ingredient -> {
+                    is Ingredient -> {
                         val targetUnitId = subItem.preferredUnitId ?: when (
                             allUnits.find { it.id == primary.measurement.unitId }?.type
                         ) {
@@ -171,7 +175,7 @@ class CommitConsumptionUseCase(
     }
 
     private suspend fun addLeftover(source: FoodItem, servings: Double) {
-        val leftover = FoodItem.Leftover(
+        val leftover = Leftover(
             name = "${source.name} (Leftover)",
             leftoverInfo = LeftoverInfo(
                 remainingServings = servings,

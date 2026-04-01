@@ -8,6 +8,7 @@ import io.github.and19081.mealplanner.core.util.Validators
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.isIngredient
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
@@ -66,7 +67,7 @@ class IngredientsViewModel(
             val allStores = args[7] as List<Store>
             val allUnits = args[8] as List<UnitModel>
             
-            val allIngredients = allItems.filter { it.isIngredient }
+            val allIngredients = allItems.filter { it.isIngredient() }
             
             val filtered =
                 if (query.isBlank()) allIngredients

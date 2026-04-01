@@ -66,6 +66,7 @@ fun AnalyticsView(viewModel: AnalyticsViewModel, mode: Mode, isExpanded: Boolean
               isExpanded,
           )
           AnalyticsSummaryCards(uiState)
+          CostComparisonSection(uiState)
           AnalyticsLocationBreakdown(uiState)
         }
 
@@ -170,6 +171,7 @@ fun AnalyticsView(viewModel: AnalyticsViewModel, mode: Mode, isExpanded: Boolean
                 )
               }
               item { AnalyticsSummaryCards(uiState) }
+              item { CostComparisonSection(uiState) }
               item { AnalyticsLocationBreakdown(uiState) }
               analyticsListContent(uiState, onTripClick = { selectedTrip = it })
             }
@@ -331,6 +333,59 @@ fun AnalyticsSummaryCards(uiState: AnalyticsUiState) {
       }
     }
   }
+}
+
+@Composable
+fun CostComparisonSection(uiState: AnalyticsUiState) {
+    val comparisons = listOfNotNull(
+        uiState.projectedVsActualWeekly,
+        uiState.projectedVsActualMonthly,
+        uiState.projectedVsActualAnnual,
+    )
+    if (comparisons.isEmpty()) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Projected vs. Actual",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            comparisons.forEach { comparison ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(comparison.period, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "Projected: $${String.format("%.2f", comparison.projected / 100.0)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                        Text(
+                            "Actual: $${String.format("%.2f", comparison.actual / 100.0)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        val diff = comparison.percentDifference
+                        val sign = if (diff >= 0) "+" else ""
+                        Text(
+                            "${sign}${String.format("%.1f", diff)}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (diff > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+                }
+                if (comparison !== comparisons.last()) HorizontalDivider()
+            }
+        }
+    }
 }
 
 @Composable

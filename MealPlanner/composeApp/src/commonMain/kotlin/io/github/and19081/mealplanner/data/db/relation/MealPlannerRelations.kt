@@ -11,7 +11,6 @@ import io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity
 import io.github.and19081.mealplanner.data.db.entity.RecipeInstructionEntity
 import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity
 import io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity
-import io.github.and19081.mealplanner.data.db.entity.RestaurantEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
 import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreEntity
@@ -58,10 +57,6 @@ data class RecipeRequirementGroupWithRequirements(
 
 data class ScheduledMealWithSource(
     @Embedded val scheduledMeal: ScheduledMealEntity,
-    @Relation(parentColumn = "food_item_id", entityColumn = "id")
-    val foodItem: FoodItemEntity?,
-    @Relation(parentColumn = "restaurant_id", entityColumn = "id")
-    val restaurant: RestaurantEntity?,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

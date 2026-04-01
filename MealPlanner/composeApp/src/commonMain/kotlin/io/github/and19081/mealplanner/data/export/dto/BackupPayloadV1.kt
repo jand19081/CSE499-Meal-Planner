@@ -111,8 +111,7 @@ data class ScheduledMealDtoV1(
     val peopleCount: Int,
     val isConsumed: Boolean,
     val anticipatedCostCents: Int?,
-    val foodItemId: String?,
-    val restaurantId: String?,
+    val mealSource: String = "",
 )
 
 @Serializable

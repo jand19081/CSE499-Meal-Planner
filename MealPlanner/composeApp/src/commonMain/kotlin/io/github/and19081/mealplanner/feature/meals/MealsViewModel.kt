@@ -10,6 +10,9 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.Validators
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Meal
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.isMeal
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
@@ -91,7 +94,7 @@ class MealsViewModel(
 
   fun saveDraft() {
       val mealId = _draftMealId.value ?: return
-      val finalMeal = FoodItem(
+      val finalMeal = Meal(
           id = mealId,
           name = draftName.value,
           recipeInfo = RecipeInfo(
@@ -120,7 +123,7 @@ class MealsViewModel(
   }
 
   val uiState = combine(coreDataFlow, filterFlow) { data, filter ->
-      val allMeals = data.items.filter { it.isRecipe }
+      val allMeals = data.items.filter { it.isRecipe() || it.isMeal() }
       val itemsById = data.items.associateBy { it.id }
 
       val warningsMap = allMeals.associate { meal ->
@@ -204,7 +207,7 @@ class MealsViewModel(
 
         fun addChange(itemId: Uuid, qty: Double, unitId: Uuid?) {
             val item = itemsMap[itemId]
-            if (item != null && !item.isRecipe) {
+            if (item != null && !item.isRecipe()) {
                 val unit = allUnits.find { it.id == unitId }
                 changes.add(
                     InventoryChange(

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -85,6 +86,16 @@ fun PantryView(
         isAdding = false
     }
 
+    showConsumeDialog?.let { itemToConsume ->
+        ConsumePantryItemDialog(
+            item = itemToConsume,
+            onDismiss = onDismissConsume,
+            onConsume = { qty ->
+                viewModel.consumeItem(itemToConsume.batchId, qty)
+            }
+        )
+    }
+
     if (actualIsExpanded) {
         Row(modifier = Modifier.fillMaxSize()) {
             // List Pane
@@ -95,6 +106,7 @@ fun PantryView(
                     onItemClick = onItemClick,
                     onLeftoverClick = onLeftoverClick,
                     onAddClick = onAddClick,
+                    onConsumeClick = onConsumeClick,
                 )
             }
 
@@ -182,6 +194,7 @@ fun PantryView(
                 onItemClick = onItemClick,
                 onLeftoverClick = onLeftoverClick,
                 onAddClick = onAddClick,
+                onConsumeClick = onConsumeClick,
             )
         }
     }
@@ -194,6 +207,7 @@ fun PantryListPane(
     onItemClick: (PantryItemUi) -> Unit,
     onLeftoverClick: (LeftoverItemUi) -> Unit,
     onAddClick: () -> Unit,
+    onConsumeClick: (PantryItemUi) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -270,7 +284,6 @@ fun ConsumePantryItemDialog(
                     label = "Amount to consume",
                     modifier = Modifier.fillMaxWidth(),
                     step = 0.5,
-                    max = item.quantity
                 )
             }
         },
@@ -354,7 +367,6 @@ fun PantryItemRow(
         }
         Column(
             horizontalAlignment = Alignment.End,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "${String.format("%.2f", item.quantity)} ${item.unit.abbreviation}",
@@ -391,120 +403,74 @@ fun PantryForm(
     onDelete: (() -> Unit)? = null,
     onAddIngredient: (String, (FoodItem) -> Unit) -> Unit,
 ) {
-}
+    var selectedIngName by remember(item) { mutableStateOf(item?.name ?: "") }
+    var quantityStr by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "") }
+    var selectedUnitName by remember(item) { mutableStateOf(item?.unit?.abbreviation ?: "") }
 
-@Composable
-fun ConsumePantryItemDialog(
-    item: PantryItemUi,
-    onDismiss: () -> Unit,
-    onConsume: (Double) -> Unit,
-) {
-    var quantityStr by remember { mutableStateOf("") }
+    MpDetailScaffold(
+        title = if (item == null) "Add to Pantry" else "Update Item",
+        onClose = onDismiss,
+        onSave = {
+            val qty = quantityStr.toDoubleOrNull()
+            val ingId =
+                if (item != null) item.id else allIngredients.find { it.name == selectedIngName }?.id
+            val unit = allUnits.find { it.abbreviation == selectedUnitName }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Consume ${item.name}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Available: ${String.format("%.2f", item.quantity)} ${item.unit.abbreviation}")
-                MpNumericStepper(
-                    value = quantityStr.toDoubleOrNull() ?: 0.0,
-                    onValueChange = { quantityStr = it.toString() },
-                    label = "Amount to consume",
-                    modifier = Modifier.fillMaxWidth(),
-                    step = 0.5,
-                    max = item.quantity
-                )
+            if (ingId != null && qty != null && unit != null) {
+                onSave(ingId, qty, unit.id)
             }
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val qty = quantityStr.toDoubleOrNull()
-                    if (qty != null && qty > 0) {
-                        onConsume(qty)
-                        onDismiss()
-                    }
-                },
-                enabled = quantityStr.toDoubleOrNull() != null
-            ) {
-                Text("Consume")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-var selectedIngName by remember(item) { mutableStateOf(item?.name ?: "") }
-var quantityStr by remember(item) { mutableStateOf(item?.quantity?.toString() ?: "") }
-var selectedUnitName by remember(item) { mutableStateOf(item?.unit?.abbreviation ?: "") }
-
-MpDetailScaffold(
-title = if (item == null) "Add to Pantry" else "Update Item",
-onClose = onDismiss,
-onSave = {
-    val qty = quantityStr.toDoubleOrNull()
-    val ingId =
-        if (item != null) item.id else allIngredients.find { it.name == selectedIngName }?.id
-    val unit = allUnits.find { it.abbreviation == selectedUnitName }
-
-    if (ingId != null && qty != null && unit != null) {
-        onSave(ingId, qty, unit.id)
-    }
-},
-saveEnabled =
-(item != null || selectedIngName.isNotBlank()) &&
-quantityStr.toDoubleOrNull() != null &&
-selectedUnitName.isNotBlank(),
-onDelete = onDelete,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (item == null) {
-            SearchableDropdown(
-                label = "FoodItem",
-                options = allIngredients.map { it.name },
-                selectedOption = selectedIngName,
-                onOptionSelected = { selectedIngName = it },
-                onAddOption = { name ->
-                    onAddIngredient(name) { newIng -> selectedIngName = newIng.name }
-                },
-                onDeleteOption = {},
-                deleteWarningMessage = "",
-            )
-        } else {
-            Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(
-                item.category,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MpNumericStepper(
-                value = quantityStr.toDoubleOrNull() ?: 0.0,
-                onValueChange = { quantityStr = it.toString() },
-                label = "Quantity",
-                modifier = Modifier.weight(1f),
-                step = 1.0,
-            )
-
-            Box(modifier = Modifier.weight(1f)) {
+        saveEnabled =
+            (item != null || selectedIngName.isNotBlank()) &&
+            quantityStr.toDoubleOrNull() != null &&
+            selectedUnitName.isNotBlank(),
+        onDelete = onDelete,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (item == null) {
                 SearchableDropdown(
-                    label = "Unit",
-                    options = allUnits.map { it.abbreviation },
-                    selectedOption = selectedUnitName,
-                    onOptionSelected = { selectedUnitName = it },
-                    onAddOption = {},
+                    label = "Ingredient",
+                    options = allIngredients.map { it.name },
+                    selectedOption = selectedIngName,
+                    onOptionSelected = { selectedIngName = it },
+                    onAddOption = { name ->
+                        onAddIngredient(name) { newIng -> selectedIngName = newIng.name }
+                    },
                     onDeleteOption = {},
                     deleteWarningMessage = "",
                 )
+            } else {
+                Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    item.category,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MpNumericStepper(
+                    value = quantityStr.toDoubleOrNull() ?: 0.0,
+                    onValueChange = { quantityStr = it.toString() },
+                    label = "Quantity",
+                    modifier = Modifier.weight(1f),
+                    step = 1.0,
+                )
+
+                Box(modifier = Modifier.weight(1f)) {
+                    SearchableDropdown(
+                        label = "Unit",
+                        options = allUnits.map { it.abbreviation },
+                        selectedOption = selectedUnitName,
+                        onOptionSelected = { selectedUnitName = it },
+                        onAddOption = {},
+                        onDeleteOption = {},
+                        deleteWarningMessage = "",
+                    )
+                }
             }
         }
     }
-}
 }
 
 @Composable

@@ -7,14 +7,6 @@ import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.core.theme.AppTheme
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.core.util.UnitType
-import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.feature.kitchen.KitchenTransaction
-import io.github.and19081.mealplanner.feature.main.Routes
-import io.github.and19081.mealplanner.feature.meals.MealPlan
-import io.github.and19081.mealplanner.feature.recipes.RecipeExecutionState
-import io.github.and19081.mealplanner.feature.settings.SettingsState
-import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingList
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -72,21 +64,21 @@ class MealPlannerTypeConverters {
     }
 
     @TypeConverter
-    fun mealSourceToJson(source: MealSource): String = json.encodeToString(MealSource.serializer(), source)
+    fun mealSourceToJson(source: MealSource): String = json.encodeToString(source)
 
     @TypeConverter
     fun jsonToMealSource(jsonString: String): MealSource =
         jsonString.ifEmpty { "{}" }
-            .let { json.decodeFromString(MealSource.serializer(), it) }
+            .let { json.decodeFromString<MealSource>(it) }
 
     // ── ConsumptionResult (serialized JSON) ──────────────────────────────────────────
 
     @TypeConverter
     fun consumptionResultToJson(result: ConsumptionResult): String =
-        json.encodeToString(ConsumptionResult.serializer(), result)
+        json.encodeToString(result)
 
     @TypeConverter
     fun jsonToConsumptionResult(jsonString: String): ConsumptionResult =
         jsonString.ifEmpty { "{}" }
-            .let { json.decodeFromString(ConsumptionResult.serializer(), it) }
+            .let { json.decodeFromString<ConsumptionResult>(it) }
 }

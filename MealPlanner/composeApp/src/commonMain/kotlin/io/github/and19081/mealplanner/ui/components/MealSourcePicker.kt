@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,11 +16,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.and19081.mealplanner.core.util.UnitModel
+import io.github.and19081.mealplanner.core.util.UnitType
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.MealSource
 import io.github.and19081.mealplanner.domain.model.Package
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+
+private enum class SourceType {
+    MEAL,
+    RECIPE,
+    INGREDIENT,
+    RESTAURANT
+}
 
 /**
  * A unified searchable dropdown component for selecting meal sources.
@@ -394,9 +403,10 @@ fun MealSourcePicker(
                                             onUnitChange(
                                                 UnitModel(
                                                     id = Uuid.random(),
+                                                    type = UnitType.Other,
                                                     abbreviation = abbr,
-                                                    plural = "${abbr}s",
-                                                    category = "cooking"
+                                                    displayName = abbr,
+                                                    isSystemUnit = false,
                                                 )
                                             )
                                         },
@@ -447,51 +457,39 @@ fun MealSourcePicker(
         }
     }
 
-    /**
-     * Internal data class to represent a selectable source type
-     */
-    private enum class SourceType {
-        MEAL,
-        RECIPE,
-        INGREDIENT,
-        RESTAURANT
-    }
+}
 
-    /**
-     * A dropdown menu item with selection state
-     */
-    @Composable
-    private fun SelectionOptionItem(
-        name: String,
-        subtitle: String,
-        isSelected: Boolean,
-        onClick: () -> Unit
-    ) {
-        DropdownMenuItem(
-            text = {
-                Column {
-                    Text(
-                        name,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            onClick = onClick,
-            leadingIcon = {
-                if (isSelected) {
-                    Icon(
-                        androidx.compose.material.icons.Icons.Default.Check,
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
+@Composable
+private fun SelectionOptionItem(
+    name: String,
+    subtitle: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Column {
+                Text(
+                    name,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        onClick = onClick,
+        leadingIcon = {
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }

@@ -1,6 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
+import io.github.and19081.mealplanner.domain.model.MealSource
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.datetime.*
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 
 class RoomMealPlanRepository(
@@ -82,8 +84,25 @@ class RoomMealPlanRepository(
     dao.clearAll()
   }
 
-  private fun ScheduledMealWithSource.toDomain(): ScheduledMeal =
-      ScheduledMeal(
+  private val json = Json { ignoreUnknownKeys = true }
+
+  private fun ScheduledMealWithSource.toDomain(): ScheduledMeal {
+      val source = try {
+          json.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
+      } catch (e: Exception) {
+          null
+      }
+      val prePlannedMealId = when (source) {
+          is MealSource.PrePlannedMeal -> source.id
+          is MealSource.StandaloneRecipe -> source.id
+          is MealSource.StandaloneIngredient -> source.id
+          is MealSource.Restaurant, null -> null
+      }
+      val restaurantId = when (source) {
+          is MealSource.Restaurant -> source.restaurantId
+          else -> null
+      }
+      return ScheduledMeal(
           id = scheduledMeal.id,
           date = try {
               LocalDate.parse(scheduledMeal.date)
@@ -96,23 +115,29 @@ class RoomMealPlanRepository(
               LocalTime(12, 0)
           },
           mealType = scheduledMeal.mealType,
-          prePlannedMealId = scheduledMeal.foodItemId,
-          restaurantId = scheduledMeal.restaurantId,
+          prePlannedMealId = prePlannedMealId,
+          restaurantId = restaurantId,
           peopleCount = scheduledMeal.peopleCount,
           isConsumed = scheduledMeal.isConsumed,
           anticipatedCostCents = scheduledMeal.anticipatedCostCents,
       )
+  }
 
-  private fun ScheduledMeal.toEntity(): ScheduledMealEntity =
-      ScheduledMealEntity(
+  private fun ScheduledMeal.toEntity(): ScheduledMealEntity {
+      val source = when {
+          restaurantId != null -> MealSource.Restaurant(restaurantId, anticipatedCostCents ?: 0)
+          prePlannedMealId != null -> MealSource.PrePlannedMeal(prePlannedMealId)
+          else -> MealSource.PrePlannedMeal(Uuid.random())
+      }
+      return ScheduledMealEntity(
           id = id,
           date = date.toString(),
           time = time.toString(),
           mealType = mealType,
-          foodItemId = prePlannedMealId,
-          restaurantId = restaurantId,
+          mealSource = json.encodeToString(MealSource.serializer(), source),
           peopleCount = peopleCount,
           isConsumed = isConsumed,
           anticipatedCostCents = anticipatedCostCents
       )
+  }
 }

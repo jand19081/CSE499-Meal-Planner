@@ -25,6 +25,7 @@ import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Ingredient
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.model.Store
@@ -225,7 +226,7 @@ fun IngredientForm(
         onSave = {
             val catId = allCategories.find { it.name == categoryName }?.id ?: Uuid.random()
             val finalIngredient =
-                FoodItem(
+                Ingredient(
                     id = ingredientId,
                     name = name,
                     preferredUnitId = preferredUnitId,

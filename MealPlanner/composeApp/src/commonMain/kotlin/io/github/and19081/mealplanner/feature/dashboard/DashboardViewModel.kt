@@ -12,7 +12,6 @@ import io.github.and19081.mealplanner.core.util.DataWarning
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig
-import io.github.and19081.mealplanner.domain.logic.ConsumeMealUseCase
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.Package
@@ -145,13 +144,7 @@ class DashboardViewModel(
   fun toggleMealConsumption(entryId: Uuid, currentStatus: Boolean) {
     viewModelScope.launch {
         if (!currentStatus) {
-            val consumeMealUseCase = ConsumeMealUseCase(
-                mealPlanRepository,
-                foodItemRepository,
-                pantryRepository,
-                unitRepository
-            )
-            consumeMealUseCase(entryId)
+            mealPlanRepository.setConsumedStatus(entryId, true)
         } else {
             mealPlanRepository.setConsumedStatus(entryId, false)
         }

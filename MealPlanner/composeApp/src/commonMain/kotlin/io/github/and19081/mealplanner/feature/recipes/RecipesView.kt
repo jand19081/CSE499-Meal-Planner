@@ -30,6 +30,9 @@ import io.github.and19081.mealplanner.core.util.DataWarning
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Recipe
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.isMeal
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
@@ -322,7 +325,7 @@ fun RecipeForm(
         onClose = onDismiss,
         onSave = {
             val finalRecipe =
-                FoodItem(
+                Recipe(
                     id = draftState.id,
                     name = draftState.name,
                     recipeInfo = RecipeInfo(
@@ -566,7 +569,7 @@ fun RecipeIngredientsEditor(
     onAddSubRecipe: (String, (FoodItem) -> Unit) -> Unit,
 ) {
     val options = remember(allItems) {
-        allItems.map { (if (it.isRecipe) "[Recipe] " else "") + it.name }
+        allItems.map { (if (it.isRecipe() || it.isMeal()) "[Recipe] " else "") + it.name }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -690,7 +693,7 @@ fun IngredientRequirementRow(
     }
 
     val selectedItem = allItems.find { it.id == req.measurement.foodItemId }
-    val selectedItemName = (if (selectedItem?.isRecipe == true) "[Recipe] " else "") + (selectedItem?.name ?: "")
+    val selectedItemName = (if (selectedItem?.isRecipe() == true || selectedItem?.isMeal() == true) "[Recipe] " else "") + (selectedItem?.name ?: "")
     val selectedUnitName = allUnits.find { it.id == req.measurement.unitId }?.abbreviation ?: ""
 
     if (isEditing) {
@@ -712,7 +715,7 @@ fun IngredientRequirementRow(
                     onOptionSelected = { option ->
                         val isRecipe = option.startsWith("[Recipe] ")
                         val cleanName = if (isRecipe) option.removePrefix("[Recipe] ") else option
-                        val found = allItems.find { it.name == cleanName && it.isRecipe == isRecipe }
+                        val found = allItems.find { it.name == cleanName && (it.isRecipe() || it.isMeal()) == isRecipe }
                         onUpdateReq(req.copy(measurement = req.measurement.copy(foodItemId = found?.id ?: Uuid.NIL)))
                     },
                     onAddOption = { name ->

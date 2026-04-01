@@ -13,6 +13,8 @@ import io.github.and19081.mealplanner.core.util.Validators
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Ingredient
+import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
@@ -140,7 +142,7 @@ class RecipesViewModel(
             val allUnits = args[7] as List<UnitModel>
             val error = args[8] as String?
 
-            val allRecipes = allItems.filter { it.isRecipe }
+            val allRecipes = allItems.filter { it.isRecipe() }
             val itemsMap = allItems.associateBy { it.id }
             val pantryMap = pantry.associateBy { it.measurement.foodItemId }
 
@@ -169,7 +171,7 @@ class RecipesViewModel(
                         groups.all { group ->
                             group.requirements.all { req ->
                                 val subItem = itemsMap[req.measurement.foodItemId] ?: return@all true
-                                if (subItem.isRecipe) return@all true
+                                if (subItem.isRecipe()) return@all true
 
                                 val pantryItem = pantryMap[req.measurement.foodItemId] ?: return@all false
 
@@ -297,7 +299,7 @@ class RecipesViewModel(
         for (group in recipeInfo.requirementGroups) {
             for (req in group.requirements) {
                 val subItem = allItemsMap[req.measurement.foodItemId]
-                if (subItem != null && subItem.isRecipe) {
+                if (subItem != null && subItem.isRecipe()) {
                     if (hasCircularDependency(subItem, allItemsMap, newVisited)) {
                         return true
                     }
@@ -352,7 +354,7 @@ class RecipesViewModel(
                 miscCategory = newCat
             }
 
-            val newIngredient = FoodItem(
+            val newIngredient = Ingredient(
                 name = name,
                 purchasableInfo = PurchasableInfo(categoryId = miscCategory.id)
             )

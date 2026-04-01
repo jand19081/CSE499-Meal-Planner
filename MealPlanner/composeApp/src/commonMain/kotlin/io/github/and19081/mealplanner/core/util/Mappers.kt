@@ -29,12 +29,14 @@ import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
 import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitEntity
+import io.github.and19081.mealplanner.domain.model.MealSource
 import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement as DomainMeasurement
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as UiDashboardConfig
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.datetime.*
+import kotlinx.serialization.json.Json
 
 // --- Measurement Mappers ---
 fun EntityMeasurement.toDomain(): DomainMeasurement =
@@ -247,8 +249,25 @@ fun PantryInventoryWithDetails.toModel(): PantryItem =
     )
 
 // --- Scheduled Meal Mappers ---
-fun ScheduledMealWithSource.toModel(): ScheduledMeal =
-    ScheduledMeal(
+private val mealSourceJson = Json { ignoreUnknownKeys = true }
+
+fun ScheduledMealWithSource.toModel(): ScheduledMeal {
+    val source = try {
+        mealSourceJson.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
+    } catch (e: Exception) {
+        null
+    }
+    val prePlannedMealId = when (source) {
+        is MealSource.PrePlannedMeal -> source.id
+        is MealSource.StandaloneRecipe -> source.id
+        is MealSource.StandaloneIngredient -> source.id
+        is MealSource.Restaurant, null -> null
+    }
+    val restaurantId = when (source) {
+        is MealSource.Restaurant -> source.restaurantId
+        else -> null
+    }
+    return ScheduledMeal(
         id = scheduledMeal.id,
         date =
             try {
@@ -263,12 +282,13 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal =
                 LocalTime(12, 0)
             },
         mealType = scheduledMeal.mealType,
-        prePlannedMealId = scheduledMeal.foodItemId,
-        restaurantId = scheduledMeal.restaurantId,
+        prePlannedMealId = prePlannedMealId,
+        restaurantId = restaurantId,
         peopleCount = scheduledMeal.peopleCount,
         isConsumed = scheduledMeal.isConsumed,
         anticipatedCostCents = scheduledMeal.anticipatedCostCents,
     )
+}
 
 // --- Shopping List Mappers ---
 fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =

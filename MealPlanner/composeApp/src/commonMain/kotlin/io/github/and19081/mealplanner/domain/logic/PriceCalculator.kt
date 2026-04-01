@@ -5,6 +5,7 @@ import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import kotlin.collections.get
@@ -33,7 +34,7 @@ object PriceCalculator {
       primaryReq?.let { req ->
         val subItem = allItemsMap[req.measurement.foodItemId] ?: return@let
         
-        if (subItem.isRecipe) {
+        if (subItem.isRecipe()) {
           // Recursive Call for Sub-Recipe
           val subRecipeBaseCost =
               calculateFoodItemCost(

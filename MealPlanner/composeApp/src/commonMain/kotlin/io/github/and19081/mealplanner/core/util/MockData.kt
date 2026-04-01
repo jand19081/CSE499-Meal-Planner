@@ -3,7 +3,9 @@ package io.github.and19081.mealplanner.core.util
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.Ingredient
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.domain.model.Recipe
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
@@ -124,7 +126,7 @@ object MockData {
 
         // --- Ingredients ---
         fun createIng(id: Uuid, name: String, cat: Category, unit: UnitModel? = null): FoodItem {
-            return FoodItem(
+            return Ingredient(
                 id = id,
                 name = name,
                 preferredUnitId = unit?.id,
@@ -232,7 +234,7 @@ object MockData {
                 )
             )
 
-        val rPancakes = FoodItem(
+        val rPancakes = Recipe(
             id = REC_PANCAKES,
             name = "Fluffy Pancakes",
             recipeInfo = RecipeInfo(
@@ -253,7 +255,7 @@ object MockData {
             )
         )
 
-        val rEnchiladas = FoodItem(
+        val rEnchiladas = Recipe(
             id = REC_ENCHILADAS,
             name = "Enchiladas",
             recipeInfo = RecipeInfo(

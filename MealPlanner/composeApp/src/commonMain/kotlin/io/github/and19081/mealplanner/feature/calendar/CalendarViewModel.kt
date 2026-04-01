@@ -7,10 +7,11 @@ import io.github.and19081.mealplanner.core.util.DataWarning
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.core.util.UnitRepository
-import io.github.and19081.mealplanner.domain.logic.ConsumeMealUseCase
 import io.github.and19081.mealplanner.domain.logic.CookingTimeCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.isMeal
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -121,7 +122,7 @@ class CalendarViewModel(
             val itemsById = allItems.associateBy { it.id }
             val restaurantsById = restaurants.associateBy { it.id }
 
-            val availableMeals = allItems.filter { it.isRecipe }
+            val availableMeals = allItems.filter { it.isRecipe() || it.isMeal() }
 
             val mealWarnings =
                 availableMeals.associate { meal ->
@@ -210,7 +211,7 @@ class CalendarViewModel(
     fun saveRestaurant(name: String) {
         viewModelScope.launch {
             restaurantRepository.addRestaurant(
-                _root_ide_package_.io.github.and19081.mealplanner.feature.meals.Restaurant(
+                io.github.and19081.mealplanner.feature.meals.Restaurant(
                     id = Uuid.random(),
                     name = name
                 )
@@ -238,7 +239,7 @@ class CalendarViewModel(
     ) {
         _errorMessage.value = null
         val newEntry =
-            _root_ide_package_.io.github.and19081.mealplanner.feature.meals.ScheduledMeal(
+            io.github.and19081.mealplanner.feature.meals.ScheduledMeal(
                 id = Uuid.random(),
                 date = date,
                 time = time,
@@ -256,7 +257,7 @@ class CalendarViewModel(
             notificationScheduler.scheduleVerificationNotification(newEntry.id, title, delay)
 
             // Schedule Start Cooking Reminder if it's a recipe
-            if (meal != null && meal.isRecipe) {
+            if (meal != null && (meal.isRecipe() || meal.isMeal())) {
                 val recipeInfo = meal.recipeInfo
                 if (recipeInfo != null) {
                     val startMillis = CookingTimeCalculator.calculateStartCookingTimestampMillis(
@@ -311,13 +312,7 @@ class CalendarViewModel(
             }
 
             if (newStatus) {
-                val consumeMealUseCase = ConsumeMealUseCase(
-                    mealPlanRepository,
-                    foodItemRepository,
-                    pantryRepository,
-                    unitRepository
-                )
-                consumeMealUseCase(entryId)
+                mealPlanRepository.setConsumedStatus(entryId, true)
             } else {
                 mealPlanRepository.setConsumedStatus(entryId, false)
             }
