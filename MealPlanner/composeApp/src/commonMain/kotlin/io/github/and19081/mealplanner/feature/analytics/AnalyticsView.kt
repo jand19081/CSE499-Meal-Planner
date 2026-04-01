@@ -20,22 +20,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import io.github.and19081.mealplanner.feature.settings.Mode
-import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.feature.settings.Mode
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.ui.components.MpDetailScaffold
 import io.github.and19081.mealplanner.ui.components.MpOutlinedTextField
 import io.github.and19081.mealplanner.ui.components.MpValidationWarning
+import kotlin.collections.find
+import kotlin.collections.forEach
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.collections.find
-import kotlin.collections.forEach
 
 @Composable
 fun AnalyticsView(viewModel: AnalyticsViewModel, mode: Mode, isExpanded: Boolean) {
@@ -337,55 +336,62 @@ fun AnalyticsSummaryCards(uiState: AnalyticsUiState) {
 
 @Composable
 fun CostComparisonSection(uiState: AnalyticsUiState) {
-    val comparisons = listOfNotNull(
-        uiState.projectedVsActualWeekly,
-        uiState.projectedVsActualMonthly,
-        uiState.projectedVsActualAnnual,
-    )
-    if (comparisons.isEmpty()) return
+  val comparisons =
+      listOfNotNull(
+          uiState.projectedVsActualWeekly,
+          uiState.projectedVsActualMonthly,
+          uiState.projectedVsActualAnnual,
+      )
+  if (comparisons.isEmpty()) return
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+  Card(
+      modifier = Modifier.fillMaxWidth(),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+  ) {
+    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Text(
+          "Projected vs. Actual",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+      )
+      comparisons.forEach { comparison ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+              comparison.period,
+              style = MaterialTheme.typography.bodyMedium,
+              modifier = Modifier.weight(1f),
+          )
+          Column(horizontalAlignment = Alignment.End) {
             Text(
-                "Projected vs. Actual",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                "Projected: $${String.format("%.2f", comparison.projected / 100.0)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
             )
-            comparisons.forEach { comparison ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(comparison.period, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "Projected: $${String.format("%.2f", comparison.projected / 100.0)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                        )
-                        Text(
-                            "Actual: $${String.format("%.2f", comparison.actual / 100.0)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        val diff = comparison.percentDifference
-                        val sign = if (diff >= 0) "+" else ""
-                        Text(
-                            "${sign}${String.format("%.1f", diff)}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (diff > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                }
-                if (comparison !== comparisons.last()) HorizontalDivider()
-            }
+            Text(
+                "Actual: $${String.format("%.2f", comparison.actual / 100.0)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            val diff = comparison.percentDifference
+            val sign = if (diff >= 0) "+" else ""
+            Text(
+                "${sign}${String.format("%.1f", diff)}%",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color =
+                    if (diff > 0) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.tertiary,
+            )
+          }
         }
+        if (comparison !== comparisons.last()) HorizontalDivider()
+      }
     }
+  }
 }
 
 @Composable
@@ -552,99 +558,98 @@ fun ReceiptForm(
       rememberTimePickerState(initialHour = selectedTime.hour, initialMinute = selectedTime.minute)
   var showTimePicker by remember { mutableStateOf(false) }
 
-    MpDetailScaffold(
-        title = "Edit Receipt",
-        onClose = onClose,
-        onSave = {
-          val updatedTrip =
-              trip.copy(
-                  actualTotalCents = ((actualTotalStr.toDoubleOrNull() ?: 0.0) * 100).toInt(),
-                  taxPaidCents = ((taxPaidStr.toDoubleOrNull() ?: 0.0) * 100).toInt(),
-                  lineItems = lineItems,
-                  time = selectedTime,
-              )
-          onSave(updatedTrip)
-        },
-        onDelete = onDelete,
-    ) {
-      Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(locationName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+  MpDetailScaffold(
+      title = "Edit Receipt",
+      onClose = onClose,
+      onSave = {
+        val updatedTrip =
+            trip.copy(
+                actualTotalCents = ((actualTotalStr.toDoubleOrNull() ?: 0.0) * 100).toInt(),
+                taxPaidCents = ((taxPaidStr.toDoubleOrNull() ?: 0.0) * 100).toInt(),
+                lineItems = lineItems,
+                time = selectedTime,
+            )
+        onSave(updatedTrip)
+      },
+      onDelete = onDelete,
+  ) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+      Text(locationName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Text(
-              "Date: ${trip.date}",
-              style = MaterialTheme.typography.bodySmall,
-              modifier = Modifier.weight(1f),
-          )
-          Button(onClick = { showTimePicker = true }) { Text(selectedTime.toString()) }
-        }
-
-        MpOutlinedTextField(
-            value = actualTotalStr,
-            onValueChange = { actualTotalStr = it },
-            label = { Text("Total Paid ($)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
+      Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        Text(
+            "Date: ${trip.date}",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
         )
+        Button(onClick = { showTimePicker = true }) { Text(selectedTime.toString()) }
+      }
 
-        MpOutlinedTextField(
-            value = taxPaidStr,
-            onValueChange = { taxPaidStr = it },
-            label = { Text("Tax Paid ($)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-        )
+      MpOutlinedTextField(
+          value = actualTotalStr,
+          onValueChange = { actualTotalStr = it },
+          label = { Text("Total Paid ($)") },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier.fillMaxWidth(),
+      )
 
-        Text("Line Items", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+      MpOutlinedTextField(
+          value = taxPaidStr,
+          onValueChange = { taxPaidStr = it },
+          label = { Text("Tax Paid ($)") },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier.fillMaxWidth(),
+      )
 
-        lineItems.forEachIndexed { index, item ->
-          Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            val name =
-                item.customName
-                    ?: allIngredients.find { it.id == item.measurement.foodItemId }?.name
-                    ?: "Unknown"
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-              IconButton(onClick = { lineItems = lineItems.filterIndexed { i, _ -> i != index } }) {
-                Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
-              }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              MpOutlinedTextField(
-                  value = item.measurement.quantity.toString(),
-                  onValueChange = { qty ->
-                    val q = qty.toDoubleOrNull() ?: 0.0
-                    lineItems =
-                        lineItems.mapIndexed { i, old ->
-                          if (i == index) old.copy(measurement = old.measurement.copy(quantity = q)) else old
-                        }
-                  },
-                  label = { Text("Qty") },
-                  modifier = Modifier.weight(1f),
-                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              )
-              MpOutlinedTextField(
-                  value = (item.pricePaidCents / 100.0).toString(),
-                  onValueChange = { price ->
-                    val p = ((price.toDoubleOrNull() ?: 0.0) * 100).toInt()
-                    lineItems =
-                        lineItems.mapIndexed { i, old ->
-                          if (i == index) old.copy(pricePaidCents = p) else old
-                        }
-                  },
-                  label = { Text("Price ($)") },
-                  modifier = Modifier.weight(1f),
-                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              )
+      Text("Line Items", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+
+      lineItems.forEachIndexed { index, item ->
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+          val name =
+              item.customName
+                  ?: allIngredients.find { it.id == item.measurement.foodItemId }?.name
+                  ?: "Unknown"
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            IconButton(onClick = { lineItems = lineItems.filterIndexed { i, _ -> i != index } }) {
+              Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
             }
           }
-          HorizontalDivider()
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MpOutlinedTextField(
+                value = item.measurement.quantity.toString(),
+                onValueChange = { qty ->
+                  val q = qty.toDoubleOrNull() ?: 0.0
+                  lineItems = lineItems.mapIndexed { i, old ->
+                    if (i == index) old.copy(measurement = old.measurement.copy(quantity = q))
+                    else old
+                  }
+                },
+                label = { Text("Qty") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            MpOutlinedTextField(
+                value = (item.pricePaidCents / 100.0).toString(),
+                onValueChange = { price ->
+                  val p = ((price.toDoubleOrNull() ?: 0.0) * 100).toInt()
+                  lineItems = lineItems.mapIndexed { i, old ->
+                    if (i == index) old.copy(pricePaidCents = p) else old
+                  }
+                },
+                label = { Text("Price ($)") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+          }
         }
+        HorizontalDivider()
       }
     }
+  }
 
   if (showTimePicker) {
     AlertDialog(

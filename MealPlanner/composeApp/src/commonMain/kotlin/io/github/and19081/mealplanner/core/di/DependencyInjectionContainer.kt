@@ -1,13 +1,9 @@
 package io.github.and19081.mealplanner.core.di
 
-import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
-import io.github.and19081.mealplanner.notification.MealNotificationScheduler
-import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
-import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.core.util.MockData
-import io.github.and19081.mealplanner.domain.repository.PantryRepository
-import io.github.and19081.mealplanner.domain.repository.ReceiptHistoryRepository
-import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
+import io.github.and19081.mealplanner.core.util.UnitRepository
+import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
+import io.github.and19081.mealplanner.data.export.DataTransferService
 import io.github.and19081.mealplanner.data.repository.RoomFoodItemRepository
 import io.github.and19081.mealplanner.data.repository.RoomMealPlanRepository
 import io.github.and19081.mealplanner.data.repository.RoomPantryRepository
@@ -17,12 +13,16 @@ import io.github.and19081.mealplanner.data.repository.RoomSettingsRepository
 import io.github.and19081.mealplanner.data.repository.RoomShoppingListItemRepository
 import io.github.and19081.mealplanner.data.repository.RoomStoreRepository
 import io.github.and19081.mealplanner.data.repository.RoomUnitRepository
+import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
+import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
+import io.github.and19081.mealplanner.domain.repository.PantryRepository
+import io.github.and19081.mealplanner.domain.repository.ReceiptHistoryRepository
+import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
 import io.github.and19081.mealplanner.domain.repository.ShoppingListRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
-import io.github.and19081.mealplanner.core.util.UnitRepository
-import io.github.and19081.mealplanner.data.export.DataTransferService
+import io.github.and19081.mealplanner.notification.MealNotificationScheduler
 import io.github.and19081.mealplanner.notification.createNotificationScheduler
 import kotlinx.coroutines.CoroutineScope
 
@@ -36,10 +36,10 @@ class DependencyInjectionContainer(
   val storeRepository: StoreRepository = RoomStoreRepository(db, scope)
   val restaurantRepository: RestaurantRepository = RoomRestaurantRepository(db, scope)
   val dataTransferService = DataTransferService(db)
-  
+
   // ECS Unified Repository
   val foodItemRepository: FoodItemRepository = RoomFoodItemRepository(db, scope)
-  
+
   val mealPlanRepository: MealPlanRepository = RoomMealPlanRepository(db, scope)
   val pantryRepository: PantryRepository = RoomPantryRepository(db, scope)
   val shoppingListRepository = ShoppingListRepository()
@@ -58,7 +58,7 @@ class DependencyInjectionContainer(
         foodItemRepository,
         mealPlanRepository,
         restaurantRepository,
-        settingsRepository
+        settingsRepository,
     )
   }
 }

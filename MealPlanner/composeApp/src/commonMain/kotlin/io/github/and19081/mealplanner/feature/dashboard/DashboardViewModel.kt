@@ -2,11 +2,6 @@ package io.github.and19081.mealplanner.feature.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.and19081.mealplanner.feature.meals.PantryItem
-import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
-import io.github.and19081.mealplanner.feature.meals.Restaurant
-import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
-import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import io.github.and19081.mealplanner.core.util.DataQualityValidator
 import io.github.and19081.mealplanner.core.util.DataWarning
 import io.github.and19081.mealplanner.core.util.UnitModel
@@ -23,6 +18,12 @@ import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
 import io.github.and19081.mealplanner.feature.calendar.CalendarEvent
+import io.github.and19081.mealplanner.feature.meals.PantryItem
+import io.github.and19081.mealplanner.feature.meals.Restaurant
+import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
+import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
+import kotlin.collections.get
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,7 +34,6 @@ import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
-import kotlin.collections.get
 
 class DashboardViewModel(
     private val mealPlanRepository: MealPlanRepository,
@@ -87,36 +87,36 @@ class DashboardViewModel(
 
             val todaysEntries = entries.filter { it.date == today }.sortedBy { it.time }
 
-            val todaysEvents =
-                todaysEntries.map { entry ->
-                  val item = itemsMap[entry.prePlannedMealId]
-                  val restaurant = restaurantsMap[entry.restaurantId]
+            val todaysEvents = todaysEntries.map { entry ->
+              val item = itemsMap[entry.prePlannedMealId]
+              val restaurant = restaurantsMap[entry.restaurantId]
 
-                  val title = item?.name ?: restaurant?.name ?: "Unknown Meal"
+              val title = item?.name ?: restaurant?.name ?: "Unknown Meal"
 
-                  val warnings =
-                      item?.let { foodItem ->
-                        DataQualityValidator.validateFoodItem(
-                            foodItem,
-                            itemsMap,
-                            packages,
-                            bridges,
-                            allUnits,
-                        )
-                      } ?: emptyList()
+              val warnings =
+                  item?.let { foodItem ->
+                    DataQualityValidator.validateFoodItem(
+                        foodItem,
+                        itemsMap,
+                        packages,
+                        bridges,
+                        allUnits,
+                    )
+                  } ?: emptyList()
 
-                  CalendarEvent(
-                      entryId = entry.id,
-                      title = title,
-                      mealType = entry.mealType,
-                      peopleCount = entry.peopleCount,
-                      isConsumed = entry.isConsumed,
-                      warnings = warnings,
-                  )
-                }
+              CalendarEvent(
+                  entryId = entry.id,
+                  title = title,
+                  mealType = entry.mealType,
+                  peopleCount = entry.peopleCount,
+                  isConsumed = entry.isConsumed,
+                  warnings = warnings,
+              )
+            }
 
             val nextMeal = todaysEvents.firstOrNull { !it.isConsumed }
-            val allWarnings = todaysEvents.flatMap { event -> event.warnings }.distinctBy { it.message }
+            val allWarnings =
+                todaysEvents.flatMap { event -> event.warnings }.distinctBy { it.message }
 
             val pantryCount = pantry.size
             val shoppingCount = shoppingItems.count { !it.isPurchased }
@@ -143,11 +143,11 @@ class DashboardViewModel(
 
   fun toggleMealConsumption(entryId: Uuid, currentStatus: Boolean) {
     viewModelScope.launch {
-        if (!currentStatus) {
-            mealPlanRepository.setConsumedStatus(entryId, true)
-        } else {
-            mealPlanRepository.setConsumedStatus(entryId, false)
-        }
+      if (!currentStatus) {
+        mealPlanRepository.setConsumedStatus(entryId, true)
+      } else {
+        mealPlanRepository.setConsumedStatus(entryId, false)
+      }
     }
   }
 }

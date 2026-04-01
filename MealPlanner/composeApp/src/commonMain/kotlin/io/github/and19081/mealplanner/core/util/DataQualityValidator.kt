@@ -2,7 +2,6 @@ package io.github.and19081.mealplanner.core.util
 
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -29,7 +28,7 @@ object DataQualityValidator {
       allPackages: List<Package>,
       allBridges: List<BridgeConversion>,
       allUnits: List<UnitModel>,
-      currentPath: Set<Uuid> = emptySet()
+      currentPath: Set<Uuid> = emptySet(),
   ): List<DataWarning> {
     val warnings = mutableListOf<DataWarning>()
 
@@ -44,7 +43,7 @@ object DataQualityValidator {
     for (group in recipeInfo.requirementGroups) {
       for (req in group.requirements) {
         val subItem = allItemsMap[req.measurement.foodItemId] ?: continue
-        
+
         if (subItem.isRecipe()) {
           warnings.addAll(
               validateFoodItem(
@@ -53,7 +52,7 @@ object DataQualityValidator {
                   allPackages = allPackages,
                   allBridges = allBridges,
                   allUnits = allUnits,
-                  currentPath = newPath
+                  currentPath = newPath,
               )
           )
           continue
@@ -74,10 +73,9 @@ object DataQualityValidator {
           continue
         }
 
-        val canConvert =
-            packages.any { pkg ->
-              hasConversionPath(pkg.unitId, req.measurement.unitId!!, bridges, allUnits)
-            }
+        val canConvert = packages.any { pkg ->
+          hasConversionPath(pkg.unitId, req.measurement.unitId!!, bridges, allUnits)
+        }
 
         if (!canConvert) {
           val reqUnitName = reqUnit.abbreviation
@@ -95,7 +93,7 @@ object DataQualityValidator {
       startUnitId: Uuid,
       targetUnitId: Uuid,
       bridges: List<BridgeConversion>,
-      units: List<UnitModel>
+      units: List<UnitModel>,
   ): Boolean {
     if (startUnitId == targetUnitId) return true
 
@@ -119,7 +117,7 @@ object DataQualityValidator {
 
       for (bridge in connectedBridges) {
         val nextUnitId = if (bridge.fromUnitId == currentId) bridge.toUnitId else bridge.fromUnitId
-        
+
         // If the next unit's type matches target unit's type, we found a path
         val nextUnit = units.find { it.id == nextUnitId }
         if (nextUnit?.type == targetUnit.type) return true

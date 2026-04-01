@@ -34,9 +34,13 @@ fun InventoryView(
   val tabs = listOf("Shopping List", "Pantry")
 
   // Use the factory to create ViewModels
-  val shoppingListVm: ShoppingListViewModel = viewModel { diContainer.viewModelFactory.createShoppingListViewModel() }
+  val shoppingListVm: ShoppingListViewModel = viewModel {
+    diContainer.viewModelFactory.createShoppingListViewModel()
+  }
   val pantryVm: PantryViewModel = viewModel { diContainer.viewModelFactory.createPantryViewModel() }
-  val ingredientsVm: IngredientsViewModel = viewModel { diContainer.viewModelFactory.createIngredientsViewModel() }
+  val ingredientsVm: IngredientsViewModel = viewModel {
+    diContainer.viewModelFactory.createIngredientsViewModel()
+  }
 
   val ingredientsUiState by ingredientsVm.uiState.collectAsState()
 
@@ -79,23 +83,23 @@ fun InventoryView(
 
     when (selectedTab) {
       0 -> {
-          ShoppingListView(
-              viewModel = shoppingListVm,
-              isExpanded = isExpanded,
-              onTransaction = { transaction, commit ->
-                  pushModal(KitchenModal.KitchenTransactionReview(transaction, commit))
-              }
-          )
+        ShoppingListView(
+            viewModel = shoppingListVm,
+            isExpanded = isExpanded,
+            onTransaction = { transaction, commit ->
+              pushModal(KitchenModal.KitchenTransactionReview(transaction, commit))
+            },
+        )
       }
       1 -> {
-          PantryView(
-              viewModel = pantryVm,
-              mode = mode,
-              isExpanded = isExpanded,
-              onAddIngredient = { name: String, onCreated: (FoodItem) -> Unit ->
-                  pushModal(KitchenModal.FoodItemCreator(name, onCreated))
-              },
-          )
+        PantryView(
+            viewModel = pantryVm,
+            mode = mode,
+            isExpanded = isExpanded,
+            onAddIngredient = { name: String, onCreated: (FoodItem) -> Unit ->
+              pushModal(KitchenModal.FoodItemCreator(name, onCreated))
+            },
+        )
       }
     }
   }

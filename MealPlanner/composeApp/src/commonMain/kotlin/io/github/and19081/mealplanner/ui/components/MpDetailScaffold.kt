@@ -59,7 +59,8 @@ fun MpDetailScaffold(
       }
 
       // Content
-      val scrollModifier = if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
+      val scrollModifier =
+          if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
       Column(
           modifier = Modifier.weight(1f).then(scrollModifier).padding(16.dp),
           verticalArrangement = Arrangement.spacedBy(16.dp),

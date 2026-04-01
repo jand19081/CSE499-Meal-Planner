@@ -29,6 +29,7 @@ import io.github.and19081.mealplanner.domain.model.Ingredient
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.model.Store
+import io.github.and19081.mealplanner.domain.model.purchasableInfo
 import io.github.and19081.mealplanner.feature.recipes.EmptyDetailPlaceholder
 import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.ui.components.CreateNewItemRow
@@ -44,13 +45,14 @@ import kotlin.uuid.Uuid
 
 @Composable
 fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boolean) {
-    val uiState by viewModel.uiState.collectAsState()
+  val uiState by viewModel.uiState.collectAsState()
 
-    var selectedIngredientId by rememberSaveable { mutableStateOf<String?>(null) }
-    var isAdding by rememberSaveable { mutableStateOf(false) }
-    var creationName by rememberSaveable { mutableStateOf("") }
+  var selectedIngredientId by rememberSaveable { mutableStateOf<String?>(null) }
+  var isAdding by rememberSaveable { mutableStateOf(false) }
+  var creationName by rememberSaveable { mutableStateOf("") }
 
-    val selectedIngredient = uiState.groupedIngredients.values.flatten().find { it.id.toString() == selectedIngredientId }
+  val selectedIngredient =
+      uiState.groupedIngredients.values.flatten().find { it.id.toString() == selectedIngredientId }
 
   val onIngredientClick: (FoodItem) -> Unit = {
     selectedIngredientId = it.id.toString()
@@ -120,7 +122,7 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
               onDeleteCategory = { categoryId -> viewModel.deleteCategory(categoryId) },
           )
         } else {
-            EmptyDetailPlaceholder()
+          EmptyDetailPlaceholder()
         }
       }
     }
@@ -197,7 +199,8 @@ fun IngredientForm(
 
   var name by remember(ingredient) { mutableStateOf(ingredient?.name ?: initialName) }
 
-  val initialCatName = allCategories.find { it.id == ingredient?.purchasableInfo?.categoryId }?.name ?: ""
+  val initialCatName =
+      allCategories.find { it.id == ingredient?.purchasableInfo?.categoryId }?.name ?: ""
   var categoryName by remember(ingredient) { mutableStateOf(initialCatName) }
 
   var preferredUnitId by remember(ingredient) { mutableStateOf(ingredient?.preferredUnitId) }
@@ -220,117 +223,115 @@ fun IngredientForm(
   var selectedTabIndex by remember { mutableIntStateOf(0) }
   val tabs = listOf("General", "Purchase Options", "Conversions")
 
-    MpDetailScaffold(
-        title = if (ingredient == null) "Add FoodItem" else "Edit FoodItem",
-        onClose = onDismiss,
-        onSave = {
-            val catId = allCategories.find { it.name == categoryName }?.id ?: Uuid.random()
-            val finalIngredient =
-                Ingredient(
-                    id = ingredientId,
-                    name = name,
-                    preferredUnitId = preferredUnitId,
-                    purchasableInfo = PurchasableInfo(
+  MpDetailScaffold(
+      title = if (ingredient == null) "Add FoodItem" else "Edit FoodItem",
+      onClose = onDismiss,
+      onSave = {
+        val catId = allCategories.find { it.name == categoryName }?.id ?: Uuid.random()
+        val finalIngredient =
+            Ingredient(
+                id = ingredientId,
+                name = name,
+                preferredUnitId = preferredUnitId,
+                purchasableInfo =
+                    PurchasableInfo(
                         expectedPriceCents = ingredient?.purchasableInfo?.expectedPriceCents,
-                        categoryId = catId
-                    )
-                )
-            onSave(finalIngredient, packages, bridges)
-        },
-        saveEnabled =
-            name.isNotBlank() &&
-                    categoryName.isNotBlank() &&
-                    allCategories.any { it.name == categoryName },
-        onDelete =
-            if (onDelete != null) {
-                {
-                    onDelete()
-                    onDismiss()
-                }
-            } else null,
-        tabs = tabs,
-        selectedTabIndex = selectedTabIndex,
-        onTabSelected = { selectedTabIndex = it },
-    ) {
-        when (selectedTabIndex) {
-            0 -> { // General
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    MpOutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    SearchableDropdown(
-                        label = "Category",
-                        options = allCategories.map { it.name },
-                        selectedOption = categoryName,
-                        onOptionSelected = { categoryName = it },
-                        onAddOption = onAddCategory,
-                        onDeleteOption = { name ->
-                            allCategories.find { it.name == name }?.let { onDeleteCategory(it.id) }
-                        },
-                        deleteWarningMessage =
-                            "Deleting this category will remove ALL ingredients in it. Are you sure?",
-                    )
-
-                    Box {
-                        var unitExpanded by remember { mutableStateOf(false) }
-                        val unitName =
-                            allUnits.find { it.id == preferredUnitId }?.displayName ?: "None"
-                        OutlinedButton(
-                            onClick = { unitExpanded = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Preferred Unit: $unitName")
-                        }
-                        DropdownMenu(
-                            expanded = unitExpanded,
-                            onDismissRequest = { unitExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text("None") },
-                                onClick = {
-                                    preferredUnitId = null
-                                    unitExpanded = false
-                                },
-                            )
-                            allUnits.forEach { unit ->
-                                DropdownMenuItem(
-                                    text = { Text(unit.displayName) },
-                                    onClick = {
-                                        preferredUnitId = unit.id
-                                        unitExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
+                        categoryId = catId,
+                    ),
+            )
+        onSave(finalIngredient, packages, bridges)
+      },
+      saveEnabled =
+          name.isNotBlank() &&
+              categoryName.isNotBlank() &&
+              allCategories.any { it.name == categoryName },
+      onDelete =
+          if (onDelete != null) {
+            {
+              onDelete()
+              onDismiss()
             }
+          } else null,
+      tabs = tabs,
+      selectedTabIndex = selectedTabIndex,
+      onTabSelected = { selectedTabIndex = it },
+  ) {
+    when (selectedTabIndex) {
+      0 -> { // General
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+          MpOutlinedTextField(
+              value = name,
+              onValueChange = { name = it },
+              label = { Text("Name") },
+              modifier = Modifier.fillMaxWidth(),
+          )
 
-            1 -> { // Purchase Options
-                PackageOptionEditor(
-                    currentPackages = packages,
-                    allStores = allStores,
-                    allUnits = allUnits,
-                    foodItemId = ingredientId,
-                    onUpdate = { packages = it },
-                    onAddStore = onAddStore,
-                    onDeleteStore = onDeleteStore,
-                )
-            }
+          SearchableDropdown(
+              label = "Category",
+              options = allCategories.map { it.name },
+              selectedOption = categoryName,
+              onOptionSelected = { categoryName = it },
+              onAddOption = onAddCategory,
+              onDeleteOption = { name ->
+                allCategories.find { it.name == name }?.let { onDeleteCategory(it.id) }
+              },
+              deleteWarningMessage =
+                  "Deleting this category will remove ALL ingredients in it. Are you sure?",
+          )
 
-            2 -> { // Conversions
-                ConversionEditor(
-                    currentBridges = bridges,
-                    allUnits = allUnits,
-                    foodItemId = ingredientId,
-                    onUpdate = { bridges = it },
-                )
+          Box {
+            var unitExpanded by remember { mutableStateOf(false) }
+            val unitName = allUnits.find { it.id == preferredUnitId }?.displayName ?: "None"
+            OutlinedButton(
+                onClick = { unitExpanded = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+              Text("Preferred Unit: $unitName")
             }
+            DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
+              DropdownMenuItem(
+                  text = { Text("None") },
+                  onClick = {
+                    preferredUnitId = null
+                    unitExpanded = false
+                  },
+              )
+              allUnits.forEach { unit ->
+                DropdownMenuItem(
+                    text = { Text(unit.displayName) },
+                    onClick = {
+                      preferredUnitId = unit.id
+                      unitExpanded = false
+                    },
+                )
+              }
+            }
+          }
         }
+      }
+
+      1 -> { // Purchase Options
+        PackageOptionEditor(
+            currentPackages = packages,
+            allStores = allStores,
+            allUnits = allUnits,
+            foodItemId = ingredientId,
+            onUpdate = { packages = it },
+            onAddStore = onAddStore,
+            onDeleteStore = onDeleteStore,
+        )
+      }
+
+      2 -> { // Conversions
+        ConversionEditor(
+            currentBridges = bridges,
+            allUnits = allUnits,
+            foodItemId = ingredientId,
+            onUpdate = { bridges = it },
+        )
+      }
     }
+  }
 }
 
 @Composable
@@ -342,14 +343,14 @@ fun IngredientListPane(
 ) {
   Scaffold(
       topBar = {
-          ListControlToolbar(
-              searchQuery = uiState.searchQuery,
-              onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-              searchPlaceholder = "Search ingredients...",
-              isSortByPrimary = uiState.isSortByCategory,
-              onToggleSort = { viewModel.toggleSortMode() },
-              onAddClick = onAddClick,
-          )
+        ListControlToolbar(
+            searchQuery = uiState.searchQuery,
+            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+            searchPlaceholder = "Search ingredients...",
+            isSortByPrimary = uiState.isSortByCategory,
+            onToggleSort = { viewModel.toggleSortMode() },
+            onAddClick = onAddClick,
+        )
       }
   ) { innerPadding ->
     LazyColumn(
@@ -374,13 +375,13 @@ fun IngredientListPane(
 
       if (uiState.groupedIngredients.isEmpty()) {
         item {
-            EmptyListMessage(
-                message =
-                    if (uiState.searchQuery.isBlank())
-                        "No ingredients found. Add your first ingredient!"
-                    else "No ingredients match your search.",
-                modifier = Modifier.padding(32.dp),
-            )
+          EmptyListMessage(
+              message =
+                  if (uiState.searchQuery.isBlank())
+                      "No ingredients found. Add your first ingredient!"
+                  else "No ingredients match your search.",
+              modifier = Modifier.padding(32.dp),
+          )
         }
       }
 
@@ -411,46 +412,46 @@ fun IngredientRow(
             "$${String.format("%.2f", min / 100.0)} - $${String.format("%.2f", max / 100.0)} / unit"
       }
 
-    ExpandableListItem(
-        title = ingredient.name,
-        subtitle = "$categoryName • $priceRange",
-        onEditClick = onEditClick,
-    ) {
-        if (packages.isNotEmpty()) {
-            Text("Best prices:", style = MaterialTheme.typography.labelSmall)
-            packages
-                .sortedBy { it.priceCents.toDouble() / it.quantity }
-                .take(3)
-                .forEach { pkg ->
-                    val store = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown Store"
-                    val unit = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
-                    Text(
-                        "• $store: $${
+  ExpandableListItem(
+      title = ingredient.name,
+      subtitle = "$categoryName • $priceRange",
+      onEditClick = onEditClick,
+  ) {
+    if (packages.isNotEmpty()) {
+      Text("Best prices:", style = MaterialTheme.typography.labelSmall)
+      packages
+          .sortedBy { it.priceCents.toDouble() / it.quantity }
+          .take(3)
+          .forEach { pkg ->
+            val store = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown Store"
+            val unit = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
+            Text(
+                "• $store: $${
                             String.format(
                                 "%.2f",
-                                pkg.priceCents / 100.0
+                                pkg.priceCents / 100.0,
                             )
                         } for ${pkg.quantity} $unit",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-        }
-
-        if (allBridges.any { it.foodItemId == ingredient.id }) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Conversions:", style = MaterialTheme.typography.labelSmall)
-            allBridges
-                .filter { it.foodItemId == ingredient.id }
-                .forEach { bridge ->
-                    val fromUnit = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
-                    val toUnit = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
-                    Text(
-                        "• ${bridge.fromQuantity} $fromUnit = ${bridge.toQuantity} $toUnit",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-        }
+                style = MaterialTheme.typography.bodySmall,
+            )
+          }
     }
+
+    if (allBridges.any { it.foodItemId == ingredient.id }) {
+      Spacer(modifier = Modifier.height(8.dp))
+      Text("Conversions:", style = MaterialTheme.typography.labelSmall)
+      allBridges
+          .filter { it.foodItemId == ingredient.id }
+          .forEach { bridge ->
+            val fromUnit = allUnits.find { it.id == bridge.fromUnitId }?.abbreviation ?: ""
+            val toUnit = allUnits.find { it.id == bridge.toUnitId }?.abbreviation ?: ""
+            Text(
+                "• ${bridge.fromQuantity} $fromUnit = ${bridge.toQuantity} $toUnit",
+                style = MaterialTheme.typography.bodySmall,
+            )
+          }
+    }
+  }
 }
 
 @Composable
@@ -493,8 +494,14 @@ fun PackageOptionEditor(
         Text("Add Package Option")
       }
     } else {
-      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Card(
+          colors =
+              CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+      ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
           SearchableDropdown(
               label = "Store",
               options = allStores.map { it.name },
@@ -502,7 +509,7 @@ fun PackageOptionEditor(
               onOptionSelected = { selectedStoreName = it },
               onAddOption = onAddStore,
               onDeleteOption = { name ->
-                  allStores.find { it.name == name }?.let { onDeleteStore(it.id) }
+                allStores.find { it.name == name }?.let { onDeleteStore(it.id) }
               },
               deleteWarningMessage = "Delete this store? This will affect other items too.",
           )
@@ -514,23 +521,23 @@ fun PackageOptionEditor(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f),
             )
-              MpOutlinedTextField(
-                  value = quantityStr,
-                  onValueChange = { quantityStr = it },
-                  label = { Text("Quantity") },
-                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                  modifier = Modifier.weight(1f),
-              )
-          }
-            SearchableDropdown(
-                label = "Unit",
-                options = allUnits.map { it.abbreviation },
-                selectedOption = selectedUnitAbbr,
-                onOptionSelected = { selectedUnitAbbr = it },
-                onAddOption = {},
-                onDeleteOption = {},
-                deleteWarningMessage = "",
+            MpOutlinedTextField(
+                value = quantityStr,
+                onValueChange = { quantityStr = it },
+                label = { Text("Quantity") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
             )
+          }
+          SearchableDropdown(
+              label = "Unit",
+              options = allUnits.map { it.abbreviation },
+              selectedOption = selectedUnitAbbr,
+              onOptionSelected = { selectedUnitAbbr = it },
+              onAddOption = {},
+              onDeleteOption = {},
+              deleteWarningMessage = "",
+          )
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = { isAdding = false }) { Text("Cancel") }
             Button(
@@ -542,13 +549,13 @@ fun PackageOptionEditor(
                   if (store != null && unit != null && price != null && qty != null) {
                     onUpdate(
                         currentPackages +
-                                Package(
-                                    foodItemId = foodItemId,
-                                    storeId = store.id,
-                                    priceCents = price,
-                                    quantity = qty,
-                                    unitId = unit.id,
-                                )
+                            Package(
+                                foodItemId = foodItemId,
+                                storeId = store.id,
+                                priceCents = price,
+                                quantity = qty,
+                                unitId = unit.id,
+                            )
                     )
                     isAdding = false
                     selectedStoreName = ""
@@ -606,8 +613,14 @@ fun ConversionEditor(
         Text("Add Conversion Bridge")
       }
     } else {
-      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Card(
+          colors =
+              CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+      ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MpOutlinedTextField(
                 value = fromQtyStr,
@@ -617,13 +630,15 @@ fun ConversionEditor(
                 modifier = Modifier.weight(1f),
             )
             Box(modifier = Modifier.weight(1f)) {
-                SearchableDropdown(
-                    label = "From Unit",
-                    options = allUnits.map { it.abbreviation },
-                    selectedOption = fromUnitName,
-                    onOptionSelected = { fromUnitName = it },
-                    onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
-                )
+              SearchableDropdown(
+                  label = "From Unit",
+                  options = allUnits.map { it.abbreviation },
+                  selectedOption = fromUnitName,
+                  onOptionSelected = { fromUnitName = it },
+                  onAddOption = {},
+                  onDeleteOption = {},
+                  deleteWarningMessage = "",
+              )
             }
           }
           Icon(Icons.Default.SyncAlt, null, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -636,13 +651,15 @@ fun ConversionEditor(
                 modifier = Modifier.weight(1f),
             )
             Box(modifier = Modifier.weight(1f)) {
-                SearchableDropdown(
-                    label = "To Unit",
-                    options = allUnits.map { it.abbreviation },
-                    selectedOption = toUnitName,
-                    onOptionSelected = { toUnitName = it },
-                    onAddOption = {}, onDeleteOption = {}, deleteWarningMessage = ""
-                )
+              SearchableDropdown(
+                  label = "To Unit",
+                  options = allUnits.map { it.abbreviation },
+                  selectedOption = toUnitName,
+                  onOptionSelected = { toUnitName = it },
+                  onAddOption = {},
+                  onDeleteOption = {},
+                  deleteWarningMessage = "",
+              )
             }
           }
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
@@ -656,13 +673,13 @@ fun ConversionEditor(
                   if (fromU != null && toU != null && fQty != null && tQty != null) {
                     onUpdate(
                         currentBridges +
-                                BridgeConversion(
-                                    foodItemId = foodItemId,
-                                    fromUnitId = fromU.id,
-                                    toUnitId = toU.id,
-                                    fromQuantity = fQty,
-                                    toQuantity = tQty,
-                                )
+                            BridgeConversion(
+                                foodItemId = foodItemId,
+                                fromUnitId = fromU.id,
+                                toUnitId = toU.id,
+                                fromQuantity = fQty,
+                                toQuantity = tQty,
+                            )
                     )
                     isAdding = false
                     fromQtyStr = ""

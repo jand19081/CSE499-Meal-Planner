@@ -6,9 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -34,8 +31,8 @@ import io.github.and19081.mealplanner.ui.components.HorizontalNumericUpDownContr
 import io.github.and19081.mealplanner.ui.components.MpDetailScaffold
 import io.github.and19081.mealplanner.ui.components.MpOutlinedTextField
 import io.github.and19081.mealplanner.ui.components.SearchableDropdown
-import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
@@ -51,9 +48,7 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
         Mode.MOBILE -> false
       }
 
-  Scaffold(
-      snackbarHost = { SnackbarHost(snackbarHostState) }
-  ) { innerPadding ->
+  Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
     if (actualIsExpanded) {
       Row(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp)) {
         // Settings List
@@ -61,21 +56,23 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
             modifier = Modifier.weight(0.4f),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-          item { 
+          item {
             SettingsContent(
-                uiState, 
-                viewModel, 
+                uiState,
+                viewModel,
                 onShowManager = { showManager = it },
                 onImportResult = { result ->
-                    scope.launch {
-                        if (result.isSuccess) {
-                            snackbarHostState.showSnackbar("Data imported successfully.")
-                        } else {
-                            snackbarHostState.showSnackbar("Import failed: ${result.exceptionOrNull()?.message}")
-                        }
+                  scope.launch {
+                    if (result.isSuccess) {
+                      snackbarHostState.showSnackbar("Data imported successfully.")
+                    } else {
+                      snackbarHostState.showSnackbar(
+                          "Import failed: ${result.exceptionOrNull()?.message}"
+                      )
                     }
-                }
-            ) 
+                  }
+                },
+            )
           }
         }
 
@@ -101,21 +98,23 @@ fun SettingsView(viewModel: SettingsViewModel, isExpanded: Boolean) {
             modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-          item { 
+          item {
             SettingsContent(
-                uiState, 
-                viewModel, 
+                uiState,
+                viewModel,
                 onShowManager = { showManager = it },
                 onImportResult = { result ->
-                    scope.launch {
-                        if (result.isSuccess) {
-                            snackbarHostState.showSnackbar("Data imported successfully.")
-                        } else {
-                            snackbarHostState.showSnackbar("Import failed: ${result.exceptionOrNull()?.message}")
-                        }
+                  scope.launch {
+                    if (result.isSuccess) {
+                      snackbarHostState.showSnackbar("Data imported successfully.")
+                    } else {
+                      snackbarHostState.showSnackbar(
+                          "Import failed: ${result.exceptionOrNull()?.message}"
+                      )
                     }
-                }
-            ) 
+                  }
+                },
+            )
           }
         }
       }
@@ -128,7 +127,7 @@ fun SettingsContent(
     uiState: SettingsUiState,
     viewModel: SettingsViewModel,
     onShowManager: (String) -> Unit,
-    onImportResult: (Result<Unit>) -> Unit = {}
+    onImportResult: (Result<Unit>) -> Unit = {},
 ) {
   var showClearConfirm by remember { mutableStateOf(false) }
 
@@ -143,7 +142,8 @@ fun SettingsContent(
                 viewModel.importData("{}") { onImportResult(it) }
                 showClearConfirm = false
               },
-              colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+              colors =
+                  ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
           ) {
             Text("Delete Everything")
           }
@@ -248,9 +248,10 @@ fun SettingsContent(
       HorizontalDivider()
       SectionHeader("Notifications")
 
-      var sliderValue by remember(uiState.notificationDelayMinutes) {
-          mutableFloatStateOf(uiState.notificationDelayMinutes.toFloat())
-      }
+      var sliderValue by
+          remember(uiState.notificationDelayMinutes) {
+            mutableFloatStateOf(uiState.notificationDelayMinutes.toFloat())
+          }
 
       Text(
           "Meal Consumed Check Delay: ${sliderValue.toInt()} min",
@@ -265,38 +266,38 @@ fun SettingsContent(
       )
     }
 
-      // Financials Section
-      Column {
-          HorizontalDivider()
-          SectionHeader("Financials")
+    // Financials Section
+    Column {
+      HorizontalDivider()
+      SectionHeader("Financials")
 
-          Text(
-              text = "Enter tax as percentage (e.g., 8.0 for 8%)",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.padding(vertical = 8.dp)
-          )
+      Text(
+          text = "Enter tax as percentage (e.g., 8.0 for 8%)",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(vertical = 8.dp),
+      )
 
-          Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
-              Text(text = "Sales Tax:")
+      Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        Text(text = "Sales Tax:")
 
-              HorizontalNumericUpDownControl(
-                  value = uiState.taxRate * 100.0,
-                  onValueChange = { newPercentage ->
-                      // Convert the 0-100 scale back to the 0.0-1.0 scale
-                      viewModel.updateTaxRate(newPercentage / 100.0)
-                  },
-                  min = 0.0,
-                  max = 100.0,
-                  step = 0.25 // +/- 0.25%
-              )
+        HorizontalNumericUpDownControl(
+            value = uiState.taxRate * 100.0,
+            onValueChange = { newPercentage ->
+              // Convert the 0-100 scale back to the 0.0-1.0 scale
+              viewModel.updateTaxRate(newPercentage / 100.0)
+            },
+            min = 0.0,
+            max = 100.0,
+            step = 0.25, // +/- 0.25%
+        )
 
-              Text("%")
-          }
+        Text("%")
       }
+    }
 
     // Backup & Restore Section
     Column {
@@ -305,11 +306,11 @@ fun SettingsContent(
 
       io.github.and19081.mealplanner.core.util.FileTransferButtons(
           onExport = { viewModel.exportDataSync() },
-          onImport = { 
-              val res = viewModel.importDataSync(it)
-              onImportResult(res)
+          onImport = {
+            val res = viewModel.importDataSync(it)
+            onImportResult(res)
           },
-          modifier = Modifier.fillMaxWidth()
+          modifier = Modifier.fillMaxWidth(),
       )
 
       Spacer(modifier = Modifier.height(8.dp))
@@ -333,68 +334,68 @@ fun SystemDataManagerForm(viewModel: SettingsViewModel, onClose: () -> Unit) {
   var selectedTabIndex by remember { mutableIntStateOf(0) }
   val tabs = listOf("Stores", "Categories", "Restaurants", "Units")
 
-    MpDetailScaffold(
-        title = "Manage System Data",
-        onClose = onClose,
-        onSave = onClose,
-        tabs = tabs,
-        selectedTabIndex = selectedTabIndex,
-        onTabSelected = { selectedTabIndex = it },
-        isScrollable = false,
-    ) {
-      Box(modifier = Modifier.fillMaxSize()) {
-        when (selectedTabIndex) {
-          0 ->
-              GenericDataManager(
-                  items = uiState.allStores.map { it.id to it.name },
-                  onSave = { id, name ->
-                    viewModel.saveStore(
-                        Store(
-                            id ?: Uuid.random(),
-                            name,
-                        )
-                    )
-                  },
-                  onDelete = { viewModel.deleteStore(it) },
-                  label = "Store",
-              )
-          1 ->
-              GenericDataManager(
-                  items = uiState.allCategories.map { it.id to it.name },
-                  onSave = { id, name ->
-                    viewModel.saveCategory(
-                        Category(
-                            id ?: Uuid.random(),
-                            name,
-                        )
-                    )
-                  },
-                  onDelete = { viewModel.deleteCategory(it) },
-                  label = "Category",
-              )
-          2 ->
-              GenericDataManager(
-                  items = uiState.allRestaurants.map { it.id to it.name },
-                  onSave = { id, name ->
-                    viewModel.saveRestaurant(
-                        Restaurant(
-                            id ?: Uuid.random(),
-                            name,
-                        )
-                    )
-                  },
-                  onDelete = { viewModel.deleteRestaurant(it) },
-                  label = "Restaurant",
-              )
-          3 ->
-              UnitDataManager(
-                  units = uiState.allUnits,
-                  onSave = { viewModel.saveUnit(it) },
-                  onDelete = { viewModel.deleteUnit(it) },
-              )
-        }
+  MpDetailScaffold(
+      title = "Manage System Data",
+      onClose = onClose,
+      onSave = onClose,
+      tabs = tabs,
+      selectedTabIndex = selectedTabIndex,
+      onTabSelected = { selectedTabIndex = it },
+      isScrollable = false,
+  ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      when (selectedTabIndex) {
+        0 ->
+            GenericDataManager(
+                items = uiState.allStores.map { it.id to it.name },
+                onSave = { id, name ->
+                  viewModel.saveStore(
+                      Store(
+                          id ?: Uuid.random(),
+                          name,
+                      )
+                  )
+                },
+                onDelete = { viewModel.deleteStore(it) },
+                label = "Store",
+            )
+        1 ->
+            GenericDataManager(
+                items = uiState.allCategories.map { it.id to it.name },
+                onSave = { id, name ->
+                  viewModel.saveCategory(
+                      Category(
+                          id ?: Uuid.random(),
+                          name,
+                      )
+                  )
+                },
+                onDelete = { viewModel.deleteCategory(it) },
+                label = "Category",
+            )
+        2 ->
+            GenericDataManager(
+                items = uiState.allRestaurants.map { it.id to it.name },
+                onSave = { id, name ->
+                  viewModel.saveRestaurant(
+                      Restaurant(
+                          id ?: Uuid.random(),
+                          name,
+                      )
+                  )
+                },
+                onDelete = { viewModel.deleteRestaurant(it) },
+                label = "Restaurant",
+            )
+        3 ->
+            UnitDataManager(
+                units = uiState.allUnits,
+                onSave = { viewModel.saveUnit(it) },
+                onDelete = { viewModel.deleteUnit(it) },
+            )
       }
     }
+  }
 }
 
 @Composable

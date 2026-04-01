@@ -19,9 +19,9 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
+import io.github.and19081.mealplanner.core.navigation.AppNavigation
 import io.github.and19081.mealplanner.feature.main.MainDestinations
 import io.github.and19081.mealplanner.feature.main.MainViewModel
-import io.github.and19081.mealplanner.core.navigation.AppNavigation
 import io.github.and19081.mealplanner.feature.settings.Mode
 import kotlinx.datetime.LocalDate
 

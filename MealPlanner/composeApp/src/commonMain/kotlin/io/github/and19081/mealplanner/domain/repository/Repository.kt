@@ -2,8 +2,8 @@ package io.github.and19081.mealplanner.domain.repository
 
 import io.github.and19081.mealplanner.feature.meals.LeftoverItem
 import io.github.and19081.mealplanner.feature.meals.PantryItem
-import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.feature.meals.Restaurant
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
@@ -26,11 +26,7 @@ interface PantryRepository {
   suspend fun removeBatch(batchId: Uuid)
 }
 
-data class PantryUpdate(
-    val foodItemId: Uuid,
-    val newQuantity: Double,
-    val unitId: Uuid
-)
+data class PantryUpdate(val foodItemId: Uuid, val newQuantity: Double, val unitId: Uuid)
 
 interface LeftoverRepository {
   val leftovers: StateFlow<List<LeftoverItem>>

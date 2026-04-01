@@ -8,13 +8,13 @@ import io.github.and19081.mealplanner.core.theme.CornerStyle
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig
+import io.github.and19081.mealplanner.data.export.DataTransferService
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
-import io.github.and19081.mealplanner.data.export.DataTransferService
 import io.github.and19081.mealplanner.feature.meals.Restaurant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.SharingStarted
@@ -113,9 +113,7 @@ class SettingsViewModel(
   }
 
   fun saveCategory(category: Category) {
-    viewModelScope.launch {
-        foodItemRepository.saveCategory(category)
-    }
+    viewModelScope.launch { foodItemRepository.saveCategory(category) }
   }
 
   fun deleteCategory(id: Uuid) {

@@ -89,9 +89,7 @@ fun ExpandableListItem(
       }
 
       if (actionIcon != null && onActionClick != null) {
-        IconButton(onClick = onActionClick) {
-          actionIcon()
-        }
+        IconButton(onClick = onActionClick) { actionIcon() }
       }
 
       IconButton(onClick = onEditClick) {

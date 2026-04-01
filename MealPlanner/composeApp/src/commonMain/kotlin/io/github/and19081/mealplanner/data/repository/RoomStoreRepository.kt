@@ -1,9 +1,9 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.domain.model.Store
-import io.github.and19081.mealplanner.domain.repository.StoreRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.StoreEntity
+import io.github.and19081.mealplanner.domain.model.Store
+import io.github.and19081.mealplanner.domain.repository.StoreRepository
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -37,5 +37,6 @@ class RoomStoreRepository(
   }
 
   private fun StoreEntity.toDomain(): Store = Store(id = id, name = name)
+
   private fun Store.toEntity(): StoreEntity = StoreEntity(id = id, name = name)
 }

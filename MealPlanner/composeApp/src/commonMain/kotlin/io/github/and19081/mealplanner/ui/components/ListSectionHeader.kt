@@ -14,13 +14,13 @@ import androidx.compose.ui.unit.dp
 fun ListSectionHeader(
     text: String,
     modifier: Modifier = Modifier,
-    trailing: @Composable (() -> Unit)? = null
+    trailing: @Composable (() -> Unit)? = null,
 ) {
   Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primaryContainer) {
     Row(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
       Text(
           text = text,

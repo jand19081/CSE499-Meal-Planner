@@ -6,15 +6,15 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class TransactionType {
-    Acquisition, // Buying (Shopping)
-    Production,  // Making (Prep Batch)
-    Consumption, // Eating (Meal)
+  Acquisition, // Buying (Shopping)
+  Production, // Making (Prep Batch)
+  Consumption, // Eating (Meal)
 }
 
 @Serializable
 enum class TransactionDirection {
-    IN,
-    OUT
+  IN,
+  OUT,
 }
 
 @Serializable
@@ -34,5 +34,5 @@ data class KitchenTransaction(
     val type: TransactionType,
     val title: String,
     val changes: List<InventoryChange>,
-    val timestamp: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    val timestamp: Long = kotlin.time.Clock.System.now().toEpochMilliseconds(),
 )

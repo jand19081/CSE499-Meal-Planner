@@ -113,7 +113,8 @@ fun SearchableDropdown(
                 }
                 showDeleteConfirm = null
               },
-              colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+              colors =
+                  ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
           ) {
             Text("Delete")
           }

@@ -7,5 +7,5 @@ import androidx.compose.ui.Modifier
 expect fun FileTransferButtons(
     onExport: suspend () -> String,
     onImport: suspend (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 )

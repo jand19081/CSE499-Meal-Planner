@@ -5,12 +5,13 @@ import kotlin.uuid.Uuid
 import kotlinx.serialization.Serializable
 
 interface NamedReference {
-    val id: Uuid
-    val name: String
+  val id: Uuid
+  val name: String
 }
 
 @Serializable
-data class Category(override val id: Uuid = Uuid.random(), override val name: String) : NamedReference
+data class Category(override val id: Uuid = Uuid.random(), override val name: String) :
+    NamedReference
 
 @Serializable
 data class Store(override val id: Uuid = Uuid.random(), override val name: String) : NamedReference
@@ -42,18 +43,14 @@ data class BridgeConversion(
     val toQuantity: Double,
 )
 
-/**
- * Marker interface for all FoodItem types.
- */
+/** Marker interface for all FoodItem types. */
 interface FoodItem {
-    val id: Uuid
-    val name: String
-    val preferredUnitId: Uuid?
+  val id: Uuid
+  val name: String
+  val preferredUnitId: Uuid?
 }
 
-/**
- * Variant for purchasable ingredients.
- */
+/** Variant for purchasable ingredients. */
 @Serializable
 data class Ingredient(
     override val id: Uuid = Uuid.random(),
@@ -62,9 +59,7 @@ data class Ingredient(
     val purchasableInfo: PurchasableInfo? = null,
 ) : FoodItem
 
-/**
- * Variant for recipe-based items (meals and recipes share storage).
- */
+/** Variant for recipe-based items (meals and recipes share storage). */
 @Serializable
 data class Recipe(
     override val id: Uuid = Uuid.random(),
@@ -73,9 +68,7 @@ data class Recipe(
     val recipeInfo: RecipeInfo,
 ) : FoodItem
 
-/**
- * Variant for pre-planned meals (shares storage with Recipe but marked as meal).
- */
+/** Variant for pre-planned meals (shares storage with Recipe but marked as meal). */
 @Serializable
 data class Meal(
     override val id: Uuid = Uuid.random(),
@@ -84,9 +77,7 @@ data class Meal(
     val recipeInfo: RecipeInfo,
 ) : FoodItem
 
-/**
- * Variant for leftover/prepared food items.
- */
+/** Variant for leftover/prepared food items. */
 @Serializable
 data class Leftover(
     override val id: Uuid = Uuid.random(),
@@ -97,23 +88,27 @@ data class Leftover(
 
 // Extension functions for FoodItem type checking
 fun FoodItem.isIngredient(): Boolean = this is Ingredient
+
 fun FoodItem.isRecipe(): Boolean = this is Recipe
+
 fun FoodItem.isMeal(): Boolean = this is Meal
+
 fun FoodItem.isLeftover(): Boolean = this is Leftover
 
 // Extension properties to access type-specific info
 val FoodItem.purchasableInfo: PurchasableInfo?
-    get() = (this as? Ingredient)?.purchasableInfo
+  get() = (this as? Ingredient)?.purchasableInfo
 
 val FoodItem.recipeInfo: RecipeInfo?
-    get() = when (this) {
+  get() =
+      when (this) {
         is Recipe -> this.recipeInfo
         is Meal -> this.recipeInfo
         else -> null
-    }
+      }
 
 val FoodItem.leftoverInfo: LeftoverInfo?
-    get() = (this as? Leftover)?.leftoverInfo
+  get() = (this as? Leftover)?.leftoverInfo
 
 @Serializable
 data class PurchasableInfo(
@@ -143,7 +138,7 @@ data class FoodItemRequirement(
 data class FoodItemRequirementGroup(
     val id: Uuid = Uuid.random(),
     val sortOrder: Int = 0,
-    val requirements: List<FoodItemRequirement> = emptyList()
+    val requirements: List<FoodItemRequirement> = emptyList(),
 )
 
 @Serializable

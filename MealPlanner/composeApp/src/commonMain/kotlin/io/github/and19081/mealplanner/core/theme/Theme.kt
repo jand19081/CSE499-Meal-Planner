@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowWidthSizeClass
 import com.materialkolor.rememberDynamicColorScheme
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
-
 import kotlinx.serialization.Serializable
 
 @Serializable

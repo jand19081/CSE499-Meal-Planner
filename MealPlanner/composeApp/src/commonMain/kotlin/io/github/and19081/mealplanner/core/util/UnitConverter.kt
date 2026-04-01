@@ -8,7 +8,7 @@ object UnitConverter {
   fun toStandard(
       amount: Double,
       fromUnit: UnitModel,
-      allUnits: Map<Uuid, UnitModel>
+      allUnits: Map<Uuid, UnitModel>,
   ): Pair<Double, UnitModel?> {
     val baseUnit =
         when (fromUnit.type) {
@@ -57,10 +57,14 @@ object UnitConverter {
           convert(amount, fromUnitId, bridgeToUnit.id, allUnits) ?: return null
         }
 
-    val targetBridgeUnit = if (bridgeFromUnit.type == fromUnit.type) bridgeToUnit else bridgeFromUnit
-    val sourceBridgeUnit = if (bridgeFromUnit.type == fromUnit.type) bridgeFromUnit else bridgeToUnit
-    val sourceBridgeQty = if (bridgeFromUnit.type == fromUnit.type) bridge.fromQuantity else bridge.toQuantity
-    val targetBridgeQty = if (bridgeFromUnit.type == fromUnit.type) bridge.toQuantity else bridge.fromQuantity
+    val targetBridgeUnit =
+        if (bridgeFromUnit.type == fromUnit.type) bridgeToUnit else bridgeFromUnit
+    val sourceBridgeUnit =
+        if (bridgeFromUnit.type == fromUnit.type) bridgeFromUnit else bridgeToUnit
+    val sourceBridgeQty =
+        if (bridgeFromUnit.type == fromUnit.type) bridge.fromQuantity else bridge.toQuantity
+    val targetBridgeQty =
+        if (bridgeFromUnit.type == fromUnit.type) bridge.toQuantity else bridge.fromQuantity
 
     val bridgedAmount = (amountInBridgeFrom / sourceBridgeQty) * targetBridgeQty
 

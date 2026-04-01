@@ -1,17 +1,14 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.feature.meals.PantryItem
-import io.github.and19081.mealplanner.domain.repository.PantryRepository
-import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
-import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
-import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
-import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
 import io.github.and19081.mealplanner.core.util.toDomain
+import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
+import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.domain.repository.PantryRepository
+import io.github.and19081.mealplanner.domain.repository.PantryUpdate
+import io.github.and19081.mealplanner.feature.meals.PantryItem
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
-
-import io.github.and19081.mealplanner.domain.repository.PantryUpdate
 
 class RoomPantryRepository(
     private val db: MealPlannerDatabase,
@@ -33,13 +30,14 @@ class RoomPantryRepository(
   }
 
   override suspend fun remove(foodItemId: Uuid, unitId: Uuid) {
-      val existing = dao.observeAllWithDetails().first().find { 
-          it.pantryItem.measurement.foodItemId == foodItemId && 
-          it.pantryItem.measurement.unitId == unitId 
-      }
-      if (existing != null) {
-          dao.delete(existing.pantryItem)
-      }
+    val existing =
+        dao.observeAllWithDetails().first().find {
+          it.pantryItem.measurement.foodItemId == foodItemId &&
+              it.pantryItem.measurement.unitId == unitId
+        }
+    if (existing != null) {
+      dao.delete(existing.pantryItem)
+    }
   }
 
   override suspend fun removeBatch(batchId: Uuid) {
@@ -50,7 +48,15 @@ class RoomPantryRepository(
   }
 
   override suspend fun setPantryItems(newItems: List<PantryItem>) {
-    updateQuantities(newItems.map { PantryUpdate(it.measurement.foodItemId ?: Uuid.NIL, it.measurement.quantity, it.measurement.unitId ?: Uuid.NIL) })
+    updateQuantities(
+        newItems.map {
+          PantryUpdate(
+              it.measurement.foodItemId ?: Uuid.NIL,
+              it.measurement.quantity,
+              it.measurement.unitId ?: Uuid.NIL,
+          )
+        }
+    )
   }
 
   private fun PantryInventoryWithDetails.toModel(): PantryItem =

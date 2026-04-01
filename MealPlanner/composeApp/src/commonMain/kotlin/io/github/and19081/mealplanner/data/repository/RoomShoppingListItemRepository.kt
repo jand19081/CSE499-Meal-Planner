@@ -1,12 +1,12 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
-import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
-import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
-import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
-import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
-import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
 import io.github.and19081.mealplanner.core.util.toDomain
+import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
+import io.github.and19081.mealplanner.data.db.entity.ShoppingCartItemEntity
+import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
+import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
+import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -29,11 +29,12 @@ class RoomShoppingListItemRepository(
             storeId = if (item.storeId == Uuid.NIL) null else item.storeId,
             packageOptionId = item.packageId,
             customName = item.customName,
-            measurement = EntityMeasurement(
-                foodItemId = item.measurement.foodItemId,
-                unitId = item.measurement.unitId,
-                quantity = item.measurement.quantity,
-            ),
+            measurement =
+                EntityMeasurement(
+                    foodItemId = item.measurement.foodItemId,
+                    unitId = item.measurement.unitId,
+                    quantity = item.measurement.quantity,
+                ),
             isPurchased = item.isPurchased,
             isPantryItem = item.isPantryItem,
         )

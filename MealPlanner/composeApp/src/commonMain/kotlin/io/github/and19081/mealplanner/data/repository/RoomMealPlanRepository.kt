@@ -1,14 +1,15 @@
 package io.github.and19081.mealplanner.data.repository
 
-import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
-import io.github.and19081.mealplanner.domain.model.MealSource
-import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
+import io.github.and19081.mealplanner.domain.model.MealSource
+import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
+import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
@@ -16,7 +17,6 @@ import kotlinx.datetime.*
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import kotlinx.serialization.json.Json
-import kotlin.time.Clock
 
 class RoomMealPlanRepository(
     private val db: MealPlannerDatabase,
@@ -48,33 +48,30 @@ class RoomMealPlanRepository(
       entryId: Uuid,
       totalCents: Int,
       taxCents: Int,
-      lineItems: List<Triple<String, Double, Int>>
+      lineItems: List<Triple<String, Double, Int>>,
   ) {
     val receiptId = Uuid.random()
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
 
-    val receiptEntity = StoreReceiptEntity(
-        id = receiptId,
-        name = "Meal Receipt",
-        date = today.toString(),
-        time = now.toString(),
-        scheduledMealId = entryId,
-        actualTotalCents = totalCents,
-        taxPaidCents = taxCents
-    )
+    val receiptEntity =
+        StoreReceiptEntity(
+            id = receiptId,
+            name = "Meal Receipt",
+            date = today.toString(),
+            time = now.toString(),
+            scheduledMealId = entryId,
+            actualTotalCents = totalCents,
+            taxPaidCents = taxCents,
+        )
 
     val lineItemEntities = lineItems.map { (name, qty, price) ->
-        ReceiptLineItemEntity(
-            receiptId = receiptId,
-            customName = name,
-            measurement = ItemMeasurement(
-                foodItemId = null,
-                unitId = null,
-                quantity = qty
-            ),
-            pricePaidCents = price
-        )
+      ReceiptLineItemEntity(
+          receiptId = receiptId,
+          customName = name,
+          measurement = ItemMeasurement(foodItemId = null, unitId = null, quantity = qty),
+          pricePaidCents = price,
+      )
     }
 
     db.receiptDao().upsertReceiptWithDetails(receiptEntity, lineItemEntities)
@@ -87,57 +84,65 @@ class RoomMealPlanRepository(
   private val json = Json { ignoreUnknownKeys = true }
 
   private fun ScheduledMealWithSource.toDomain(): ScheduledMeal {
-      val source = try {
+    val source =
+        try {
           json.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
-      } catch (e: Exception) {
+        } catch (e: Exception) {
           null
-      }
-      val prePlannedMealId = when (source) {
+        }
+    val prePlannedMealId =
+        when (source) {
           is MealSource.PrePlannedMeal -> source.id
           is MealSource.StandaloneRecipe -> source.id
           is MealSource.StandaloneIngredient -> source.id
-          is MealSource.Restaurant, null -> null
-      }
-      val restaurantId = when (source) {
+          is MealSource.Restaurant,
+          null -> null
+        }
+    val restaurantId =
+        when (source) {
           is MealSource.Restaurant -> source.restaurantId
           else -> null
-      }
-      return ScheduledMeal(
-          id = scheduledMeal.id,
-          date = try {
+        }
+    return ScheduledMeal(
+        id = scheduledMeal.id,
+        date =
+            try {
               LocalDate.parse(scheduledMeal.date)
-          } catch (e: Exception) {
+            } catch (e: Exception) {
               Clock.System.todayIn(TimeZone.currentSystemDefault())
-          },
-          time = try {
+            },
+        time =
+            try {
               LocalTime.parse(scheduledMeal.time)
-          } catch (e: Exception) {
+            } catch (e: Exception) {
               LocalTime(12, 0)
-          },
-          mealType = scheduledMeal.mealType,
-          prePlannedMealId = prePlannedMealId,
-          restaurantId = restaurantId,
-          peopleCount = scheduledMeal.peopleCount,
-          isConsumed = scheduledMeal.isConsumed,
-          anticipatedCostCents = scheduledMeal.anticipatedCostCents,
-      )
+            },
+        mealType = scheduledMeal.mealType,
+        prePlannedMealId = prePlannedMealId,
+        restaurantId = restaurantId,
+        peopleCount = scheduledMeal.peopleCount,
+        isConsumed = scheduledMeal.isConsumed,
+        anticipatedCostCents = scheduledMeal.anticipatedCostCents,
+        source = source,
+    )
   }
 
   private fun ScheduledMeal.toEntity(): ScheduledMealEntity {
-      val source = when {
+    val source =
+        when {
           restaurantId != null -> MealSource.Restaurant(restaurantId, anticipatedCostCents ?: 0)
           prePlannedMealId != null -> MealSource.PrePlannedMeal(prePlannedMealId)
           else -> MealSource.PrePlannedMeal(Uuid.random())
-      }
-      return ScheduledMealEntity(
-          id = id,
-          date = date.toString(),
-          time = time.toString(),
-          mealType = mealType,
-          mealSource = json.encodeToString(MealSource.serializer(), source),
-          peopleCount = peopleCount,
-          isConsumed = isConsumed,
-          anticipatedCostCents = anticipatedCostCents
-      )
+        }
+    return ScheduledMealEntity(
+        id = id,
+        date = date.toString(),
+        time = time.toString(),
+        mealType = mealType,
+        mealSource = json.encodeToString(MealSource.serializer(), source),
+        peopleCount = peopleCount,
+        isConsumed = isConsumed,
+        anticipatedCostCents = anticipatedCostCents,
+    )
   }
 }

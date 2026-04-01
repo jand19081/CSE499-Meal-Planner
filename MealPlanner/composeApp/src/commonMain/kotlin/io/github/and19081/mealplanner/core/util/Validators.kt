@@ -56,7 +56,8 @@ object Validators {
 
   fun validateExpirationDate(expirationDate: LocalDate, dateAdded: LocalDate): Result<LocalDate> {
     return when {
-      expirationDate < dateAdded -> Result.failure(Exception("Expiration date cannot be before the date added"))
+      expirationDate < dateAdded ->
+          Result.failure(Exception("Expiration date cannot be before the date added"))
       else -> Result.success(expirationDate)
     }
   }
@@ -64,7 +65,8 @@ object Validators {
   fun validateScheduledMealDate(scheduledDate: LocalDate): Result<LocalDate> {
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     return when {
-      scheduledDate.year > today.year + 5 -> Result.failure(Exception("Cannot schedule meals more than 5 years in advance"))
+      scheduledDate.year > today.year + 5 ->
+          Result.failure(Exception("Cannot schedule meals more than 5 years in advance"))
       scheduledDate.year < 2000 -> Result.failure(Exception("Invalid historical date"))
       else -> Result.success(scheduledDate)
     }
@@ -73,7 +75,8 @@ object Validators {
   fun validateRecipeInstructions(instructions: List<String>): Result<List<String>> {
     val cleaned = instructions.map { it.trim() }.filter { it.isNotEmpty() }
     return when {
-      cleaned.isEmpty() -> Result.failure(Exception("A recipe must have at least one instruction step"))
+      cleaned.isEmpty() ->
+          Result.failure(Exception("A recipe must have at least one instruction step"))
       else -> Result.success(cleaned)
     }
   }

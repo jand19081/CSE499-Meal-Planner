@@ -3,6 +3,7 @@
 package io.github.and19081.mealplanner.feature.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,12 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.filled.RestaurantMenu
 import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.ui.components.MpValidationWarning
-import kotlinx.datetime.LocalDate
 import kotlin.time.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
@@ -36,7 +36,7 @@ fun DashboardView(
     viewModel: DashboardViewModel,
     mode: Mode,
     isExpanded: Boolean,
-    onCanMakeNowClick: () -> Unit = {}
+    onCanMakeNowClick: () -> Unit = {},
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
@@ -100,7 +100,7 @@ fun DashboardHeader(today: LocalDate) {
     )
     Text(
         text =
-            "${today.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${today.day}",
+            "${today.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }}, ${today.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${today.dayOfMonth}",
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -110,7 +110,7 @@ fun DashboardHeader(today: LocalDate) {
 @Composable
 fun DashboardStats(
     uiState: DashboardViewModel.DashboardUiState,
-    onCanMakeNowClick: () -> Unit = {}
+    onCanMakeNowClick: () -> Unit = {},
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
     // Weekly Cost (If Enabled)
@@ -271,7 +271,10 @@ fun DashboardMealPlan(uiState: DashboardViewModel.DashboardUiState, viewModel: D
                       containerColor = MaterialTheme.colorScheme.surface,
                   ),
               modifier =
-                  Modifier.background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small),
+                  Modifier.background(
+                      MaterialTheme.colorScheme.surface,
+                      MaterialTheme.shapes.small,
+                  ),
           )
         }
       }
@@ -297,7 +300,8 @@ fun DashboardStatCard(
 ) {
   Card(
       modifier = modifier,
-      colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+      colors =
+          CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
   ) {
     Column(modifier = Modifier.padding(16.dp)) {
       Icon(icon, null)

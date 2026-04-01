@@ -1,13 +1,13 @@
 package io.github.and19081.mealplanner.domain.logic
 
-import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.isRecipe
-import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.isRecipe
+import io.github.and19081.mealplanner.domain.model.recipeInfo
+import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import kotlin.collections.get
 import kotlin.uuid.Uuid
 
@@ -33,7 +33,7 @@ object PriceCalculator {
       val primaryReq = group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
       primaryReq?.let { req ->
         val subItem = allItemsMap[req.measurement.foodItemId] ?: return@let
-        
+
         if (subItem.isRecipe()) {
           // Recursive Call for Sub-Recipe
           val subRecipeBaseCost =
@@ -50,17 +50,20 @@ object PriceCalculator {
           val costPerServing = subRecipeBaseCost.toDouble() / recipeServings
 
           // Convert the required quantity into the recipe's base unit (servings)
-          val preferredUnitId = subItem.preferredUnitId ?: io.github.and19081.mealplanner.core.util.SystemUnits.Each.id
+          val preferredUnitId =
+              subItem.preferredUnitId
+                  ?: io.github.and19081.mealplanner.core.util.SystemUnits.Each.id
           val reqUnitId = req.measurement.unitId ?: preferredUnitId
           val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
 
-          val servingsNeeded = io.github.and19081.mealplanner.core.util.UnitConverter.convert(
-              amount = req.measurement.quantity,
-              fromUnitId = reqUnitId,
-              toUnitId = preferredUnitId,
-              allUnits = allUnits,
-              bridges = bridges
-          ) ?: req.measurement.quantity // Fallback if no conversion exists
+          val servingsNeeded =
+              io.github.and19081.mealplanner.core.util.UnitConverter.convert(
+                  amount = req.measurement.quantity,
+                  fromUnitId = reqUnitId,
+                  toUnitId = preferredUnitId,
+                  allUnits = allUnits,
+                  bridges = bridges,
+              ) ?: req.measurement.quantity // Fallback if no conversion exists
 
           totalCents += (costPerServing * servingsNeeded).toLong()
           return@let
@@ -70,10 +73,9 @@ object PriceCalculator {
         val packages = packagesByIngredient[subItem.id] ?: emptyList()
         val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
 
-        val bestOption =
-            packages.minByOrNull {
-              if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
-            }
+        val bestOption = packages.minByOrNull {
+          if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
+        }
 
         if (bestOption != null && bestOption.quantity > 0) {
           val convertedReqQty =
@@ -115,27 +117,26 @@ object PriceCalculator {
 
     var totalCents = 0L
     val recipeInfo = meal.recipeInfo ?: return 0L
-    
+
     // Scale based on people count vs recipe servings
     val scale = if (recipeInfo.servings > 0) entry.peopleCount / recipeInfo.servings else 1.0
 
     // For simplicity, we just use calculateFoodItemCost and multiply by scale
     // Note: This might need more granular scaling for nested recipes if they don't scale linearly
-    val baseCost = calculateFoodItemCost(
-        meal,
-        allItemsMap,
-        packagesByIngredient,
-        bridgesByIngredient,
-        allUnits,
-        emptySet()
-    ) ?: 0L
-    
+    val baseCost =
+        calculateFoodItemCost(
+            meal,
+            allItemsMap,
+            packagesByIngredient,
+            bridgesByIngredient,
+            allUnits,
+            emptySet(),
+        ) ?: 0L
+
     return (baseCost * scale).toLong()
   }
 
-  /**
-   * Feature 5: "Make vs Buy" Cost Analysis.
-   */
+  /** Feature 5: "Make vs Buy" Cost Analysis. */
   fun calculateMakeToStockAnalysis(
       recipe: FoodItem,
       allItemsMap: Map<Uuid, FoodItem>,
@@ -145,15 +146,21 @@ object PriceCalculator {
   ): Pair<Long?, Long?> {
     // 1. Cost to Make (Raw Materials)
     val costToMake =
-        calculateFoodItemCost(recipe, allItemsMap, packagesByIngredient, bridgesByIngredient, allUnits)
+        calculateFoodItemCost(
+            recipe,
+            allItemsMap,
+            packagesByIngredient,
+            bridgesByIngredient,
+            allUnits,
+        )
 
     // 2. Cost to Buy (Equivalent Package Option)
     val costToBuy: Long? = null
-    
+
     // In ECS, "produces ingredient" logic needs to be revisited.
     // For now, let's assume we look for a FoodItem that is an ingredient and matches the name?
     // Or add producesFoodItemId to RecipeInfo.
-    
+
     // For now, return null for costToBuy until schema updated or logic refined
     return costToMake to costToBuy
   }

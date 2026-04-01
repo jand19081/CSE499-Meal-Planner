@@ -2,6 +2,7 @@ package io.github.and19081.mealplanner.feature.meals
 
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.domain.model.MealSource
 import io.github.and19081.mealplanner.domain.model.NamedReference
 import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
@@ -22,6 +23,7 @@ data class ScheduledMeal(
     val peopleCount: Int,
     val isConsumed: Boolean = false,
     val anticipatedCostCents: Int? = null,
+    val source: MealSource? = null,
 )
 
 @Serializable

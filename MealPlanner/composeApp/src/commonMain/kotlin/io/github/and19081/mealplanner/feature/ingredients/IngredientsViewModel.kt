@@ -8,18 +8,19 @@ import io.github.and19081.mealplanner.core.util.Validators
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.isIngredient
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Package
 import io.github.and19081.mealplanner.domain.model.Store
-import io.github.and19081.mealplanner.domain.model.ItemMeasurement
+import io.github.and19081.mealplanner.domain.model.isIngredient
+import io.github.and19081.mealplanner.domain.model.purchasableInfo
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.ShoppingListItemRepository
 import io.github.and19081.mealplanner.domain.repository.StoreRepository
 import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
+import kotlin.collections.get
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlin.collections.get
 
 data class IngredientsUiState(
     val groupedIngredients: Map<String, List<FoodItem>>,
@@ -66,9 +67,9 @@ class IngredientsViewModel(
             val allBridges = args[6] as List<BridgeConversion>
             val allStores = args[7] as List<Store>
             val allUnits = args[8] as List<UnitModel>
-            
+
             val allIngredients = allItems.filter { it.isIngredient() }
-            
+
             val filtered =
                 if (query.isBlank()) allIngredients
                 else {
@@ -81,8 +82,8 @@ class IngredientsViewModel(
                   filtered
                       .sortedBy { it.name }
                       .groupBy { item ->
-                          val catId = item.purchasableInfo?.categoryId
-                          catMap[catId]?.name ?: "Uncategorized"
+                        val catId = item.purchasableInfo?.categoryId
+                        catMap[catId]?.name ?: "Uncategorized"
                       }
                       .toSortedMap()
                 } else {
@@ -101,14 +102,24 @@ class IngredientsViewModel(
                 allPackages = allPackages,
                 allBridges = allBridges,
                 allUnits = allUnits,
-                doesExactMatchExist = allIngredients.any { it.name.equals(query, ignoreCase = true) },
+                doesExactMatchExist =
+                    allIngredients.any { it.name.equals(query, ignoreCase = true) },
                 errorMessage = error,
             )
           }
           .stateIn(
               viewModelScope,
               SharingStarted.WhileSubscribed(5000),
-              IngredientsUiState(emptyMap(), true, "", emptyList(), emptyList(), emptyList(), emptyList(), emptyList()),
+              IngredientsUiState(
+                  emptyMap(),
+                  true,
+                  "",
+                  emptyList(),
+                  emptyList(),
+                  emptyList(),
+                  emptyList(),
+                  emptyList(),
+              ),
           )
 
   fun onSearchQueryChange(query: String) {
@@ -181,25 +192,20 @@ class IngredientsViewModel(
   }
 
   fun deleteCategory(categoryId: Uuid) {
-    viewModelScope.launch {
-        foodItemRepository.deleteCategory(categoryId)
-    }
+    viewModelScope.launch { foodItemRepository.deleteCategory(categoryId) }
   }
 
   fun addIngredientToShoppingList(ingredient: FoodItem, quantity: Double, unitId: Uuid) {
     viewModelScope.launch {
-        shoppingListItemRepository.addItem(
-            ShoppingListItem(
-                measurement = ItemMeasurement(
-                    foodItemId = ingredient.id,
-                    quantity = quantity,
-                    unitId = unitId
-                ),
-                storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
-                isPurchased = false,
-                isPantryItem = true
-            )
-        )
+      shoppingListItemRepository.addItem(
+          ShoppingListItem(
+              measurement =
+                  ItemMeasurement(foodItemId = ingredient.id, quantity = quantity, unitId = unitId),
+              storeId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
+              isPurchased = false,
+              isPantryItem = true,
+          )
+      )
     }
   }
 }

@@ -19,8 +19,7 @@ class ShoppingListRepository {
 
   fun setStoreOverride(foodItemId: Uuid, storeId: Uuid) {
     val current = _overrides.value.toMutableMap()
-    current[foodItemId] =
-        ShoppingListOverride(foodItemId, forceStoreId = storeId, inPantry = false)
+    current[foodItemId] = ShoppingListOverride(foodItemId, forceStoreId = storeId, inPantry = false)
     _overrides.value = current
   }
 

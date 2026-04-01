@@ -1,38 +1,42 @@
 package io.github.and19081.mealplanner.core.util
 
-import io.github.and19081.mealplanner.feature.settings.AppSettings
 import io.github.and19081.mealplanner.data.db.entity.AppSettingsEntity
-import io.github.and19081.mealplanner.domain.model.BridgeConversion
-import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.data.db.entity.CategoryEntity
-import io.github.and19081.mealplanner.data.db.relation.ComposedFoodItemRelation
-import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as UiDashboardConfig
 import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
-import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
-import io.github.and19081.mealplanner.domain.model.LeftoverInfo
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
 import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
-import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
-import io.github.and19081.mealplanner.feature.meals.PantryItem
-import io.github.and19081.mealplanner.domain.model.PurchasableInfo
-import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
-import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptLineItem
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
-import io.github.and19081.mealplanner.domain.model.RecipeInfo
-import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
-import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
-import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
-import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
-import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.data.db.entity.StoreEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
-import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
 import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitEntity
-import io.github.and19081.mealplanner.domain.model.MealSource
-import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
+import io.github.and19081.mealplanner.data.db.relation.ComposedFoodItemRelation
+import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
+import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
+import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
+import io.github.and19081.mealplanner.domain.model.BridgeConversion
+import io.github.and19081.mealplanner.domain.model.Category
+import io.github.and19081.mealplanner.domain.model.FoodItem
+import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
+import io.github.and19081.mealplanner.domain.model.Ingredient
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement as DomainMeasurement
-import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as UiDashboardConfig
+import io.github.and19081.mealplanner.domain.model.Leftover
+import io.github.and19081.mealplanner.domain.model.LeftoverInfo
+import io.github.and19081.mealplanner.domain.model.Meal
+import io.github.and19081.mealplanner.domain.model.MealSource
+import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchasableInfo
+import io.github.and19081.mealplanner.domain.model.Recipe
+import io.github.and19081.mealplanner.domain.model.RecipeInfo
+import io.github.and19081.mealplanner.domain.model.Store
+import io.github.and19081.mealplanner.feature.meals.PantryItem
+import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
+import io.github.and19081.mealplanner.feature.settings.AppSettings
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
+import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptLineItem
+import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.datetime.*
@@ -69,144 +73,159 @@ fun UnitModel.toEntity(): UnitEntity =
 
 // --- Category Mappers ---
 fun CategoryEntity.toModel(): Category = Category(id = id, name = name)
+
 fun Category.toEntity(): CategoryEntity = CategoryEntity(id = id, name = name)
 
 // --- Store Mappers ---
 fun StoreEntity.toModel(): Store = Store(id = id, name = name)
+
 fun Store.toEntity(): StoreEntity = StoreEntity(id = id, name = name)
 
 // --- Food Item Mappers (ECS) ---
 fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
-    val processedRecipeInfo = recipe?.let {
-        RecipeInfo(
-            description = it.description,
-            instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
-            servings = it.servings,
-            mealType = it.mealType,
-            prepTimeMinutes = it.prepTimeMinutes,
-            cookTimeMinutes = it.cookTimeMinutes,
-            requirementGroups = requirementGroups.map { group ->
-                io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup(
-                    id = group.group.id,
-                    sortOrder = group.group.sortOrder,
-                    requirements = group.requirements.map { req ->
+  val processedRecipeInfo = recipe?.let {
+    RecipeInfo(
+        description = it.description,
+        instructions = instructions.sortedBy { it.stepOrder }.map { it.instruction },
+        servings = it.servings,
+        mealType = it.mealType,
+        prepTimeMinutes = it.prepTimeMinutes,
+        cookTimeMinutes = it.cookTimeMinutes,
+        requirementGroups =
+            requirementGroups.map { group ->
+              io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup(
+                  id = group.group.id,
+                  sortOrder = group.group.sortOrder,
+                  requirements =
+                      group.requirements.map { req ->
                         FoodItemRequirement(
                             id = req.id,
                             measurement = req.measurement.toDomain(),
-                            isPrimary = req.isPrimary
+                            isPrimary = req.isPrimary,
                         )
-                    }
-                )
-            }
-        )
-    }
+                      },
+              )
+            },
+    )
+  }
 
-    return when {
-        purchasable != null -> FoodItem.Ingredient(
+  return when {
+    purchasable != null ->
+        Ingredient(
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
-            purchasableInfo = PurchasableInfo(
-                expectedPriceCents = purchasable.expectedPriceCents,
-                categoryId = purchasable.categoryId
-            )
+            purchasableInfo =
+                PurchasableInfo(
+                    expectedPriceCents = purchasable.expectedPriceCents,
+                    categoryId = purchasable.categoryId,
+                ),
         )
 
-        processedRecipeInfo != null -> {
-            // Check the isMeal flag from the recipe component entity
-            if (recipe?.isMeal == true) {
-                FoodItem.Meal(
-                    id = item.id,
-                    name = item.name,
-                    preferredUnitId = item.preferredUnitId,
-                    recipeInfo = processedRecipeInfo
-                )
-            } else {
-                FoodItem.Recipe(
-                    id = item.id,
-                    name = item.name,
-                    preferredUnitId = item.preferredUnitId,
-                    recipeInfo = processedRecipeInfo
-                )
-            }
-        }
-
-        leftover != null -> FoodItem.Leftover(
+    processedRecipeInfo != null -> {
+      // Check the isMeal flag from the recipe component entity
+      if (recipe?.isMeal == true) {
+        Meal(
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
-            leftoverInfo = LeftoverInfo(
-                remainingServings = leftover.remainingServings,
-                dateAdded = leftover.dateAdded,
-                expirationDate = leftover.expirationDate
-            )
+            recipeInfo = processedRecipeInfo,
+        )
+      } else {
+        Recipe(
+            id = item.id,
+            name = item.name,
+            preferredUnitId = item.preferredUnitId,
+            recipeInfo = processedRecipeInfo,
+        )
+      }
+    }
+
+    leftover != null ->
+        Leftover(
+            id = item.id,
+            name = item.name,
+            preferredUnitId = item.preferredUnitId,
+            leftoverInfo =
+                LeftoverInfo(
+                    remainingServings = leftover.remainingServings,
+                    dateAdded = leftover.dateAdded,
+                    expirationDate = leftover.expirationDate,
+                ),
         )
 
-        else -> {
-            // No component - create a base Ingredient with no purchasable info
-            FoodItem.Ingredient(
-                id = item.id,
-                name = item.name,
-                preferredUnitId = item.preferredUnitId,
-                purchasableInfo = null
-            )
-        }
+    else -> {
+      // No component - create a base Ingredient with no purchasable info
+      Ingredient(
+          id = item.id,
+          name = item.name,
+          preferredUnitId = item.preferredUnitId,
+          purchasableInfo = null,
+      )
     }
+  }
 }
 
 fun FoodItem.toEntity(): FoodItemEntity =
     FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId)
 
-// Extension function to get purchasableInfo from an Ingredient
-val FoodItem.purchasableInfo: PurchasableInfo?
-    get() = (this as? FoodItem.Ingredient)?.purchasableInfo
-
 // Extension function to get recipeInfo from Recipe or Meal variants
 val FoodItem.recipeInfoFromBase: RecipeInfo?
-    get() = when (this) {
-        is FoodItem.Recipe -> this.recipeInfo
-        is FoodItem.Meal -> this.recipeInfo
+  get() =
+      when (this) {
+        is Recipe -> this.recipeInfo
+        is Meal -> this.recipeInfo
         else -> null
-    }
+      }
 
-fun PurchasableInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity =
+fun PurchasableInfo.toEntity(
+    foodItemId: Uuid
+): io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity =
     io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity(
         foodItemId = foodItemId,
         expectedPriceCents = expectedPriceCents,
-        categoryId = categoryId
+        categoryId = categoryId,
     )
 
-fun RecipeInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity =
+fun RecipeInfo.toEntity(
+    foodItemId: Uuid
+): io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity =
     io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity(
         foodItemId = foodItemId,
         description = description,
         servings = servings,
         mealType = mealType,
         prepTimeMinutes = prepTimeMinutes,
-        cookTimeMinutes = cookTimeMinutes
+        cookTimeMinutes = cookTimeMinutes,
     )
 
-fun LeftoverInfo.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity =
+fun LeftoverInfo.toEntity(
+    foodItemId: Uuid
+): io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity =
     io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity(
         foodItemId = foodItemId,
         remainingServings = remainingServings,
         dateAdded = dateAdded,
-        expirationDate = expirationDate
+        expirationDate = expirationDate,
     )
 
-fun io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup.toEntity(foodItemId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity =
+fun io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup.toEntity(
+    foodItemId: Uuid
+): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity =
     io.github.and19081.mealplanner.data.db.entity.RecipeRequirementGroupEntity(
         id = id,
         foodItemId = foodItemId,
-        sortOrder = sortOrder
+        sortOrder = sortOrder,
     )
 
-fun io.github.and19081.mealplanner.domain.model.FoodItemRequirement.toEntity(groupId: Uuid): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity =
+fun io.github.and19081.mealplanner.domain.model.FoodItemRequirement.toEntity(
+    groupId: Uuid
+): io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity =
     io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity(
         id = id,
         groupId = groupId,
         measurement = measurement.toEntity(),
-        isPrimary = isPrimary
+        isPrimary = isPrimary,
     )
 
 // --- Package Mappers ---
@@ -252,42 +271,46 @@ fun PantryInventoryWithDetails.toModel(): PantryItem =
 private val mealSourceJson = Json { ignoreUnknownKeys = true }
 
 fun ScheduledMealWithSource.toModel(): ScheduledMeal {
-    val source = try {
+  val source =
+      try {
         mealSourceJson.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
-    } catch (e: Exception) {
+      } catch (e: Exception) {
         null
-    }
-    val prePlannedMealId = when (source) {
+      }
+  val prePlannedMealId =
+      when (source) {
         is MealSource.PrePlannedMeal -> source.id
         is MealSource.StandaloneRecipe -> source.id
         is MealSource.StandaloneIngredient -> source.id
-        is MealSource.Restaurant, null -> null
-    }
-    val restaurantId = when (source) {
+        is MealSource.Restaurant,
+        null -> null
+      }
+  val restaurantId =
+      when (source) {
         is MealSource.Restaurant -> source.restaurantId
         else -> null
-    }
-    return ScheduledMeal(
-        id = scheduledMeal.id,
-        date =
-            try {
-                LocalDate.parse(scheduledMeal.date)
-            } catch (e: Exception) {
-                Clock.System.todayIn(TimeZone.currentSystemDefault())
-            },
-        time =
-            try {
-                LocalTime.parse(scheduledMeal.time)
-            } catch (e: Exception) {
-                LocalTime(12, 0)
-            },
-        mealType = scheduledMeal.mealType,
-        prePlannedMealId = prePlannedMealId,
-        restaurantId = restaurantId,
-        peopleCount = scheduledMeal.peopleCount,
-        isConsumed = scheduledMeal.isConsumed,
-        anticipatedCostCents = scheduledMeal.anticipatedCostCents,
-    )
+      }
+  return ScheduledMeal(
+      id = scheduledMeal.id,
+      date =
+          try {
+            LocalDate.parse(scheduledMeal.date)
+          } catch (e: Exception) {
+            Clock.System.todayIn(TimeZone.currentSystemDefault())
+          },
+      time =
+          try {
+            LocalTime.parse(scheduledMeal.time)
+          } catch (e: Exception) {
+            LocalTime(12, 0)
+          },
+      mealType = scheduledMeal.mealType,
+      prePlannedMealId = prePlannedMealId,
+      restaurantId = restaurantId,
+      peopleCount = scheduledMeal.peopleCount,
+      isConsumed = scheduledMeal.isConsumed,
+      anticipatedCostCents = scheduledMeal.anticipatedCostCents,
+  )
 }
 
 // --- Shopping List Mappers ---
@@ -308,15 +331,15 @@ fun StoreReceiptEntity.toModel(): ReceiptHistory =
         id = id,
         date =
             try {
-                LocalDate.parse(date)
+              LocalDate.parse(date)
             } catch (e: Exception) {
-                Clock.System.todayIn(TimeZone.currentSystemDefault())
+              Clock.System.todayIn(TimeZone.currentSystemDefault())
             },
         time =
             try {
-                LocalTime.parse(time)
+              LocalTime.parse(time)
             } catch (e: Exception) {
-                LocalTime(12, 0)
+              LocalTime(12, 0)
             },
         storeId = storeId,
         restaurantId = restaurantId,
@@ -352,7 +375,7 @@ fun AppSettingsEntity.toModel(): AppSettings =
         isFirstLaunch = isFirstLaunch,
         view = appMode,
         defaultTaxRatePercentage = defaultTaxRatePercentage ?: 0.0,
-        mealConsumedNotificationDelayMinutes = notificationDelayMinutes ?: 30
+        mealConsumedNotificationDelayMinutes = notificationDelayMinutes ?: 30,
     )
 
 fun UiDashboardConfig.toModel(): UiDashboardConfig =

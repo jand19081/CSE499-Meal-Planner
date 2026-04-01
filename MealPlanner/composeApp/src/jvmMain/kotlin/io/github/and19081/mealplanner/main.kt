@@ -1,8 +1,8 @@
 package io.github.and19081.mealplanner
 
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.runtime.remember
 import androidx.room.Room
 import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
@@ -28,8 +28,8 @@ fun main() = application {
 
   Window(
       onCloseRequest = {
-          appScope.cancel()
-          exitApplication()
+        appScope.cancel()
+        exitApplication()
       },
       title = "MealPlanner",
   ) {
