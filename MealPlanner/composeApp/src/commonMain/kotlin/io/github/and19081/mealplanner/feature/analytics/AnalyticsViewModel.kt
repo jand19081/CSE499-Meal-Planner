@@ -9,7 +9,7 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.domain.logic.PriceCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.model.isIngredient
 import io.github.and19081.mealplanner.domain.model.isMeal
@@ -67,7 +67,7 @@ class AnalyticsViewModel(
   data class InputData(
       val entries: List<ScheduledMeal>,
       val allItems: List<FoodItem>,
-      val packages: List<Package>,
+      val purchaseOptions: List<PurchaseOption>,
       val bridges: List<BridgeConversion>,
       val receiptHistory: List<ReceiptHistory>,
       val stores: List<Store>,
@@ -83,7 +83,7 @@ class AnalyticsViewModel(
       combine(
               mealPlanRepository.entries,
               foodItemRepository.foodItems,
-              foodItemRepository.packages,
+              foodItemRepository.purchaseOptions,
               foodItemRepository.conversions,
               receiptHistoryRepository.trips,
               storeRepository.stores,
@@ -96,7 +96,7 @@ class AnalyticsViewModel(
           ) { args: Array<Any?> ->
             val entries = args[0] as List<ScheduledMeal>
             val allItems = args[1] as List<FoodItem>
-            val packages = args[2] as List<Package>
+            val purchaseOptions = args[2] as List<PurchaseOption>
             val bridges = args[3] as List<BridgeConversion>
             val trips = args[4] as List<ReceiptHistory>
             val stores = args[5] as List<Store>
@@ -111,7 +111,7 @@ class AnalyticsViewModel(
                 InputData(
                     entries = entries,
                     allItems = allItems,
-                    packages = packages,
+                    purchaseOptions = purchaseOptions,
                     bridges = bridges,
                     receiptHistory = trips,
                     stores = stores,
@@ -134,7 +134,7 @@ class AnalyticsViewModel(
                       DataQualityValidator.validateFoodItem(
                           meal,
                           itemsMap,
-                          data.packages,
+                          data.purchaseOptions,
                           data.bridges,
                           data.allUnits,
                       )
@@ -182,7 +182,7 @@ class AnalyticsViewModel(
                 PriceCalculator.calculateEstimatedCost(
                     entry = entry,
                     allItemsMap = itemsMap,
-                    packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                    purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
                     bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                     allUnits = data.allUnits.associateBy { it.id },
                 )
@@ -227,7 +227,7 @@ class AnalyticsViewModel(
                           PriceCalculator.calculateFoodItemCost(
                               item = meal,
                               allItemsMap = itemsMap,
-                              packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                              purchaseOptionByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
                               bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                               allUnits = data.allUnits.associateBy { it.id },
                           )
@@ -255,7 +255,7 @@ class AnalyticsViewModel(
                       PriceCalculator.calculateEstimatedCost(
                           entry = entry,
                           allItemsMap = itemsMap,
-                          packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
                           bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                           allUnits = data.allUnits.associateBy { it.id },
                       )
@@ -291,7 +291,7 @@ class AnalyticsViewModel(
                       PriceCalculator.calculateEstimatedCost(
                           entry = entry,
                           allItemsMap = itemsMap,
-                          packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
                           bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                           allUnits = data.allUnits.associateBy { it.id },
                       )
@@ -327,7 +327,7 @@ class AnalyticsViewModel(
                       PriceCalculator.calculateEstimatedCost(
                           entry = entry,
                           allItemsMap = itemsMap,
-                          packagesByIngredient = data.packages.groupBy { it.foodItemId },
+                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
                           bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
                           allUnits = data.allUnits.associateBy { it.id },
                       )

@@ -60,9 +60,9 @@ class MainViewModel : ViewModel() {
   fun toggleCalendarViewMode() {
     _calendarViewMode.value =
         when (_calendarViewMode.value) {
-          CalendarViewMode.DAY -> CalendarViewMode.WEEK
-          CalendarViewMode.WEEK -> CalendarViewMode.MONTH
-          CalendarViewMode.MONTH -> CalendarViewMode.DAY
+          CalendarViewMode.MONTH -> CalendarViewMode.WEEK
+          CalendarViewMode.WEEK -> CalendarViewMode.DAY
+          CalendarViewMode.DAY -> CalendarViewMode.MONTH
         }
   }
 

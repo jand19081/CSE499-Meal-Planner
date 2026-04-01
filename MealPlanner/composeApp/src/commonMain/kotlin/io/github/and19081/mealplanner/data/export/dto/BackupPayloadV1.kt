@@ -23,7 +23,7 @@ data class BackupPayloadV1(
     val appSettings: AppSettingsDtoV1? = null,
     val storeReceipts: List<StoreReceiptDtoV1> = emptyList(),
     val unitConversionBridges: List<UnitConversionBridgeDtoV1> = emptyList(),
-    val packageOptions: List<PackageOptionDtoV1> = emptyList(),
+    val purchaseOptions: List<PurchaseOptionDtoV1> = emptyList(),
     val recipeRequirementGroups: List<RecipeRequirementGroupDtoV1> = emptyList(),
     val recipeRequirements: List<RecipeRequirementDtoV1> = emptyList(),
     val pantryInventory: List<PantryInventoryDtoV1> = emptyList(),
@@ -82,6 +82,7 @@ data class RecipeComponentDtoV1(
     val description: String?,
     val servings: Double,
     val mealType: RecipeMealType,
+    val isMeal: Boolean = false,
     val prepTimeMinutes: Int?,
     val cookTimeMinutes: Int?,
 )
@@ -159,7 +160,7 @@ data class UnitConversionBridgeDtoV1(
 )
 
 @Serializable
-data class PackageOptionDtoV1(
+data class PurchaseOptionDtoV1(
     val id: String,
     val storeId: String,
     val foodItemId: String,
@@ -200,7 +201,7 @@ data class PantryInventoryDtoV1(
 data class ShoppingCartItemDtoV1(
     val id: String,
     val storeId: String?,
-    val packageOptionId: String?,
+    val purchaseOptionId: String?,
     val customName: String?,
     val measurement: ItemMeasurementDtoV1,
     val isPurchased: Boolean,

@@ -76,6 +76,7 @@ fun RecipeComponentEntity.toDtoV1() =
         description = description,
         servings = servings,
         mealType = mealType,
+        isMeal = isMeal,
         prepTimeMinutes = prepTimeMinutes,
         cookTimeMinutes = cookTimeMinutes,
     )
@@ -86,6 +87,7 @@ fun RecipeComponentDtoV1.toEntity() =
         description = description,
         servings = servings,
         mealType = mealType,
+        isMeal = isMeal,
         prepTimeMinutes = prepTimeMinutes,
         cookTimeMinutes = cookTimeMinutes,
     )
@@ -234,8 +236,8 @@ fun UnitConversionBridgeDtoV1.toEntity() =
         toQuantity = toQuantity,
     )
 
-fun PackageOptionEntity.toDtoV1() =
-    PackageOptionDtoV1(
+fun PurchaseOptionEntity.toDtoV1() =
+    PurchaseOptionDtoV1(
         id = id.toString(),
         storeId = storeId.toString(),
         foodItemId = foodItemId.toString(),
@@ -244,8 +246,8 @@ fun PackageOptionEntity.toDtoV1() =
         quantity = quantity,
     )
 
-fun PackageOptionDtoV1.toEntity() =
-    PackageOptionEntity(
+fun PurchaseOptionDtoV1.toEntity() =
+    PurchaseOptionEntity(
         id = Uuid.parse(id),
         storeId = Uuid.parse(storeId),
         foodItemId = Uuid.parse(foodItemId),
@@ -308,7 +310,7 @@ fun ShoppingCartItemEntity.toDtoV1() =
     ShoppingCartItemDtoV1(
         id = id.toString(),
         storeId = storeId?.toString(),
-        packageOptionId = packageOptionId?.toString(),
+        purchaseOptionId = purchaseOptionId?.toString(),
         customName = customName,
         measurement = measurement.toDtoV1(),
         isPurchased = isPurchased,
@@ -319,7 +321,7 @@ fun ShoppingCartItemDtoV1.toEntity() =
     ShoppingCartItemEntity(
         id = Uuid.parse(id),
         storeId = storeId?.let { Uuid.parse(it) },
-        packageOptionId = packageOptionId?.let { Uuid.parse(it) },
+        purchaseOptionId = purchaseOptionId?.let { Uuid.parse(it) },
         customName = customName,
         measurement = measurement.toEntity(),
         isPurchased = isPurchased,

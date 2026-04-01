@@ -34,7 +34,7 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.isIngredient
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -315,7 +315,7 @@ fun MealListPane(
               meal = meal,
               allRecipes = allRecipes,
               allIngredients = allIngredients,
-              allPackages = uiState.allPackages,
+              allPurchaseOptions = uiState.allPurchaseOptions,
               allBridges = uiState.allBridges,
               allUnits = uiState.allUnits,
               warnings = uiState.mealWarnings[meal.id] ?: emptyList(),
@@ -350,7 +350,7 @@ fun MealRow(
     meal: FoodItem,
     allRecipes: List<FoodItem>,
     allIngredients: List<FoodItem>,
-    allPackages: List<Package>,
+    allPurchaseOptions: List<PurchaseOption>,
     allBridges: List<BridgeConversion>,
     allUnits: List<UnitModel>,
     warnings: List<DataWarning>,
@@ -373,7 +373,7 @@ fun MealRow(
       PriceCalculator.calculateFoodItemCost(
           item = meal,
           allItemsMap = (allRecipes + allIngredients).associateBy { it.id },
-          packagesByIngredient = allPackages.groupBy { it.foodItemId },
+          purchaseOptionByIngredient = allPurchaseOptions.groupBy { it.foodItemId },
           bridgesByIngredient = allBridges.groupBy { it.foodItemId },
           allUnits = allUnits.associateBy { it.id },
       )

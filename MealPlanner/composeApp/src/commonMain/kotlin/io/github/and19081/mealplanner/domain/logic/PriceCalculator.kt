@@ -4,7 +4,7 @@ import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
@@ -16,7 +16,7 @@ object PriceCalculator {
   fun calculateFoodItemCost(
       item: FoodItem,
       allItemsMap: Map<Uuid, FoodItem>,
-      packagesByIngredient: Map<Uuid, List<Package>>,
+      purchaseOptionByIngredient: Map<Uuid, List<PurchaseOption>>,
       bridgesByIngredient: Map<Uuid, List<BridgeConversion>>,
       allUnits: Map<Uuid, UnitModel>,
       visited: Set<Uuid> = emptySet(),
@@ -40,7 +40,7 @@ object PriceCalculator {
               calculateFoodItemCost(
                   subItem,
                   allItemsMap,
-                  packagesByIngredient,
+                  purchaseOptionByIngredient,
                   bridgesByIngredient,
                   allUnits,
                   newVisited,
@@ -70,10 +70,10 @@ object PriceCalculator {
         }
 
         // It's an ingredient (purchasable)
-        val packages = packagesByIngredient[subItem.id] ?: emptyList()
+        val purchaseOptions = purchaseOptionByIngredient[subItem.id] ?: emptyList()
         val bridges = bridgesByIngredient[subItem.id] ?: emptyList()
 
-        val bestOption = packages.minByOrNull {
+        val bestOption = purchaseOptions.minByOrNull {
           if (it.quantity > 0) it.priceCents / it.quantity else Double.MAX_VALUE
         }
 
@@ -100,7 +100,7 @@ object PriceCalculator {
   fun calculateEstimatedCost(
       entry: ScheduledMeal,
       allItemsMap: Map<Uuid, FoodItem>,
-      packagesByIngredient: Map<Uuid, List<Package>>,
+      purchaseOptionsByIngredient: Map<Uuid, List<PurchaseOption>>,
       bridgesByIngredient: Map<Uuid, List<BridgeConversion>>,
       allUnits: Map<Uuid, UnitModel>,
   ): Long {
@@ -127,7 +127,7 @@ object PriceCalculator {
         calculateFoodItemCost(
             meal,
             allItemsMap,
-            packagesByIngredient,
+            purchaseOptionsByIngredient,
             bridgesByIngredient,
             allUnits,
             emptySet(),
@@ -140,7 +140,7 @@ object PriceCalculator {
   fun calculateMakeToStockAnalysis(
       recipe: FoodItem,
       allItemsMap: Map<Uuid, FoodItem>,
-      packagesByIngredient: Map<Uuid, List<Package>>,
+      purchaseOptionByIngredient: Map<Uuid, List<PurchaseOption>>,
       bridgesByIngredient: Map<Uuid, List<BridgeConversion>>,
       allUnits: Map<Uuid, UnitModel>,
   ): Pair<Long?, Long?> {
@@ -149,12 +149,12 @@ object PriceCalculator {
         calculateFoodItemCost(
             recipe,
             allItemsMap,
-            packagesByIngredient,
+            purchaseOptionByIngredient,
             bridgesByIngredient,
             allUnits,
         )
 
-    // 2. Cost to Buy (Equivalent Package Option)
+    // 2. Cost to Buy (Equivalent Purchase Option)
     val costToBuy: Long? = null
 
     // In ECS, "produces ingredient" logic needs to be revisited.

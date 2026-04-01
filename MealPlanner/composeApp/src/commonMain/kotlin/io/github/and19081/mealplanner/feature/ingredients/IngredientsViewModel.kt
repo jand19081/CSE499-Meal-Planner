@@ -9,7 +9,7 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.model.isIngredient
 import io.github.and19081.mealplanner.domain.model.purchasableInfo
@@ -28,7 +28,7 @@ data class IngredientsUiState(
     val searchQuery: String,
     val allStores: List<Store>,
     val allCategories: List<Category>,
-    val allPackages: List<Package>,
+    val allPurchaseOptions: List<PurchaseOption>,
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
     val doesExactMatchExist: Boolean = false,
@@ -53,7 +53,7 @@ class IngredientsViewModel(
               _errorMessage,
               foodItemRepository.foodItems,
               foodItemRepository.categories,
-              foodItemRepository.packages,
+              foodItemRepository.purchaseOptions,
               foodItemRepository.conversions,
               storeRepository.stores,
               unitRepository.units,
@@ -63,7 +63,7 @@ class IngredientsViewModel(
             val error = args[2] as String?
             val allItems = args[3] as List<FoodItem>
             val allCategories = args[4] as List<Category>
-            val allPackages = args[5] as List<Package>
+            val allPurchaseOptions = args[5] as List<PurchaseOption>
             val allBridges = args[6] as List<BridgeConversion>
             val allStores = args[7] as List<Store>
             val allUnits = args[8] as List<UnitModel>
@@ -99,7 +99,7 @@ class IngredientsViewModel(
                 searchQuery = query,
                 allStores = allStores,
                 allCategories = allCategories,
-                allPackages = allPackages,
+                allPurchaseOptions = allPurchaseOptions,
                 allBridges = allBridges,
                 allUnits = allUnits,
                 doesExactMatchExist =
@@ -137,7 +137,7 @@ class IngredientsViewModel(
 
   fun saveIngredient(
       ingredient: FoodItem,
-      packages: List<Package>,
+      purchaseOptions: List<PurchaseOption>,
       bridges: List<BridgeConversion>,
   ) {
     val validation = Validators.validateIngredientName(ingredient.name)
@@ -149,7 +149,7 @@ class IngredientsViewModel(
     _errorMessage.value = null
     viewModelScope.launch {
       foodItemRepository.saveFoodItem(ingredient)
-      packages.forEach { foodItemRepository.savePackage(it) }
+      purchaseOptions.forEach { foodItemRepository.savePurchaseOption(it) }
       bridges.forEach { foodItemRepository.saveConversion(it) }
     }
   }
@@ -158,8 +158,8 @@ class IngredientsViewModel(
     viewModelScope.launch { foodItemRepository.deleteFoodItem(id) }
   }
 
-  fun deletePackage(id: Uuid) {
-    viewModelScope.launch { foodItemRepository.deletePackage(id) }
+  fun deletePurchaseOption(id: Uuid) {
+    viewModelScope.launch { foodItemRepository.deletePurchaseOption(id) }
   }
 
   fun deleteBridge(id: Uuid) {
@@ -177,9 +177,9 @@ class IngredientsViewModel(
   fun deleteStore(storeId: Uuid) {
     viewModelScope.launch {
       storeRepository.deleteStore(storeId)
-      foodItemRepository.packages.value
+      foodItemRepository.purchaseOptions.value
           .filter { it.storeId == storeId }
-          .forEach { foodItemRepository.deletePackage(it.id) }
+          .forEach { foodItemRepository.deletePurchaseOption(it.id) }
     }
   }
 

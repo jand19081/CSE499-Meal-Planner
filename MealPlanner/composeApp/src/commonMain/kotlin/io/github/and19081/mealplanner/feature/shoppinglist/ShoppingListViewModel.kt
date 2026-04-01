@@ -12,7 +12,7 @@ import io.github.and19081.mealplanner.core.util.UnitType
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -69,7 +69,7 @@ class ShoppingListViewModel(
   data class CoreData(
       val allItems: List<FoodItem>,
       val allStores: List<Store>,
-      val allPackages: List<Package>,
+      val allPurchaseOptions: List<PurchaseOption>,
       val allBridges: List<BridgeConversion>,
       val allUnits: List<UnitModel>,
       val taxRate: Double,
@@ -95,7 +95,7 @@ class ShoppingListViewModel(
       combine(
           foodItemRepository.foodItems,
           storeRepository.stores,
-          foodItemRepository.packages,
+          foodItemRepository.purchaseOptions,
           foodItemRepository.conversions,
           unitRepository.units,
           settingsRepository.appSettings,
@@ -103,7 +103,7 @@ class ShoppingListViewModel(
         CoreData(
             allItems = args[0] as List<FoodItem>,
             allStores = args[1] as List<Store>,
-            allPackages = args[2] as List<Package>,
+            allPurchaseOptions = args[2] as List<PurchaseOption>,
             allBridges = args[3] as List<BridgeConversion>,
             allUnits = args[4] as List<UnitModel>,
             taxRate = (args[5] as? AppSettings)?.defaultTaxRatePercentage ?: 0.0,
@@ -127,7 +127,7 @@ class ShoppingListViewModel(
 
   private val calculatedListFlow =
       combine(coreDataFlow, userDataFlow) { core, user ->
-        val (allItems, allStores, allPackages, allBridges, allUnits, taxRate) = core
+        val (allItems, allStores, allPurchaseOptions, allBridges, allUnits, taxRate) = core
         val (entries, overrides, pantryItems, customItems) = user
 
         val itemsMap = allItems.associateBy { it.id }
@@ -169,7 +169,7 @@ class ShoppingListViewModel(
                     DataQualityValidator.validateFoodItem(
                         rootItem,
                         itemsMap,
-                        allPackages,
+                        allPurchaseOptions,
                         allBridges,
                         allUnits,
                     )
@@ -315,18 +315,18 @@ class ShoppingListViewModel(
             return@forEach
           }
 
-          val packages = allPackages.filter { it.foodItemId == itemId }
+          val purchaseOptions = allPurchaseOptions.filter { it.foodItemId == itemId }
 
           val forcedStoreId = override?.forceStoreId
           val bestOption =
               if (forcedStoreId != null) {
-                packages.find { it.storeId == forcedStoreId }
-                    ?: packages.minByOrNull {
+                purchaseOptions.find { it.storeId == forcedStoreId }
+                    ?: purchaseOptions.minByOrNull {
                       if (it.quantity > 0) it.priceCents.toDouble() / it.quantity
                       else Double.MAX_VALUE
                     }
               } else {
-                packages.minByOrNull {
+                purchaseOptions.minByOrNull {
                   if (it.quantity > 0) it.priceCents.toDouble() / it.quantity else Double.MAX_VALUE
                 }
               }
@@ -634,11 +634,11 @@ class ShoppingListViewModel(
 
   fun updatePrice(foodItemId: Uuid, newPriceCents: Int) {
     viewModelScope.launch {
-      val packages = foodItemRepository.packages.value
-      val pkg = packages.filter { it.foodItemId == foodItemId }.minByOrNull { it.priceCents }
+      val purchaseOptions = foodItemRepository.purchaseOptions.value
+      val purchaseOption = purchaseOptions.filter { it.foodItemId == foodItemId }.minByOrNull { it.priceCents }
 
-      if (pkg != null) {
-        foodItemRepository.savePackage(pkg.copy(priceCents = newPriceCents))
+      if (purchaseOption != null) {
+        foodItemRepository.savePurchaseOption(purchaseOption.copy(priceCents = newPriceCents))
       }
     }
   }
@@ -737,11 +737,11 @@ class ShoppingListViewModel(
 
   fun updatePrice(foodItemId: Uuid, storeId: Uuid, newPriceCents: Int) {
     viewModelScope.launch {
-      val packages = foodItemRepository.packages.value
-      val pkg = packages.find { it.foodItemId == foodItemId && it.storeId == storeId }
+      val purchaseOptions = foodItemRepository.purchaseOptions.value
+      val purchaseOption = purchaseOptions.find { it.foodItemId == foodItemId && it.storeId == storeId }
 
-      if (pkg != null) {
-        foodItemRepository.savePackage(pkg.copy(priceCents = newPriceCents))
+      if (purchaseOption != null) {
+        foodItemRepository.savePurchaseOption(purchaseOption.copy(priceCents = newPriceCents))
       }
     }
   }

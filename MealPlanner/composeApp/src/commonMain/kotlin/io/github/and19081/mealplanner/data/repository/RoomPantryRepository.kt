@@ -21,6 +21,16 @@ class RoomPantryRepository(
           .map { list -> list.map { it.toModel() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  override suspend fun getPantryItemById(id: Uuid): PantryItem? {
+    return dao.getById(id)?.let { PantryItem(id = it.id, measurement = it.measurement.toDomain()) }
+  }
+
+  override suspend fun getPantryItemByFoodItemId(foodItemId: Uuid): PantryItem? {
+    return dao.getByFoodItemId(foodItemId)?.let {
+      PantryItem(id = it.id, measurement = it.measurement.toDomain())
+    }
+  }
+
   override suspend fun updateQuantity(foodItemId: Uuid, quantity: Double, unitId: Uuid) {
     updateQuantities(listOf(PantryUpdate(foodItemId, quantity, unitId)))
   }
@@ -30,21 +40,11 @@ class RoomPantryRepository(
   }
 
   override suspend fun remove(foodItemId: Uuid, unitId: Uuid) {
-    val existing =
-        dao.observeAllWithDetails().first().find {
-          it.pantryItem.measurement.foodItemId == foodItemId &&
-              it.pantryItem.measurement.unitId == unitId
-        }
-    if (existing != null) {
-      dao.delete(existing.pantryItem)
-    }
+    dao.deleteByFoodItemAndUnit(foodItemId, unitId)
   }
 
   override suspend fun removeBatch(batchId: Uuid) {
-    val existing = dao.observeAllWithDetails().first().find { it.pantryItem.id == batchId }
-    if (existing != null) {
-      dao.delete(existing.pantryItem)
-    }
+    dao.deleteById(batchId)
   }
 
   override suspend fun setPantryItems(newItems: List<PantryItem>) {

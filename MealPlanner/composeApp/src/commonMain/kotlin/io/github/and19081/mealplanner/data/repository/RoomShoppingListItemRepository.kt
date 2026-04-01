@@ -9,7 +9,10 @@ import io.github.and19081.mealplanner.domain.repository.ShoppingListItemReposito
 import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 class RoomShoppingListItemRepository(
     private val db: MealPlannerDatabase,
@@ -27,7 +30,7 @@ class RoomShoppingListItemRepository(
         ShoppingCartItemEntity(
             id = item.id,
             storeId = if (item.storeId == Uuid.NIL) null else item.storeId,
-            packageOptionId = item.packageId,
+            purchaseOptionId = item.purchaseOptionId,
             customName = item.customName,
             measurement =
                 EntityMeasurement(
@@ -42,26 +45,23 @@ class RoomShoppingListItemRepository(
   }
 
   override suspend fun toggleItem(id: Uuid) {
-    val existing = items.value.find { it.id == id }
+    val existing = dao.getById(id)
     if (existing != null) {
       dao.setPurchased(id, !existing.isPurchased)
     }
   }
 
   override suspend fun removeItem(id: Uuid) {
-    val existing = dao.observeAllWithDetails().first().find { it.cartItem.id == id }
-    if (existing != null) {
-      dao.delete(existing.cartItem)
-    }
+    dao.deleteById(id)
   }
 
   private fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
       ShoppingListItem(
           id = cartItem.id,
           customName = cartItem.customName,
-          storeId = cartItem.storeId ?: Uuid.parse("00000000-0000-0000-0000-000000000000"),
+          storeId = cartItem.storeId ?: Uuid.NIL,
           measurement = cartItem.measurement.toDomain(),
-          packageId = cartItem.packageOptionId,
+          purchaseOptionId = cartItem.purchaseOptionId,
           isPurchased = cartItem.isPurchased,
           isPantryItem = cartItem.isPantryItem,
       )

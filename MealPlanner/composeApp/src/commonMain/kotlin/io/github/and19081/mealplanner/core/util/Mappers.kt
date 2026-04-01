@@ -5,7 +5,7 @@ import io.github.and19081.mealplanner.data.db.entity.CategoryEntity
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig as UiDashboardConfig
 import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement as EntityMeasurement
-import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
+import io.github.and19081.mealplanner.data.db.entity.PurchaseOptionEntity
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
@@ -26,7 +26,7 @@ import io.github.and19081.mealplanner.domain.model.Leftover
 import io.github.and19081.mealplanner.domain.model.LeftoverInfo
 import io.github.and19081.mealplanner.domain.model.Meal
 import io.github.and19081.mealplanner.domain.model.MealSource
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.model.Recipe
 import io.github.and19081.mealplanner.domain.model.RecipeInfo
@@ -228,9 +228,9 @@ fun io.github.and19081.mealplanner.domain.model.FoodItemRequirement.toEntity(
         isPrimary = isPrimary,
     )
 
-// --- Package Mappers ---
-fun PackageOptionEntity.toModel(): Package =
-    Package(
+// --- PurchaseOption Mappers ---
+fun PurchaseOptionEntity.toModel(): PurchaseOption =
+    PurchaseOption(
         id = id,
         foodItemId = foodItemId,
         storeId = storeId,
@@ -239,8 +239,8 @@ fun PackageOptionEntity.toModel(): Package =
         unitId = unitId,
     )
 
-fun Package.toEntity(): PackageOptionEntity =
-    PackageOptionEntity(
+fun PurchaseOption.toEntity(): PurchaseOptionEntity =
+    PurchaseOptionEntity(
         id = id,
         storeId = storeId,
         foodItemId = foodItemId,
@@ -277,19 +277,6 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal {
       } catch (e: Exception) {
         null
       }
-  val prePlannedMealId =
-      when (source) {
-        is MealSource.PrePlannedMeal -> source.id
-        is MealSource.StandaloneRecipe -> source.id
-        is MealSource.StandaloneIngredient -> source.id
-        is MealSource.Restaurant,
-        null -> null
-      }
-  val restaurantId =
-      when (source) {
-        is MealSource.Restaurant -> source.restaurantId
-        else -> null
-      }
   return ScheduledMeal(
       id = scheduledMeal.id,
       date =
@@ -305,8 +292,7 @@ fun ScheduledMealWithSource.toModel(): ScheduledMeal {
             LocalTime(12, 0)
           },
       mealType = scheduledMeal.mealType,
-      prePlannedMealId = prePlannedMealId,
-      restaurantId = restaurantId,
+      source = source,
       peopleCount = scheduledMeal.peopleCount,
       isConsumed = scheduledMeal.isConsumed,
       anticipatedCostCents = scheduledMeal.anticipatedCostCents,
@@ -320,7 +306,7 @@ fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
         customName = cartItem.customName,
         storeId = cartItem.storeId ?: Uuid.parse("00000000-0000-0000-0000-000000000000"),
         measurement = cartItem.measurement.toDomain(),
-        packageId = cartItem.packageOptionId,
+        purchaseOptionId = cartItem.purchaseOptionId,
         isPurchased = cartItem.isPurchased,
         isPantryItem = cartItem.isPantryItem,
     )

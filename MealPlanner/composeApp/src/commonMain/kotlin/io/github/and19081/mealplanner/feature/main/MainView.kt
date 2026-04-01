@@ -27,7 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowWidthSizeClass
 import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.feature.ingredients.IngredientForm
 import io.github.and19081.mealplanner.feature.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.feature.kitchen.KitchenModal
@@ -153,14 +153,14 @@ fun MainView(
                 IngredientForm(
                     ingredient = null,
                     initialName = modal.name,
-                    allPackages = emptyList<Package>(),
+                    allPurchaseOptions = emptyList<PurchaseOption>(),
                     allBridges = emptyList<BridgeConversion>(),
                     allStores = ingredientsUiState.allStores,
                     allCategories = ingredientsUiState.allCategories,
                     allUnits = ingredientsUiState.allUnits,
                     onDismiss = { viewModel.popModal() },
-                    onSave = { ingredient, packages, bridges ->
-                      ingredientsVm.saveIngredient(ingredient, packages, bridges)
+                    onSave = { ingredient, purchaseOptions, bridges ->
+                      ingredientsVm.saveIngredient(ingredient, purchaseOptions, bridges)
                       modal.onCreated(ingredient)
                       viewModel.popModal()
                     },

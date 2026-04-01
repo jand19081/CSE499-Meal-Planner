@@ -18,13 +18,23 @@ data class ScheduledMeal(
     val date: LocalDate,
     val time: LocalTime,
     val mealType: RecipeMealType,
-    val prePlannedMealId: Uuid? = null,
-    val restaurantId: Uuid? = null,
+    val source: MealSource? = null,
     val peopleCount: Int,
     val isConsumed: Boolean = false,
     val anticipatedCostCents: Int? = null,
-    val source: MealSource? = null,
-)
+) {
+  val prePlannedMealId: Uuid?
+    get() =
+        when (source) {
+          is MealSource.PrePlannedMeal -> source.id
+          is MealSource.StandaloneRecipe -> source.id
+          is MealSource.StandaloneIngredient -> source.id
+          else -> null
+        }
+
+  val restaurantId: Uuid?
+    get() = (source as? MealSource.Restaurant)?.restaurantId
+}
 
 @Serializable
 data class PantryItem(

@@ -4,17 +4,19 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
 
 interface FoodItemRepository {
   val foodItems: StateFlow<List<FoodItem>>
   val categories: StateFlow<List<Category>>
-  val packages: StateFlow<List<Package>>
+  val purchaseOptions: StateFlow<List<PurchaseOption>>
   val conversions: StateFlow<List<BridgeConversion>>
 
   suspend fun getFoodItem(id: Uuid): FoodItem?
+
+  suspend fun getConversionsForFoodItem(foodItemId: Uuid): List<BridgeConversion>
 
   suspend fun saveFoodItem(
       item: FoodItem,
@@ -34,8 +36,8 @@ interface FoodItemRepository {
 
   suspend fun deleteConversion(id: Uuid)
 
-  // Packages
-  suspend fun savePackage(pkg: Package)
+  // PurchaseOptions
+  suspend fun savePurchaseOption(purchaseOption: PurchaseOption)
 
-  suspend fun deletePackage(id: Uuid)
+  suspend fun deletePurchaseOption(id: Uuid)
 }

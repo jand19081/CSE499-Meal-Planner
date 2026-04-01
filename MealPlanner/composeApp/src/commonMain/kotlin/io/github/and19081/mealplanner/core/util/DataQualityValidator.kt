@@ -2,13 +2,13 @@ package io.github.and19081.mealplanner.core.util
 
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
 import kotlin.uuid.Uuid
 
 sealed class DataWarning(val message: String) {
-  class MissingPackage(val itemName: String) :
+  class MissingPurchaseOption(val itemName: String) :
       DataWarning("Missing purchase options for '$itemName'")
 
   class MissingBridge(val itemName: String, val fromUnit: String, val toUnit: String) :
@@ -25,7 +25,7 @@ object DataQualityValidator {
   fun validateFoodItem(
       item: FoodItem,
       allItemsMap: Map<Uuid, FoodItem>,
-      allPackages: List<Package>,
+      allPurchaseOptions: List<PurchaseOption>,
       allBridges: List<BridgeConversion>,
       allUnits: List<UnitModel>,
       currentPath: Set<Uuid> = emptySet(),
@@ -49,7 +49,7 @@ object DataQualityValidator {
               validateFoodItem(
                   item = subItem,
                   allItemsMap = allItemsMap,
-                  allPackages = allPackages,
+                  allPurchaseOptions = allPurchaseOptions,
                   allBridges = allBridges,
                   allUnits = allUnits,
                   currentPath = newPath,
@@ -59,11 +59,11 @@ object DataQualityValidator {
         }
 
         // It's an ingredient (purchasable)
-        val packages = allPackages.filter { it.foodItemId == subItem.id }
+        val purchaseOptions = allPurchaseOptions.filter { it.foodItemId == subItem.id }
         val bridges = allBridges.filter { it.foodItemId == subItem.id }
 
-        if (packages.isEmpty()) {
-          warnings.add(DataWarning.MissingPackage(subItem.name))
+        if (purchaseOptions.isEmpty()) {
+          warnings.add(DataWarning.MissingPurchaseOption(subItem.name))
           continue
         }
 
@@ -73,15 +73,15 @@ object DataQualityValidator {
           continue
         }
 
-        val canConvert = packages.any { pkg ->
-          hasConversionPath(pkg.unitId, req.measurement.unitId!!, bridges, allUnits)
+        val canConvert = purchaseOptions.any { purchaseOption ->
+          hasConversionPath(purchaseOption.unitId, req.measurement.unitId!!, bridges, allUnits)
         }
 
         if (!canConvert) {
           val reqUnitName = reqUnit.abbreviation
-          val pkgUnitName =
-              allUnits.find { it.id == packages.first().unitId }?.abbreviation ?: "Unknown"
-          warnings.add(DataWarning.MissingBridge(subItem.name, reqUnitName, pkgUnitName))
+          val purchaseOptionUnitName =
+              allUnits.find { it.id == purchaseOptions.first().unitId }?.abbreviation ?: "Unknown"
+          warnings.add(DataWarning.MissingBridge(subItem.name, reqUnitName, purchaseOptionUnitName))
         }
       }
     }

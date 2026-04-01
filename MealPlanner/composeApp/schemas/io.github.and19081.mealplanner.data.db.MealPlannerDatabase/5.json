@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "e4fc02d96a7ac94cfa5a28175fcd1108",
+    "identityHash": "eb0198fa776ab33879499633b634c249",
     "entities": [
       {
         "tableName": "units",
@@ -908,7 +908,7 @@
         ]
       },
       {
-        "tableName": "package_options",
+        "tableName": "purchase_options",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `store_id` TEXT NOT NULL, `food_item_id` TEXT NOT NULL, `unit_id` TEXT NOT NULL, `price_cents` INTEGER, `quantity` REAL, PRIMARY KEY(`id`), FOREIGN KEY(`store_id`) REFERENCES `stores`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
@@ -954,31 +954,31 @@
         },
         "indices": [
           {
-            "name": "index_package_options_store_id",
+            "name": "index_purchase_options_store_id",
             "unique": false,
             "columnNames": [
               "store_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_package_options_store_id` ON `${TABLE_NAME}` (`store_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_purchase_options_store_id` ON `${TABLE_NAME}` (`store_id`)"
           },
           {
-            "name": "index_package_options_food_item_id",
+            "name": "index_purchase_options_food_item_id",
             "unique": false,
             "columnNames": [
               "food_item_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_package_options_food_item_id` ON `${TABLE_NAME}` (`food_item_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_purchase_options_food_item_id` ON `${TABLE_NAME}` (`food_item_id`)"
           },
           {
-            "name": "index_package_options_unit_id",
+            "name": "index_purchase_options_unit_id",
             "unique": false,
             "columnNames": [
               "unit_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_package_options_unit_id` ON `${TABLE_NAME}` (`unit_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_purchase_options_unit_id` ON `${TABLE_NAME}` (`unit_id`)"
           }
         ],
         "foreignKeys": [
@@ -1261,7 +1261,7 @@
       },
       {
         "tableName": "shopping_cart_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `store_id` TEXT, `package_option_id` TEXT, `custom_name` TEXT, `is_purchased` INTEGER NOT NULL, `is_pantry_item` INTEGER NOT NULL, `food_item_id` TEXT, `unit_id` TEXT, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`store_id`) REFERENCES `stores`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`package_option_id`) REFERENCES `package_options`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `store_id` TEXT, `purchase_option_id` TEXT, `custom_name` TEXT, `is_purchased` INTEGER NOT NULL, `is_pantry_item` INTEGER NOT NULL, `food_item_id` TEXT, `unit_id` TEXT, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`store_id`) REFERENCES `stores`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`purchase_option_id`) REFERENCES `purchase_options`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1275,8 +1275,8 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "packageOptionId",
-            "columnName": "package_option_id",
+            "fieldPath": "purchaseOptionId",
+            "columnName": "purchase_option_id",
             "affinity": "TEXT"
           },
           {
@@ -1348,13 +1348,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_shopping_cart_items_unit_id` ON `${TABLE_NAME}` (`unit_id`)"
           },
           {
-            "name": "index_shopping_cart_items_package_option_id",
+            "name": "index_shopping_cart_items_purchase_option_id",
             "unique": false,
             "columnNames": [
-              "package_option_id"
+              "purchase_option_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_shopping_cart_items_package_option_id` ON `${TABLE_NAME}` (`package_option_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shopping_cart_items_purchase_option_id` ON `${TABLE_NAME}` (`purchase_option_id`)"
           }
         ],
         "foreignKeys": [
@@ -1392,11 +1392,11 @@
             ]
           },
           {
-            "table": "package_options",
+            "table": "purchase_options",
             "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
-              "package_option_id"
+              "purchase_option_id"
             ],
             "referencedColumns": [
               "id"
@@ -1522,7 +1522,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e4fc02d96a7ac94cfa5a28175fcd1108')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eb0198fa776ab33879499633b634c249')"
     ]
   }
 }

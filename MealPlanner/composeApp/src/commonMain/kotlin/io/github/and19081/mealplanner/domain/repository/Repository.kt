@@ -11,6 +11,10 @@ import kotlinx.coroutines.flow.StateFlow
 interface PantryRepository {
   val pantryItems: StateFlow<List<PantryItem>>
 
+  suspend fun getPantryItemById(id: Uuid): PantryItem?
+
+  suspend fun getPantryItemByFoodItemId(foodItemId: Uuid): PantryItem?
+
   suspend fun updateQuantity(
       foodItemId: Uuid,
       quantity: Double,

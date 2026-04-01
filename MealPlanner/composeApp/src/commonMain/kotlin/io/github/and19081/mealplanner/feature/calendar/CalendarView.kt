@@ -1,11 +1,9 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package io.github.and19081.mealplanner.feature.calendar
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -43,6 +41,8 @@ import io.github.and19081.mealplanner.feature.meals.Restaurant
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.ui.components.ConsumeMealDialog
+import io.github.and19081.mealplanner.ui.components.DayDetailPanel
+import io.github.and19081.mealplanner.ui.components.DayEventUi
 import io.github.and19081.mealplanner.ui.components.MealSourcePicker
 import kotlin.collections.find
 import kotlin.time.Clock
@@ -67,26 +67,55 @@ fun CalendarView(
   var showEditDialog by remember { mutableStateOf(false) }
   var selectedEntryId by remember { mutableStateOf<Uuid?>(null) }
 
-  var showDayOverviewDialog by remember { mutableStateOf(false) }
-  var selectedDateForDialog by remember { mutableStateOf<LocalDate?>(today) }
+  var showDayDetailPanel by remember { mutableStateOf(false) }
+  var selectedDateForPanel by remember { mutableStateOf<LocalDate?>(today) }
 
   val actualSelectedDate = uiState.dates.find { it.isSelected }?.date ?: today
 
   var showServeMealDialog by remember { mutableStateOf(false) }
   var entryToConsumeId by remember { mutableStateOf<Uuid?>(null) }
 
+  fun buildDayEvents(date: LocalDate): List<DayEventUi> =
+      (uiState.dates.find { it.date == date }?.events ?: emptyList()).map { event ->
+        DayEventUi(
+            entryId = event.entryId,
+            title = event.title,
+            mealType = event.mealType,
+            time = event.time,
+            isConsumed = event.isConsumed,
+            peopleCount = event.peopleCount,
+        )
+      }
+
   val snackbarHostState = remember { SnackbarHostState() }
 
   Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
-        CalendarTopBar(
-            title =
-                if (calendarViewMode == CalendarViewMode.MONTH) {
+        val topBarTitle =
+            when (calendarViewMode) {
+              CalendarViewMode.MONTH ->
                   "${uiState.currentMonth.month.name} ${uiState.currentMonth.year}"
-                } else {
+              CalendarViewMode.WEEK -> {
+                val weekDates = uiState.weekDates
+                if (weekDates.isEmpty()) {
                   "Week View"
-                },
+                } else {
+                  val first = weekDates.first().date
+                  val last = weekDates.last().date
+                  if (first.month == last.month)
+                      "${first.month.name.take(3)} ${first.dayOfMonth}–${last.dayOfMonth} ${first.year}"
+                  else
+                      "${first.month.name.take(3)} ${first.dayOfMonth} – ${last.month.name.take(3)} ${last.dayOfMonth} ${last.year}"
+                }
+              }
+              CalendarViewMode.DAY -> {
+                val d = uiState.focusedDate
+                "${d.dayOfWeek.name.take(3)}, ${d.month.name.take(3)} ${d.dayOfMonth} ${d.year}"
+              }
+            }
+        CalendarTopBar(
+            title = topBarTitle,
             onPrevClick = onPrevClick,
             onNextClick = onNextClick,
             onToggleViewMode = onToggleViewMode,
@@ -104,32 +133,75 @@ fun CalendarView(
         }
       },
   ) { padding ->
-    Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-      if (calendarViewMode == CalendarViewMode.MONTH) {
-        MonthViewGrid(
-            uiState = uiState,
-            onDateClick = onDateSelected,
-            onEventClick = { entryId ->
-              selectedEntryId = entryId
-              showEditDialog = true
-            },
-            onDateLongClick = { date ->
-              selectedDateForDialog = date
-              showDayOverviewDialog = true
-            },
-        )
-      } else {
-        WeekViewList(
-            uiState = uiState,
-            onEventClick = { entryId ->
-              selectedEntryId = entryId
-              showEditDialog = true
-            },
-            onServeClick = { entryId ->
-              entryToConsumeId = entryId
-              showServeMealDialog = true
-            },
-        )
+    when (calendarViewMode) {
+      CalendarViewMode.MONTH -> {
+        Row(modifier = Modifier.padding(padding).fillMaxSize()) {
+          MonthViewGrid(
+              modifier = Modifier.weight(1f),
+              uiState = uiState,
+              onDateClick = { date ->
+                onDateSelected(date)
+                selectedDateForPanel = date
+                showDayDetailPanel = true
+              },
+          )
+          if (showDayDetailPanel && selectedDateForPanel != null && mode == Mode.DESKTOP) {
+            DayDetailPanel(
+                date = selectedDateForPanel!!,
+                dayEvents = buildDayEvents(selectedDateForPanel!!),
+                mode = mode,
+                modifier = Modifier.width(320.dp),
+                onDismiss = { showDayDetailPanel = false },
+                onEventClick = { entryId ->
+                  selectedEntryId = entryId
+                  showEditDialog = true
+                  showDayDetailPanel = false
+                },
+                onAddEvent = {
+                  selectedEntryId = null
+                  showEditDialog = true
+                  showDayDetailPanel = false
+                },
+                onConsumeEvent = { entryId ->
+                  entryToConsumeId = entryId
+                  showServeMealDialog = true
+                  showDayDetailPanel = false
+                },
+            )
+          }
+        }
+      }
+      CalendarViewMode.WEEK -> {
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+          WeekViewList(
+              uiState = uiState,
+              onEventClick = { entryId ->
+                selectedEntryId = entryId
+                showEditDialog = true
+              },
+              onServeClick = { entryId ->
+                entryToConsumeId = entryId
+                showServeMealDialog = true
+              },
+          )
+        }
+      }
+      CalendarViewMode.DAY -> {
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+          DayViewList(
+              date = uiState.focusedDate,
+              events = uiState.dates.find { it.date == uiState.focusedDate }?.events
+                  ?: emptyList(),
+              onEventClick = { entryId ->
+                selectedEntryId = entryId
+                showEditDialog = true
+              },
+              onServeClick = { entryId ->
+                entryToConsumeId = entryId
+                showServeMealDialog = true
+              },
+          )
+        }
       }
     }
   }
@@ -149,12 +221,27 @@ fun CalendarView(
           if (entry == null) {
             viewModel.addPlan(date, time, meal, restaurant, type, count, cost)
           } else {
+            val updatedSource =
+                when {
+                  restaurant != null ->
+                      MealSource.Restaurant(restaurant.id, cost ?: 0)
+                  meal?.isMeal() == true -> MealSource.PrePlannedMeal(meal.id)
+                  meal?.isRecipe() == true -> MealSource.StandaloneRecipe(meal.id)
+                  meal != null ->
+                      MealSource.StandaloneIngredient(
+                          meal.id,
+                          (entry.source as? MealSource.StandaloneIngredient)?.quantity ?: 0.0,
+                          (entry.source as? MealSource.StandaloneIngredient)?.unitId
+                              ?: meal.preferredUnitId
+                              ?: Uuid.NIL,
+                      )
+                  else -> entry.source
+                }
             viewModel.updatePlan(
                 entry.copy(
                     date = date,
                     time = time,
-                    prePlannedMealId = meal?.id,
-                    restaurantId = restaurant?.id,
+                    source = updatedSource,
                     mealType = type,
                     peopleCount = count,
                     anticipatedCostCents = cost,
@@ -173,25 +260,26 @@ fun CalendarView(
     )
   }
 
-  if (showDayOverviewDialog && selectedDateForDialog != null) {
-    DayOverviewDialog(
-        date = selectedDateForDialog!!,
-        events = uiState.dates.find { it.date == selectedDateForDialog }?.events ?: emptyList(),
-        onDismiss = { showDayOverviewDialog = false },
+  if (showDayDetailPanel && selectedDateForPanel != null && mode != Mode.DESKTOP) {
+    DayDetailPanel(
+        date = selectedDateForPanel!!,
+        dayEvents = buildDayEvents(selectedDateForPanel!!),
+        mode = mode,
+        onDismiss = { showDayDetailPanel = false },
         onEventClick = { entryId ->
           selectedEntryId = entryId
           showEditDialog = true
-          showDayOverviewDialog = false
+          showDayDetailPanel = false
         },
         onAddEvent = {
           selectedEntryId = null
           showEditDialog = true
-          showDayOverviewDialog = false
+          showDayDetailPanel = false
         },
-        onServeEvent = { entryId ->
+        onConsumeEvent = { entryId ->
           entryToConsumeId = entryId
           showServeMealDialog = true
-          showDayOverviewDialog = false
+          showDayDetailPanel = false
         },
     )
   }
@@ -252,8 +340,11 @@ fun CalendarTopBar(
         }
         IconButton(onClick = onToggleViewMode) {
           Icon(
-              if (viewMode == CalendarViewMode.MONTH) Icons.Default.CalendarViewWeek
-              else Icons.Default.CalendarMonth,
+              when (viewMode) {
+                CalendarViewMode.MONTH -> Icons.Default.CalendarViewWeek
+                CalendarViewMode.WEEK -> Icons.Default.CalendarViewDay
+                CalendarViewMode.DAY -> Icons.Default.CalendarMonth
+              },
               contentDescription = "Toggle View Mode",
           )
         }
@@ -265,12 +356,11 @@ fun CalendarTopBar(
 fun MonthViewGrid(
     uiState: CalendarUiState,
     onDateClick: (LocalDate) -> Unit,
-    onEventClick: (Uuid) -> Unit,
-    onDateLongClick: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-  val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+  val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-  Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+  Column(modifier = modifier.fillMaxSize().padding(horizontal = 8.dp)) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
       dayNames.forEach { day ->
         Text(
@@ -293,21 +383,16 @@ fun MonthViewGrid(
         DateCell(
             dateModel = dateModel,
             onClick = { onDateClick(dateModel.date) },
-            onLongClick = { onDateLongClick(dateModel.date) },
-            onEventClick = onEventClick,
         )
       }
     }
   }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DateCell(
     dateModel: CalendarUiState.DateUiModel,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onEventClick: (Uuid) -> Unit,
 ) {
   val backgroundColor =
       when {
@@ -325,7 +410,7 @@ fun DateCell(
       modifier =
           Modifier.aspectRatio(0.8f)
               .background(backgroundColor, MaterialTheme.shapes.small)
-              .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+              .clickable(onClick = onClick)
               .padding(4.dp)
   ) {
     Column {
@@ -348,7 +433,6 @@ fun DateCell(
                         getMealTypeColor(event.mealType).copy(alpha = 0.3f),
                         MaterialTheme.shapes.extraSmall,
                     )
-                    .clickable { onEventClick(event.entryId) }
                     .padding(horizontal = 3.dp, vertical = 1.dp)
         ) {
           Box(
@@ -490,6 +574,116 @@ fun WeekViewList(
 }
 
 @Composable
+fun DayViewList(
+    date: LocalDate,
+    events: List<CalendarEvent>,
+    onEventClick: (Uuid) -> Unit,
+    onServeClick: (Uuid) -> Unit,
+) {
+  LazyColumn(
+      modifier = Modifier.fillMaxSize().padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    item {
+      Text(
+          text =
+              "${date.dayOfWeek.name}, ${date.month.name} ${date.dayOfMonth} ${date.year}",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          modifier = Modifier.padding(bottom = 8.dp),
+      )
+    }
+
+    if (events.isEmpty()) {
+      item {
+        Text(
+            "No meals planned",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+      }
+    } else {
+      items(events.sortedBy { it.time }) { event ->
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+          Row(
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .clickable { onEventClick(event.entryId) }
+                      .padding(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Box(
+                modifier =
+                    Modifier.size(8.dp)
+                        .background(
+                            getMealTypeColor(event.mealType),
+                            MaterialTheme.shapes.extraSmall,
+                        )
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+              Row(
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  modifier = Modifier.fillMaxWidth(),
+              ) {
+                Text(text = event.title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text =
+                        "${event.time.hour.toString().padStart(2, '0')}:${event.time.minute.toString().padStart(2, '0')}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+              }
+              Text(
+                  text = "${event.mealType.name} • ${event.peopleCount} servings",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.outline,
+              )
+              if (event.warnings.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(
+                      Icons.Default.Warning,
+                      contentDescription = null,
+                      modifier = Modifier.size(12.dp),
+                      tint = MaterialTheme.colorScheme.error,
+                  )
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text(
+                      "${event.warnings.size} warnings",
+                      style = MaterialTheme.typography.labelSmall,
+                      color = MaterialTheme.colorScheme.error,
+                  )
+                }
+              }
+            }
+            if (!event.isConsumed) {
+              IconButton(onClick = { onServeClick(event.entryId) }) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Mark Consumed",
+                    tint = MaterialTheme.colorScheme.outline,
+                )
+              }
+            } else {
+              Icon(
+                  Icons.Default.CheckCircle,
+                  contentDescription = "Consumed",
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.padding(12.dp),
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
 fun EditMealDialog(
     entry: ScheduledMeal?,
     initialDate: LocalDate,
@@ -524,18 +718,20 @@ fun EditMealDialog(
 
   // Reconstruct initial MealSource from entry
   var selectedSource by remember {
+    val entryRestaurantId = entry?.restaurantId
+    val entryMealId = entry?.prePlannedMealId
     mutableStateOf<MealSource?>(
         when {
-          entry?.restaurantId != null ->
+          entryRestaurantId != null ->
               MealSource.Restaurant(
-                  restaurantId = entry.restaurantId,
+                  restaurantId = entryRestaurantId,
                   anticipatedCostCents = entry.anticipatedCostCents ?: 0,
               )
-          entry?.prePlannedMealId != null -> {
-            val item = (availableMeals + availableRecipes).find { it.id == entry.prePlannedMealId }
+          entryMealId != null -> {
+            val item = (availableMeals + availableRecipes).find { it.id == entryMealId }
             when {
-              item?.isMeal() == true -> MealSource.PrePlannedMeal(entry.prePlannedMealId)
-              item?.isRecipe() == true -> MealSource.StandaloneRecipe(entry.prePlannedMealId)
+              item?.isMeal() == true -> MealSource.PrePlannedMeal(entryMealId)
+              item?.isRecipe() == true -> MealSource.StandaloneRecipe(entryMealId)
               else -> null
             }
           }
@@ -747,56 +943,6 @@ fun EditMealDialog(
   }
 }
 
-@Composable
-fun DayOverviewDialog(
-    date: LocalDate,
-    events: List<CalendarEvent>,
-    onDismiss: () -> Unit,
-    onEventClick: (Uuid) -> Unit,
-    onAddEvent: () -> Unit,
-    onServeEvent: (Uuid) -> Unit,
-) {
-  AlertDialog(
-      onDismissRequest = onDismiss,
-      title = { Text("${date.dayOfWeek.name}, ${date.dayOfMonth} ${date.month.name}") },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          if (events.isEmpty()) {
-            Text("No meals planned for this day.")
-          } else {
-            events.forEach { event ->
-              ListItem(
-                  headlineContent = { Text(event.title) },
-                  supportingContent = { Text("${event.mealType.name} • ${event.peopleCount} ppl") },
-                  trailingContent = {
-                    if (!event.isConsumed) {
-                      IconButton(onClick = { onServeEvent(event.entryId) }) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "Consume")
-                      }
-                    } else {
-                      Icon(
-                          Icons.Default.CheckCircle,
-                          contentDescription = null,
-                          tint = MaterialTheme.colorScheme.primary,
-                      )
-                    }
-                  },
-                  modifier = Modifier.clickable { onEventClick(event.entryId) },
-              )
-            }
-          }
-        }
-      },
-      confirmButton = {
-        Button(onClick = onAddEvent) {
-          Icon(Icons.Default.Add, contentDescription = null)
-          Spacer(modifier = Modifier.width(8.dp))
-          Text("Add Meal")
-        }
-      },
-      dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-  )
-}
 
 /** Helper function to determine meal type color */
 @Composable

@@ -26,7 +26,7 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.Ingredient
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.model.Store
 import io.github.and19081.mealplanner.domain.model.purchasableInfo
@@ -69,9 +69,9 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
     isAdding = false
   }
 
-  val onSave: (FoodItem, List<Package>, List<BridgeConversion>) -> Unit =
-      { updatedIngredient, newPackages, newBridges ->
-        viewModel.saveIngredient(updatedIngredient, newPackages, newBridges)
+  val onSave: (FoodItem, List<PurchaseOption>, List<BridgeConversion>) -> Unit =
+      { updatedIngredient, newPurchaseOptions, newBridges ->
+        viewModel.saveIngredient(updatedIngredient, newPurchaseOptions, newBridges)
         onDismissDetail()
       }
 
@@ -102,7 +102,7 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
           IngredientForm(
               ingredient = selectedIngredient,
               initialName = if (isAdding) uiState.searchQuery else "",
-              allPackages = uiState.allPackages,
+              allPurchaseOptions = uiState.allPurchaseOptions,
               allBridges = uiState.allBridges,
               allStores = uiState.allStores,
               allCategories = uiState.allCategories,
@@ -132,7 +132,7 @@ fun IngredientsView(viewModel: IngredientsViewModel, mode: Mode, isExpanded: Boo
       IngredientForm(
           ingredient = selectedIngredient,
           initialName = if (isAdding) uiState.searchQuery else "",
-          allPackages = uiState.allPackages,
+          allPurchaseOptions = uiState.allPurchaseOptions,
           allBridges = uiState.allBridges,
           allStores = uiState.allStores,
           allCategories = uiState.allCategories,
@@ -182,13 +182,13 @@ fun EmptyDetailPlaceholder() {
 fun IngredientForm(
     ingredient: FoodItem?,
     initialName: String = "",
-    allPackages: List<Package>,
+    allPurchaseOptions: List<PurchaseOption>,
     allBridges: List<BridgeConversion>,
     allStores: List<Store>,
     allCategories: List<Category>,
     allUnits: List<UnitModel>,
     onDismiss: () -> Unit,
-    onSave: (FoodItem, List<Package>, List<BridgeConversion>) -> Unit,
+    onSave: (FoodItem, List<PurchaseOption>, List<BridgeConversion>) -> Unit,
     onDelete: (() -> Unit)? = null,
     onAddStore: (String) -> Unit,
     onDeleteStore: (Uuid) -> Unit,
@@ -205,10 +205,10 @@ fun IngredientForm(
 
   var preferredUnitId by remember(ingredient) { mutableStateOf(ingredient?.preferredUnitId) }
 
-  var packages by
+  var purchaseOptions by
       remember(ingredient) {
         mutableStateOf(
-            if (ingredient != null) allPackages.filter { it.foodItemId == ingredient.id }
+            if (ingredient != null) allPurchaseOptions.filter { it.foodItemId == ingredient.id }
             else emptyList()
         )
       }
@@ -239,7 +239,7 @@ fun IngredientForm(
                         categoryId = catId,
                     ),
             )
-        onSave(finalIngredient, packages, bridges)
+        onSave(finalIngredient, purchaseOptions, bridges)
       },
       saveEnabled =
           name.isNotBlank() &&
@@ -311,12 +311,12 @@ fun IngredientForm(
       }
 
       1 -> { // Purchase Options
-        PackageOptionEditor(
-            currentPackages = packages,
+        PurchaseOptionEditor(
+            currentPurchaseOption = purchaseOptions,
             allStores = allStores,
             allUnits = allUnits,
             foodItemId = ingredientId,
-            onUpdate = { packages = it },
+            onUpdate = { purchaseOptions = it },
             onAddStore = onAddStore,
             onDeleteStore = onDeleteStore,
         )
@@ -363,7 +363,7 @@ fun IngredientListPane(
           IngredientRow(
               ingredient = ingredient,
               categoryName = category,
-              packages = uiState.allPackages.filter { it.foodItemId == ingredient.id },
+              purchaseOptions = uiState.allPurchaseOptions.filter { it.foodItemId == ingredient.id },
               allStores = uiState.allStores,
               allUnits = uiState.allUnits,
               allBridges = uiState.allBridges,
@@ -396,17 +396,17 @@ fun IngredientListPane(
 fun IngredientRow(
     ingredient: FoodItem,
     categoryName: String,
-    packages: List<Package>,
+    purchaseOptions: List<PurchaseOption>,
     allStores: List<Store>,
     allUnits: List<UnitModel>,
     allBridges: List<BridgeConversion>,
     onEditClick: () -> Unit,
 ) {
   val priceRange =
-      if (packages.isEmpty()) "No price data"
+      if (purchaseOptions.isEmpty()) "No price data"
       else {
-        val min = packages.minOf { it.priceCents.toDouble() / it.quantity }
-        val max = packages.maxOf { it.priceCents.toDouble() / it.quantity }
+        val min = purchaseOptions.minOf { it.priceCents.toDouble() / it.quantity }
+        val max = purchaseOptions.maxOf { it.priceCents.toDouble() / it.quantity }
         if (min == max) "$${String.format("%.2f", min / 100.0)} / unit"
         else
             "$${String.format("%.2f", min / 100.0)} - $${String.format("%.2f", max / 100.0)} / unit"
@@ -417,21 +417,21 @@ fun IngredientRow(
       subtitle = "$categoryName • $priceRange",
       onEditClick = onEditClick,
   ) {
-    if (packages.isNotEmpty()) {
+    if (purchaseOptions.isNotEmpty()) {
       Text("Best prices:", style = MaterialTheme.typography.labelSmall)
-      packages
+      purchaseOptions
           .sortedBy { it.priceCents.toDouble() / it.quantity }
           .take(3)
-          .forEach { pkg ->
-            val store = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown Store"
-            val unit = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
+          .forEach { purchaseOption ->
+            val store = allStores.find { it.id == purchaseOption.storeId }?.name ?: "Unknown Store"
+            val unit = allUnits.find { it.id == purchaseOption.unitId }?.abbreviation ?: ""
             Text(
                 "• $store: $${
                             String.format(
                                 "%.2f",
-                                pkg.priceCents / 100.0,
+                                purchaseOption.priceCents / 100.0,
                             )
-                        } for ${pkg.quantity} $unit",
+                        } for ${purchaseOption.quantity} $unit",
                 style = MaterialTheme.typography.bodySmall,
             )
           }
@@ -455,12 +455,12 @@ fun IngredientRow(
 }
 
 @Composable
-fun PackageOptionEditor(
-    currentPackages: List<Package>,
+fun PurchaseOptionEditor(
+    currentPurchaseOption: List<PurchaseOption>,
     allStores: List<Store>,
     allUnits: List<UnitModel>,
     foodItemId: Uuid,
-    onUpdate: (List<Package>) -> Unit,
+    onUpdate: (List<PurchaseOption>) -> Unit,
     onAddStore: (String) -> Unit,
     onDeleteStore: (Uuid) -> Unit,
 ) {
@@ -471,18 +471,18 @@ fun PackageOptionEditor(
   var selectedUnitAbbr by remember { mutableStateOf("") }
 
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    currentPackages.forEach { pkg ->
-      val storeName = allStores.find { it.id == pkg.storeId }?.name ?: "Unknown"
-      val unitAbbr = allUnits.find { it.id == pkg.unitId }?.abbreviation ?: ""
+    currentPurchaseOption.forEach { purchaseOption ->
+      val storeName = allStores.find { it.id == purchaseOption.storeId }?.name ?: "Unknown"
+      val unitAbbr = allUnits.find { it.id == purchaseOption.unitId }?.abbreviation ?: ""
       Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
           Text(storeName, style = MaterialTheme.typography.bodyMedium)
           Text(
-              "$${String.format("%.2f", pkg.priceCents / 100.0)} for ${pkg.quantity} $unitAbbr",
+              "$${String.format("%.2f", purchaseOption.priceCents / 100.0)} for ${purchaseOption.quantity} $unitAbbr",
               style = MaterialTheme.typography.bodySmall,
           )
         }
-        IconButton(onClick = { onUpdate(currentPackages - pkg) }) {
+        IconButton(onClick = { onUpdate(currentPurchaseOption - purchaseOption) }) {
           Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
         }
       }
@@ -491,7 +491,7 @@ fun PackageOptionEditor(
 
     if (!isAdding) {
       Button(onClick = { isAdding = true }, modifier = Modifier.fillMaxWidth()) {
-        Text("Add Package Option")
+        Text("Add Purchase Option")
       }
     } else {
       Card(
@@ -548,8 +548,8 @@ fun PackageOptionEditor(
                   val qty = quantityStr.toDoubleOrNull()
                   if (store != null && unit != null && price != null && qty != null) {
                     onUpdate(
-                        currentPackages +
-                            Package(
+                        currentPurchaseOption +
+                            PurchaseOption(
                                 foodItemId = foodItemId,
                                 storeId = store.id,
                                 priceCents = price,

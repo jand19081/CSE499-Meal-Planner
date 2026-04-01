@@ -36,7 +36,7 @@ class DataTransferService(private val database: MealPlannerDatabase) {
             appSettings = database.appSettingsDao().get()?.toDtoV1(),
             storeReceipts = database.receiptDao().getAllReceipts().map { it.toDtoV1() },
             unitConversionBridges = database.foodItemDao().getAllConversions().map { it.toDtoV1() },
-            packageOptions = database.packageOptionDao().getAll().map { it.toDtoV1() },
+            purchaseOptions = database.purchaseOptionDao().getAll().map { it.toDtoV1() },
             recipeRequirementGroups =
                 database.foodItemDao().getAllRequirementGroups().map { it.toDtoV1() },
             recipeRequirements = database.foodItemDao().getAllRequirements().map { it.toDtoV1() },
@@ -92,7 +92,7 @@ class DataTransferService(private val database: MealPlannerDatabase) {
           database
               .foodItemDao()
               .upsertAllConversions(backup.unitConversionBridges.map { it.toEntity() })
-          database.packageOptionDao().upsertAll(backup.packageOptions.map { it.toEntity() })
+          database.purchaseOptionDao().upsertAll(backup.purchaseOptions.map { it.toEntity() })
           database
               .foodItemDao()
               .upsertAllRequirementGroups(backup.recipeRequirementGroups.map { it.toEntity() })
@@ -112,7 +112,7 @@ class DataTransferService(private val database: MealPlannerDatabase) {
     // 1. Delete leaf nodes / tables with many dependencies first
     database.receiptDao().clearAllLineItems()
     database.shoppingListDao().clearAll()
-    database.packageOptionDao().clearAll()
+    database.purchaseOptionDao().clearAll()
     database.receiptDao().clearAllReceipts()
     database.scheduledMealDao().clearAll()
     database.pantryDao().clearAll()

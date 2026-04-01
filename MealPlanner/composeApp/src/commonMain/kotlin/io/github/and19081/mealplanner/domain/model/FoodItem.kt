@@ -24,7 +24,7 @@ data class ItemMeasurement(
 )
 
 @Serializable
-data class Package(
+data class PurchaseOption(
     val id: Uuid = Uuid.random(),
     val foodItemId: Uuid,
     val storeId: Uuid,
@@ -44,7 +44,7 @@ data class BridgeConversion(
 )
 
 /** Marker interface for all FoodItem types. */
-interface FoodItem {
+sealed interface FoodItem {
   val id: Uuid
   val name: String
   val preferredUnitId: Uuid?

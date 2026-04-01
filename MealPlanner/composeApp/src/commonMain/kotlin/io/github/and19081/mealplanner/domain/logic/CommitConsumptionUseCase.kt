@@ -20,7 +20,6 @@ import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.todayIn
@@ -35,8 +34,7 @@ class CommitConsumptionUseCase(
   suspend operator fun invoke(result: ConsumptionResult) {
     when (result) {
       is ConsumptionResult.HomeMealConsumed -> {
-        val meal =
-            mealPlanRepository.entries.first().find { it.id == result.scheduledMealId } ?: return
+        val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val foodItemId = meal.prePlannedMealId ?: return
         val foodItem = foodItemRepository.getFoodItem(foodItemId) ?: return
         deductRecipeIngredients(foodItem, meal.peopleCount.toDouble())
@@ -45,8 +43,7 @@ class CommitConsumptionUseCase(
       }
 
       is ConsumptionResult.HomeRecipeConsumed -> {
-        val meal =
-            mealPlanRepository.entries.first().find { it.id == result.scheduledMealId } ?: return
+        val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val foodItemId = meal.prePlannedMealId ?: return
         val foodItem = foodItemRepository.getFoodItem(foodItemId) ?: return
         deductRecipeIngredients(foodItem, meal.peopleCount.toDouble())
@@ -55,16 +52,14 @@ class CommitConsumptionUseCase(
       }
 
       is ConsumptionResult.HomeIngredientConsumed -> {
-        val meal =
-            mealPlanRepository.entries.first().find { it.id == result.scheduledMealId } ?: return
+        val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val src = meal.source as? MealSource.StandaloneIngredient ?: return
         val allUnits = unitRepository.units.value
         val unit =
             allUnits.find { it.id == src.unitId }
                 ?: allUnits.find { it.type == UnitType.Count && it.factorToBase == 1.0 }
                 ?: return
-        val pantryItems = pantryRepository.pantryItems.first()
-        val current = pantryItems.find { it.measurement.foodItemId == src.id }
+        val current = pantryRepository.getPantryItemByFoodItemId(src.id)
         val currentQty = current?.measurement?.quantity ?: 0.0
         val currentUnitId = current?.measurement?.unitId ?: unit.id
         val convertedDeduct =
@@ -107,10 +102,7 @@ class CommitConsumptionUseCase(
           is Meal -> item.recipeInfo
           else -> return
         }
-    val allItems = foodItemRepository.foodItems.first().associateBy { it.id }
     val allUnits = unitRepository.units.value
-    val allBridges = foodItemRepository.conversions.first()
-    val pantryItems = pantryRepository.pantryItems.first()
 
     suspend fun deductRecursive(fi: FoodItem, multiplier: Double) {
       val info =
@@ -119,13 +111,14 @@ class CommitConsumptionUseCase(
             is Meal -> fi.recipeInfo
             else -> return
           }
-      val servingsPerBatch = if (info.servings > 0) info.servings else 1.0
       info.requirementGroups.forEach { group ->
         val primary =
             group.requirements.find { it.isPrimary }
                 ?: group.requirements.firstOrNull()
                 ?: return@forEach
-        val subItem = allItems[primary.measurement.foodItemId] ?: return@forEach
+        val subItem =
+            foodItemRepository.getFoodItem(primary.measurement.foodItemId ?: return@forEach)
+                ?: return@forEach
         when (subItem) {
           is Recipe,
           is Meal -> {
@@ -148,7 +141,7 @@ class CommitConsumptionUseCase(
                       UnitType.Volume -> SystemUnits.Ml.id
                       else -> SystemUnits.Each.id
                     }
-            val bridges = allBridges.filter { it.foodItemId == subItem.id }
+            val bridges = foodItemRepository.getConversionsForFoodItem(subItem.id)
             val deductAmt =
                 UnitConverter.convert(
                     primary.measurement.quantity * multiplier,
@@ -157,7 +150,7 @@ class CommitConsumptionUseCase(
                     allUnits.associateBy { it.id },
                     bridges,
                 ) ?: 0.0
-            val current = pantryItems.find { it.measurement.foodItemId == subItem.id }
+            val current = pantryRepository.getPantryItemByFoodItemId(subItem.id)
             val currentQty =
                 if (current != null) {
                   UnitConverter.convert(
@@ -205,11 +198,9 @@ class CommitConsumptionUseCase(
             date = today,
             time = now,
             restaurantId =
-                run {
-                  val meal =
-                      mealPlanRepository.entries.first().find { it.id == result.scheduledMealId }
-                  (meal?.source as? MealSource.Restaurant)?.restaurantId
-                },
+                (mealPlanRepository.getMealById(result.scheduledMealId)?.source
+                        as? MealSource.Restaurant)
+                    ?.restaurantId,
             projectedTotalCents = 0,
             actualTotalCents = result.actualCostCents,
             taxPaidCents = 0,

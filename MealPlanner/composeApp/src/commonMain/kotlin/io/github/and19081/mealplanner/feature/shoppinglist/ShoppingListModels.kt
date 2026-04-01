@@ -12,7 +12,7 @@ data class ShoppingListItem(
     val customName: String? = null,
     val storeId: Uuid,
     val measurement: ItemMeasurement,
-    val packageId: Uuid? = null,
+    val purchaseOptionId: Uuid? = null,
     val isPurchased: Boolean = false,
     val isPantryItem: Boolean = true,
 )

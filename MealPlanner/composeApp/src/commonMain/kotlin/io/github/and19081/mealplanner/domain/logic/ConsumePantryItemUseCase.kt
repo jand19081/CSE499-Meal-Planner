@@ -5,7 +5,6 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import kotlin.math.max
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.first
 
 class ConsumePantryItemUseCase(
     private val pantryRepository: PantryRepository,
@@ -17,8 +16,7 @@ class ConsumePantryItemUseCase(
       amountConsumed: Double,
       unitId: Uuid,
   ) {
-    val pantryItems = pantryRepository.pantryItems.first()
-    val current = pantryItems.find { it.id == pantryItemId } ?: return
+    val current = pantryRepository.getPantryItemById(pantryItemId) ?: return
     val allUnits = unitRepository.units.value.associateBy { it.id }
     val storedUnitId = current.measurement.unitId ?: unitId
     val convertedAmount =

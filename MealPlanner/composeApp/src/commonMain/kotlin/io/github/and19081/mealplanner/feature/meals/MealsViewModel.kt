@@ -15,7 +15,7 @@ import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
 import io.github.and19081.mealplanner.domain.model.Meal
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.RecipeInfo
 import io.github.and19081.mealplanner.domain.model.isMeal
 import io.github.and19081.mealplanner.domain.model.isRecipe
@@ -36,7 +36,7 @@ data class MealsUiState(
     val groupedMeals: Map<String, List<FoodItem>>,
     val searchQuery: String,
     val allItems: List<FoodItem>,
-    val allPackages: List<Package>,
+    val allPurchaseOptions: List<PurchaseOption>,
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
     val errorMessage: String? = null,
@@ -45,7 +45,7 @@ data class MealsUiState(
 
 private data class CoreDataState(
     val items: List<FoodItem>,
-    val packages: List<Package>,
+    val purchaseOptions: List<PurchaseOption>,
     val bridges: List<BridgeConversion>,
     val units: List<UnitModel>,
 )
@@ -107,11 +107,11 @@ class MealsViewModel(
   private val coreDataFlow =
       combine(
           foodItemRepository.foodItems,
-          foodItemRepository.packages,
+          foodItemRepository.purchaseOptions,
           foodItemRepository.conversions,
           unitRepository.units,
-      ) { items, packages, bridges, units ->
-        CoreDataState(items, packages, bridges, units)
+      ) { items, purchaseOptions, bridges, units ->
+        CoreDataState(items, purchaseOptions, bridges, units)
       }
 
   private val filterFlow =
@@ -129,7 +129,7 @@ class MealsViewModel(
                   DataQualityValidator.validateFoodItem(
                       meal,
                       itemsById,
-                      data.packages,
+                      data.purchaseOptions,
                       data.bridges,
                       data.units,
                   )
@@ -150,7 +150,7 @@ class MealsViewModel(
                 groupedMeals = grouped,
                 searchQuery = filter.query,
                 allItems = data.items,
-                allPackages = data.packages,
+                allPurchaseOptions = data.purchaseOptions,
                 allBridges = data.bridges,
                 allUnits = data.units,
                 errorMessage = filter.error,

@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.and19081.mealplanner.core.util.RecipeMealType
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.feature.settings.Mode
 import kotlin.uuid.Uuid
 import kotlinx.datetime.LocalDate
@@ -51,7 +51,7 @@ fun DayDetailPanel(
     onConsumeEvent: (Uuid) -> Unit,
     onDismiss: () -> Unit,
     allMeals: List<FoodItem> = emptyList(),
-    allRestaurants: List<Package> = emptyList(),
+    allRestaurants: List<PurchaseOption> = emptyList(),
     mode: Mode = Mode.AUTO,
     modifier: Modifier = Modifier,
 ) {
@@ -196,7 +196,7 @@ private fun DayEventRow(
     onEventClick: () -> Unit,
     onConsume: () -> Unit,
     allMeals: List<FoodItem>,
-    allRestaurants: List<Package>,
+    allRestaurants: List<PurchaseOption>,
 ) {
   val color =
       when (event.mealType) {

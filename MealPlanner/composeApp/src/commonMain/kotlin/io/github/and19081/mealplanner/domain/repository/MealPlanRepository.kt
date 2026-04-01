@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.StateFlow
 interface MealPlanRepository {
   val entries: StateFlow<List<ScheduledMeal>>
 
+  suspend fun getMealById(id: Uuid): ScheduledMeal?
+
   suspend fun addPlan(entry: ScheduledMeal)
 
   suspend fun removePlan(entryId: Uuid)

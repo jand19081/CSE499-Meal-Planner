@@ -7,7 +7,7 @@ import io.github.and19081.mealplanner.data.db.converters.MealPlannerTypeConverte
 import io.github.and19081.mealplanner.data.db.dao.AppSettingsDao
 import io.github.and19081.mealplanner.data.db.dao.CategoryDao
 import io.github.and19081.mealplanner.data.db.dao.FoodItemDao
-import io.github.and19081.mealplanner.data.db.dao.PackageOptionDao
+import io.github.and19081.mealplanner.data.db.dao.PurchaseOptionDao
 import io.github.and19081.mealplanner.data.db.dao.PantryDao
 import io.github.and19081.mealplanner.data.db.dao.ReceiptDao
 import io.github.and19081.mealplanner.data.db.dao.RestaurantDao
@@ -19,9 +19,9 @@ import io.github.and19081.mealplanner.data.db.entity.AppSettingsEntity
 import io.github.and19081.mealplanner.data.db.entity.CategoryEntity
 import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
 import io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity
-import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
 import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
 import io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity
+import io.github.and19081.mealplanner.data.db.entity.PurchaseOptionEntity
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.RecipeComponentEntity
 import io.github.and19081.mealplanner.data.db.entity.RecipeInstructionEntity
@@ -65,7 +65,7 @@ import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 
             // Edges / junction tables
             UnitConversionBridgeEntity::class,
-            PackageOptionEntity::class,
+            PurchaseOptionEntity::class,
             RecipeRequirementGroupEntity::class,
             RecipeRequirementEntity::class,
             PantryInventoryEntity::class,
@@ -89,7 +89,7 @@ abstract class MealPlannerDatabase : RoomDatabase() {
 
   abstract fun scheduledMealDao(): ScheduledMealDao
 
-  abstract fun packageOptionDao(): PackageOptionDao
+  abstract fun purchaseOptionDao(): PurchaseOptionDao
 
   abstract fun pantryDao(): PantryDao
 

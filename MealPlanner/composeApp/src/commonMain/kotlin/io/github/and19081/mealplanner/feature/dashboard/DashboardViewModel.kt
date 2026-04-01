@@ -9,7 +9,7 @@ import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.data.db.entity.DashboardConfig
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
@@ -62,7 +62,7 @@ class DashboardViewModel(
       combine(
               mealPlanRepository.entries,
               foodItemRepository.foodItems,
-              foodItemRepository.packages,
+              foodItemRepository.purchaseOptions,
               foodItemRepository.conversions,
               unitRepository.units,
               pantryRepository.pantryItems,
@@ -73,7 +73,7 @@ class DashboardViewModel(
           ) { args: Array<Any?> ->
             val entries = args[0] as List<ScheduledMeal>
             val allItems = args[1] as List<FoodItem>
-            val packages = args[2] as List<Package>
+            val purchaseOptions = args[2] as List<PurchaseOption>
             val bridges = args[3] as List<BridgeConversion>
             val allUnits = args[4] as List<UnitModel>
             val pantry = args[5] as List<PantryItem>
@@ -98,7 +98,7 @@ class DashboardViewModel(
                     DataQualityValidator.validateFoodItem(
                         foodItem,
                         itemsMap,
-                        packages,
+                        purchaseOptions,
                         bridges,
                         allUnits,
                     )
@@ -108,6 +108,7 @@ class DashboardViewModel(
                   entryId = entry.id,
                   title = title,
                   mealType = entry.mealType,
+                  time = entry.time,
                   peopleCount = entry.peopleCount,
                   isConsumed = entry.isConsumed,
                   warnings = warnings,

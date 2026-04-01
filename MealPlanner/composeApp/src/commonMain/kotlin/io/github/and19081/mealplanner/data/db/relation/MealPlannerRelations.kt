@@ -3,7 +3,7 @@ package io.github.and19081.mealplanner.data.db.relation
 import androidx.room.*
 import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
 import io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity
-import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
+import io.github.and19081.mealplanner.data.db.entity.PurchaseOptionEntity
 import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
 import io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
@@ -36,7 +36,7 @@ data class ComposedFoodItemRelation(
     )
     val requirementGroups: List<RecipeRequirementGroupWithRequirements>,
     @Relation(parentColumn = "id", entityColumn = "food_item_id")
-    val packageOptions: List<PackageOptionEntity>,
+    val purchaseOptions: List<PurchaseOptionEntity>,
     @Relation(parentColumn = "id", entityColumn = "food_item_id")
     val conversions: List<UnitConversionBridgeEntity>,
 )
@@ -64,8 +64,8 @@ data class ShoppingCartItemWithDetails(
     @Relation(parentColumn = "food_item_id", entityColumn = "id") val foodItem: FoodItemEntity?,
     @Relation(parentColumn = "store_id", entityColumn = "id") val store: StoreEntity?,
     @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity?,
-    @Relation(parentColumn = "package_option_id", entityColumn = "id")
-    val packageOption: PackageOptionEntity?,
+    @Relation(parentColumn = "purchase_option_id", entityColumn = "id")
+    val purchaseOption: PurchaseOptionEntity?,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

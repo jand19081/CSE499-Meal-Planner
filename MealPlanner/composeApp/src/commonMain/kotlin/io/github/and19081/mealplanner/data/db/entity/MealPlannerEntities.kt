@@ -311,7 +311,7 @@ data class UnitConversionBridgeEntity(
 )
 
 @Entity(
-    tableName = "package_options",
+    tableName = "purchase_options",
     foreignKeys =
         [
             ForeignKey(StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.CASCADE),
@@ -326,7 +326,7 @@ data class UnitConversionBridgeEntity(
     indices =
         [Index(value = ["store_id"]), Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
 )
-data class PackageOptionEntity(
+data class PurchaseOptionEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "store_id") val storeId: Uuid,
     @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
@@ -424,9 +424,9 @@ data class PantryInventoryEntity(
             ForeignKey(StoreEntity::class, ["id"], ["store_id"], onDelete = ForeignKey.SET_NULL),
             ForeignKey(UnitEntity::class, ["id"], ["unit_id"], onDelete = ForeignKey.RESTRICT),
             ForeignKey(
-                PackageOptionEntity::class,
+                PurchaseOptionEntity::class,
                 ["id"],
-                ["package_option_id"],
+                ["purchase_option_id"],
                 onDelete = ForeignKey.SET_NULL,
             ),
         ],
@@ -435,13 +435,13 @@ data class PantryInventoryEntity(
             Index(value = ["food_item_id"]),
             Index(value = ["store_id"]),
             Index(value = ["unit_id"]),
-            Index(value = ["package_option_id"]),
+            Index(value = ["purchase_option_id"]),
         ],
 )
 data class ShoppingCartItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "store_id") val storeId: Uuid? = null,
-    @ColumnInfo(name = "package_option_id") val packageOptionId: Uuid? = null,
+    @ColumnInfo(name = "purchase_option_id") val purchaseOptionId: Uuid? = null,
     @ColumnInfo(name = "custom_name") val customName: String? = null,
     @Embedded val measurement: ItemMeasurement,
     @ColumnInfo(name = "is_purchased") val isPurchased: Boolean = false,

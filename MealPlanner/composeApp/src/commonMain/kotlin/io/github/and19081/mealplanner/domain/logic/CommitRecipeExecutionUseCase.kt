@@ -12,7 +12,6 @@ import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
@@ -32,20 +31,19 @@ class CommitRecipeExecutionUseCase(
 
   private suspend fun deductIngredients(recipe: Recipe, scaleFactor: Double) {
     val allUnits = unitRepository.units.value.associateBy { it.id }
-    val allBridges = foodItemRepository.conversions.first()
-    val allItems = foodItemRepository.foodItems.first().associateBy { it.id }
-    val pantryItems = pantryRepository.pantryItems.first()
 
     recipe.recipeInfo.requirementGroups.forEach { group ->
       val req =
           group.requirements.find { it.isPrimary }
               ?: group.requirements.firstOrNull()
               ?: return@forEach
-      val subItem = allItems[req.measurement.foodItemId] ?: return@forEach
+      val subItem =
+          foodItemRepository.getFoodItem(req.measurement.foodItemId ?: return@forEach)
+              ?: return@forEach
       if (subItem !is Ingredient) return@forEach
 
       val targetUnitId = subItem.preferredUnitId ?: SystemUnits.Each.id
-      val bridges = allBridges.filter { it.foodItemId == subItem.id }
+      val bridges = foodItemRepository.getConversionsForFoodItem(subItem.id)
       val deductAmt =
           UnitConverter.convert(
               req.measurement.quantity * scaleFactor,
@@ -55,7 +53,7 @@ class CommitRecipeExecutionUseCase(
               bridges,
           ) ?: 0.0
 
-      val current = pantryItems.find { it.measurement.foodItemId == subItem.id }
+      val current = pantryRepository.getPantryItemByFoodItemId(subItem.id)
       val currentQty =
           if (current != null) {
             UnitConverter.convert(

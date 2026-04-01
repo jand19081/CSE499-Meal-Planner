@@ -15,7 +15,7 @@ import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
 import io.github.and19081.mealplanner.domain.model.Ingredient
 import io.github.and19081.mealplanner.domain.model.ItemMeasurement
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.PurchasableInfo
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -57,7 +57,7 @@ data class RecipesUiState(
     val doesExactMatchExist: Boolean,
     val allItems: List<FoodItem>,
     val pantryItems: List<PantryItem>,
-    val allPackages: List<Package>,
+    val allPurchaseOptions: List<PurchaseOption>,
     val allBridges: List<BridgeConversion>,
     val allUnits: List<UnitModel>,
     val isSortByAlpha: Boolean,
@@ -134,7 +134,7 @@ class RecipesViewModel(
               _sortByAlpha,
               _filterCanMakeNow,
               pantryRepository.pantryItems,
-              foodItemRepository.packages,
+              foodItemRepository.purchaseOptions,
               foodItemRepository.conversions,
               unitRepository.units,
               _errorMessage,
@@ -144,7 +144,7 @@ class RecipesViewModel(
             val isAlpha = args[2] as Boolean
             val canMakeNow = args[3] as Boolean
             val pantry = args[4] as List<PantryItem>
-            val packages = args[5] as List<Package>
+            val purchaseOptions = args[5] as List<PurchaseOption>
             val bridges = args[6] as List<BridgeConversion>
             val allUnits = args[7] as List<UnitModel>
             val error = args[8] as String?
@@ -158,7 +158,7 @@ class RecipesViewModel(
                   DataQualityValidator.validateFoodItem(
                       recipe,
                       itemsMap,
-                      packages,
+                      purchaseOptions,
                       bridges,
                       allUnits,
                   )
@@ -218,7 +218,7 @@ class RecipesViewModel(
                 doesExactMatchExist = allRecipes.any { it.name.equals(query, ignoreCase = true) },
                 allItems = allItems,
                 pantryItems = pantry,
-                allPackages = packages,
+                allPurchaseOptions = purchaseOptions,
                 allBridges = bridges,
                 allUnits = allUnits,
                 isSortByAlpha = isAlpha,
@@ -383,7 +383,7 @@ class RecipesViewModel(
                       unitId = Uuid.parse("00000000-0000-0000-0000-000000000000"),
                       quantity = batches,
                   ),
-              packageId = null,
+              purchaseOptionId = null,
               isPurchased = false,
               isPantryItem = true,
           )

@@ -11,7 +11,7 @@ import io.github.and19081.mealplanner.domain.logic.CommitConsumptionUseCase
 import io.github.and19081.mealplanner.domain.logic.CookingTimeCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.isMeal
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -22,7 +22,6 @@ import io.github.and19081.mealplanner.domain.repository.RestaurantRepository
 import io.github.and19081.mealplanner.domain.repository.SettingsRepository
 import io.github.and19081.mealplanner.feature.kitchen.ConsumptionResult
 import io.github.and19081.mealplanner.notification.MealNotificationScheduler
-import kotlin.collections.get
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +33,7 @@ data class CalendarUiState(
     val currentMonth: LocalDate,
     val dates: List<DateUiModel>,
     val weekDates: List<DateUiModel>,
+    val focusedDate: LocalDate = currentMonth,
     val availableMeals: List<FoodItem> = emptyList(),
     val allItems: List<FoodItem> = emptyList(),
     val allUnits: List<UnitModel> = emptyList(),
@@ -55,6 +55,7 @@ data class CalendarEvent(
     val entryId: Uuid,
     val mealType: RecipeMealType,
     val title: String,
+    val time: kotlinx.datetime.LocalTime,
     val peopleCount: Int,
     val isConsumed: Boolean,
     val warnings: List<DataWarning> = emptyList(),
@@ -95,7 +96,7 @@ class CalendarViewModel(
               _selectedDate,
               mealPlanRepository.entries,
               foodItemRepository.foodItems,
-              foodItemRepository.packages,
+              foodItemRepository.purchaseOptions,
               foodItemRepository.conversions,
               unitRepository.units,
               restaurantRepository.restaurants,
@@ -106,7 +107,7 @@ class CalendarViewModel(
             val entries =
                 args[2] as List<io.github.and19081.mealplanner.feature.meals.ScheduledMeal>
             val allItems = args[3] as List<FoodItem>
-            val packages = args[4] as List<Package>
+            val purchaseOptions = args[4] as List<PurchaseOption>
             val bridges = args[5] as List<BridgeConversion>
             val allUnits = args[6] as List<UnitModel>
             val restaurants =
@@ -128,7 +129,7 @@ class CalendarViewModel(
                   DataQualityValidator.validateFoodItem(
                       meal,
                       itemsById,
-                      packages,
+                      purchaseOptions,
                       bridges,
                       allUnits,
                   )
@@ -148,6 +149,7 @@ class CalendarViewModel(
                     entryId = entry.id,
                     mealType = entry.mealType,
                     title = mealName,
+                    time = entry.time,
                     peopleCount = entry.peopleCount,
                     isConsumed = entry.isConsumed,
                     warnings = warnings,
@@ -163,25 +165,19 @@ class CalendarViewModel(
               )
             }
 
+            val anchor = selectedDate ?: currentMonth
+            val anchorDayOfWeek = anchor.dayOfWeek.ordinal
             val weekDates =
-                if (selectedDate != null) {
-                  val dayOfWeek = selectedDate.dayOfWeek.ordinal
-                  dateUiModels.filter {
-                    it.date >= selectedDate.minus(dayOfWeek, DateTimeUnit.DAY) &&
-                        it.date <= selectedDate.plus(6 - dayOfWeek, DateTimeUnit.DAY)
-                  }
-                } else {
-                  val todayDayOfWeek = today.dayOfWeek.ordinal
-                  dateUiModels.filter {
-                    it.date >= today.minus(todayDayOfWeek, DateTimeUnit.DAY) &&
-                        it.date <= today.plus(6 - todayDayOfWeek, DateTimeUnit.DAY)
-                  }
+                dateUiModels.filter {
+                  it.date >= anchor.minus(anchorDayOfWeek, DateTimeUnit.DAY) &&
+                      it.date <= anchor.plus(6 - anchorDayOfWeek, DateTimeUnit.DAY)
                 }
 
             CalendarUiState(
                 currentMonth = currentMonth,
                 dates = dateUiModels,
                 weekDates = weekDates,
+                focusedDate = anchor,
                 availableMeals = availableMeals,
                 allItems = allItems,
                 allUnits = allUnits,
@@ -230,14 +226,32 @@ class CalendarViewModel(
       anticipatedCostCents: Int? = null,
   ) {
     _errorMessage.value = null
+    val source =
+        when {
+          restaurant != null ->
+              io.github.and19081.mealplanner.domain.model.MealSource.Restaurant(
+                  restaurant.id,
+                  anticipatedCostCents ?: 0,
+              )
+          meal?.isMeal() == true ->
+              io.github.and19081.mealplanner.domain.model.MealSource.PrePlannedMeal(meal.id)
+          meal?.isRecipe() == true ->
+              io.github.and19081.mealplanner.domain.model.MealSource.StandaloneRecipe(meal.id)
+          meal != null ->
+              io.github.and19081.mealplanner.domain.model.MealSource.StandaloneIngredient(
+                  meal.id,
+                  0.0,
+                  meal.preferredUnitId ?: Uuid.NIL,
+              )
+          else -> null
+        }
     val newEntry =
         io.github.and19081.mealplanner.feature.meals.ScheduledMeal(
             id = Uuid.random(),
             date = date,
             time = time,
             mealType = mealType,
-            prePlannedMealId = meal?.id,
-            restaurantId = restaurant?.id,
+            source = source,
             peopleCount = peopleCount,
             anticipatedCostCents = anticipatedCostCents,
         )

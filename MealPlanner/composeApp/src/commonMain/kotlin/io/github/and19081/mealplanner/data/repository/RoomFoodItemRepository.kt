@@ -10,7 +10,7 @@ import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.Category
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirementGroup
-import io.github.and19081.mealplanner.domain.model.Package
+import io.github.and19081.mealplanner.domain.model.PurchaseOption
 import io.github.and19081.mealplanner.domain.model.leftoverInfo
 import io.github.and19081.mealplanner.domain.model.purchasableInfo
 import io.github.and19081.mealplanner.domain.model.recipeInfo
@@ -26,7 +26,7 @@ class RoomFoodItemRepository(
 
   private val foodItemDao = db.foodItemDao()
   private val categoryDao = db.categoryDao()
-  private val packageDao = db.packageOptionDao()
+  private val packageDao = db.purchaseOptionDao()
 
   override val foodItems: StateFlow<List<FoodItem>> =
       foodItemDao
@@ -40,7 +40,7 @@ class RoomFoodItemRepository(
           .map { list -> list.map { it.toModel() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-  override val packages: StateFlow<List<Package>> =
+  override val purchaseOptions: StateFlow<List<PurchaseOption>> =
       packageDao
           .observeAll()
           .map { list -> list.map { it.toModel() } }
@@ -54,6 +54,10 @@ class RoomFoodItemRepository(
 
   override suspend fun getFoodItem(id: Uuid): FoodItem? {
     return foodItemDao.getComposedById(id)?.toDomainModel()
+  }
+
+  override suspend fun getConversionsForFoodItem(foodItemId: Uuid): List<BridgeConversion> {
+    return foodItemDao.getConversionsByFoodItemId(foodItemId).map { it.toModel() }
   }
 
   override suspend fun saveFoodItem(
@@ -107,11 +111,11 @@ class RoomFoodItemRepository(
     foodItemDao.deleteConversion(id)
   }
 
-  override suspend fun savePackage(pkg: Package) {
-    packageDao.upsert(pkg.toEntity())
+  override suspend fun savePurchaseOption(purchaseOption: PurchaseOption) {
+    packageDao.upsert(purchaseOption.toEntity())
   }
 
-  override suspend fun deletePackage(id: Uuid) {
+  override suspend fun deletePurchaseOption(id: Uuid) {
     packageDao.deleteById(id)
   }
 }

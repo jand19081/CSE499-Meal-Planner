@@ -5,7 +5,7 @@ import io.github.and19081.mealplanner.data.db.entity.AppSettingsEntity
 import io.github.and19081.mealplanner.data.db.entity.CategoryEntity
 import io.github.and19081.mealplanner.data.db.entity.FoodItemEntity
 import io.github.and19081.mealplanner.data.db.entity.LeftoverComponentEntity
-import io.github.and19081.mealplanner.data.db.entity.PackageOptionEntity
+import io.github.and19081.mealplanner.data.db.entity.PurchaseOptionEntity
 import io.github.and19081.mealplanner.data.db.entity.PantryInventoryEntity
 import io.github.and19081.mealplanner.data.db.entity.PurchasableComponentEntity
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
@@ -238,6 +238,9 @@ interface FoodItemDao {
   @Query("SELECT * FROM unit_conversion_bridges")
   suspend fun getAllConversions(): List<UnitConversionBridgeEntity>
 
+  @Query("SELECT * FROM unit_conversion_bridges WHERE food_item_id = :foodItemId")
+  suspend fun getConversionsByFoodItemId(foodItemId: Uuid): List<UnitConversionBridgeEntity>
+
   @Upsert suspend fun upsertConversion(bridge: UnitConversionBridgeEntity)
 
   @Upsert suspend fun upsertAllConversions(items: List<UnitConversionBridgeEntity>)
@@ -285,31 +288,31 @@ interface ScheduledMealDao {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PackageOptionDao
+// PurchaseOptionDao
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Dao
-interface PackageOptionDao {
-  @Query("SELECT * FROM package_options ORDER BY food_item_id ASC")
-  fun observeAll(): Flow<List<PackageOptionEntity>>
+interface PurchaseOptionDao {
+  @Query("SELECT * FROM purchase_options ORDER BY food_item_id ASC")
+  fun observeAll(): Flow<List<PurchaseOptionEntity>>
 
-  @Query("SELECT * FROM package_options") suspend fun getAll(): List<PackageOptionEntity>
+  @Query("SELECT * FROM purchase_options") suspend fun getAll(): List<PurchaseOptionEntity>
 
-  @Query("SELECT * FROM package_options WHERE food_item_id = :foodItemId ORDER BY price_cents ASC")
-  fun observeForFoodItem(foodItemId: Uuid): Flow<List<PackageOptionEntity>>
+  @Query("SELECT * FROM purchase_options WHERE food_item_id = :foodItemId ORDER BY price_cents ASC")
+  fun observeForFoodItem(foodItemId: Uuid): Flow<List<PurchaseOptionEntity>>
 
-  @Query("SELECT * FROM package_options WHERE id = :id")
-  suspend fun getById(id: Uuid): PackageOptionEntity?
+  @Query("SELECT * FROM purchase_options WHERE id = :id")
+  suspend fun getById(id: Uuid): PurchaseOptionEntity?
 
-  @Upsert suspend fun upsert(option: PackageOptionEntity)
+  @Upsert suspend fun upsert(option: PurchaseOptionEntity)
 
-  @Upsert suspend fun upsertAll(options: List<PackageOptionEntity>)
+  @Upsert suspend fun upsertAll(options: List<PurchaseOptionEntity>)
 
-  @Delete suspend fun delete(option: PackageOptionEntity)
+  @Delete suspend fun delete(option: PurchaseOptionEntity)
 
-  @Query("DELETE FROM package_options WHERE id = :id") suspend fun deleteById(id: Uuid)
+  @Query("DELETE FROM purchase_options WHERE id = :id") suspend fun deleteById(id: Uuid)
 
-  @Query("DELETE FROM package_options") suspend fun clearAll()
+  @Query("DELETE FROM purchase_options") suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -328,6 +331,17 @@ interface PantryDao {
 
   @Query("SELECT * FROM pantry_inventory") suspend fun getAll(): List<PantryInventoryEntity>
 
+  @Query("SELECT * FROM pantry_inventory WHERE id = :id")
+  suspend fun getById(id: Uuid): PantryInventoryEntity?
+
+  @Query("SELECT * FROM pantry_inventory WHERE food_item_id = :foodItemId LIMIT 1")
+  suspend fun getByFoodItemId(foodItemId: Uuid): PantryInventoryEntity?
+
+  @Query("DELETE FROM pantry_inventory WHERE food_item_id = :foodItemId AND unit_id = :unitId")
+  suspend fun deleteByFoodItemAndUnit(foodItemId: Uuid, unitId: Uuid)
+
+  @Query("DELETE FROM pantry_inventory WHERE id = :id") suspend fun deleteById(id: Uuid)
+
   @Upsert suspend fun upsert(item: PantryInventoryEntity)
 
   @Upsert suspend fun upsertAll(items: List<PantryInventoryEntity>)
@@ -340,17 +354,16 @@ interface PantryDao {
   suspend fun updateQuantities(
       updates: List<io.github.and19081.mealplanner.domain.repository.PantryUpdate>
   ) {
-    val allExisting = getAllWithDetails()
     updates.forEach { update ->
-      val existing = allExisting.find { it.pantryItem.measurement.foodItemId == update.foodItemId }
+      val existing = getByFoodItemId(update.foodItemId)
       if (existing != null) {
         if (update.newQuantity <= 0) {
-          delete(existing.pantryItem)
+          delete(existing)
         } else {
           upsert(
-              existing.pantryItem.copy(
+              existing.copy(
                   measurement =
-                      existing.pantryItem.measurement.copy(
+                      existing.measurement.copy(
                           quantity = update.newQuantity,
                           unitId = update.unitId,
                       )
@@ -384,6 +397,11 @@ interface ShoppingListDao {
   fun observeAllWithDetails(): Flow<List<ShoppingCartItemWithDetails>>
 
   @Query("SELECT * FROM shopping_cart_items") suspend fun getAll(): List<ShoppingCartItemEntity>
+
+  @Query("SELECT * FROM shopping_cart_items WHERE id = :id")
+  suspend fun getById(id: Uuid): ShoppingCartItemEntity?
+
+  @Query("DELETE FROM shopping_cart_items WHERE id = :id") suspend fun deleteById(id: Uuid)
 
   @Upsert suspend fun upsert(item: ShoppingCartItemEntity)
 

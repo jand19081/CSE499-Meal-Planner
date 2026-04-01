@@ -29,6 +29,10 @@ class RoomMealPlanRepository(
           .map { list -> list.map { it.toDomain() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  override suspend fun getMealById(id: Uuid): ScheduledMeal? {
+    return dao.getWithSource(id)?.toDomain()
+  }
+
   override suspend fun addPlan(entry: ScheduledMeal) {
     dao.upsert(entry.toEntity())
   }
@@ -90,19 +94,6 @@ class RoomMealPlanRepository(
         } catch (e: Exception) {
           null
         }
-    val prePlannedMealId =
-        when (source) {
-          is MealSource.PrePlannedMeal -> source.id
-          is MealSource.StandaloneRecipe -> source.id
-          is MealSource.StandaloneIngredient -> source.id
-          is MealSource.Restaurant,
-          null -> null
-        }
-    val restaurantId =
-        when (source) {
-          is MealSource.Restaurant -> source.restaurantId
-          else -> null
-        }
     return ScheduledMeal(
         id = scheduledMeal.id,
         date =
@@ -118,28 +109,21 @@ class RoomMealPlanRepository(
               LocalTime(12, 0)
             },
         mealType = scheduledMeal.mealType,
-        prePlannedMealId = prePlannedMealId,
-        restaurantId = restaurantId,
+        source = source,
         peopleCount = scheduledMeal.peopleCount,
         isConsumed = scheduledMeal.isConsumed,
         anticipatedCostCents = scheduledMeal.anticipatedCostCents,
-        source = source,
     )
   }
 
   private fun ScheduledMeal.toEntity(): ScheduledMealEntity {
-    val source =
-        when {
-          restaurantId != null -> MealSource.Restaurant(restaurantId, anticipatedCostCents ?: 0)
-          prePlannedMealId != null -> MealSource.PrePlannedMeal(prePlannedMealId)
-          else -> MealSource.PrePlannedMeal(Uuid.random())
-        }
+    val src = source ?: MealSource.PrePlannedMeal(Uuid.random())
     return ScheduledMealEntity(
         id = id,
         date = date.toString(),
         time = time.toString(),
         mealType = mealType,
-        mealSource = json.encodeToString(MealSource.serializer(), source),
+        mealSource = json.encodeToString(MealSource.serializer(), src),
         peopleCount = peopleCount,
         isConsumed = isConsumed,
         anticipatedCostCents = anticipatedCostCents,
