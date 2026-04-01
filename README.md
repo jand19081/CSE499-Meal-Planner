@@ -68,12 +68,9 @@ MealPlanner/
     ./gradlew :composeApp:run
     ```
 
-## 🗺️ Roadmap & Upcoming Refactors
+## 🗺️ Roadmap (Needs Updated)
 
-* **Domain Type Safety**: Transitioning the `FoodItem` interface to a `sealed interface` to guarantee exhaustive compile-time checking across the app.
-* **Query Optimization**: Replacing in-memory list filtering (`.first().find { ... }`) with targeted O(1) / O(log N) Room DAO queries for better performance and concurrency safety.
-* **Data Integrity Enhancements**: Updating DTOs for backup payloads to ensure full feature parity (e.g., preserving `isMeal` flags during round-trip exports).
-* **UI Consolidation**: Extracting complex Flow combinations (like the shopping list calculation) into dedicated, independently testable calculator classes.
+* New roadmap coming soon.
 
 ---
 *Developed for CSE 499 Senior Project.*
