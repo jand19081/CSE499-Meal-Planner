@@ -2,21 +2,23 @@ package io.github.and19081.mealplanner
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.tooling.preview.Preview
-import io.github.and19081.mealplanner.main.MainView
-import io.github.and19081.mealplanner.settings.MealPlannerTheme
+import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
+import io.github.and19081.mealplanner.core.theme.MealPlannerTheme
+import io.github.and19081.mealplanner.feature.main.MainView
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
 @Composable
-@Preview
-fun App() {
-    // Initialize Mock Data Once
-    LaunchedEffect(Unit) {
-        MockData.initialize()
+fun App(dependencyInjectionContainer: DependencyInjectionContainer) {
+  LaunchedEffect(Unit) {
+    try {
+      dependencyInjectionContainer.initializeMockData()
+    } catch (e: Exception) {
+      e.printStackTrace()
     }
+  }
 
-    MealPlannerTheme {
-        MainView()
-    }
+  MealPlannerTheme(settingsRepository = dependencyInjectionContainer.settingsRepository) {
+    MainView(diContainer = dependencyInjectionContainer)
+  }
 }

@@ -1,0 +1,109 @@
+{
+  "category": {
+    "id": "UUID",
+    "name": "String"
+  },
+  "store": {
+    "id": "UUID",
+    "name": "String"
+  },
+  "restaurant": {
+    "id": "UUID",
+    "name": "String"
+  },
+  "unit": {
+    "id": "UUID",
+    "type": "Enum(Weight, Volume, Count, Custom)",
+    "abbreviation": "String",
+    "display_name": "String",
+    "is_system_unit": "Boolean"
+  },
+  "bridge_conversion": {
+    "id": "UUID",
+    "ingredient_id": "UUID",
+    "from_unit_id": "UUID",
+    "from_quantity": "Number",
+    "to_unit_id": "UUID",
+    "to_quantity": "Number"
+  },
+  "ingredient": {
+    "id": "UUID",
+    "name": "String",
+    "category_id": "UUID"
+  },
+  "pantry_item": {
+    "id": "UUID",
+    "ingredient_id": "UUID",
+    "quantity": "Number",
+    "unit_id": "UUID"
+  },
+  "package": {
+    "id": "UUID",
+    "ingredient_id": "UUID",
+    "store_id": "UUID",
+    "price_cents": "Integer",
+    "quantity": "Number",
+    "unit_id": "UUID"
+  },
+  "recipe": {
+    "id": "UUID",
+    "name": "String",
+    "instructions": ["String"],
+    "servings": "Number",
+    "meal_type": "Enum(Breakfast, Lunch, Dinner, Snack, Other)",
+    "prep_time_minutes": "Integer",
+    "cook_time_minutes": "Integer",
+    "ingredients": [
+      {
+        "ingredient_id": "UUID",
+        "quantity": "Number",
+        "unit_id": "UUID"
+      }
+    ]
+  },
+  "pre_planned_meal": {
+    "id": "UUID",
+    "name": "String",
+    "recipes": ["UUID"],
+    "independent_ingredients": [
+      {
+        "ingredient_id": "UUID",
+        "quantity": "Number",
+        "unit_id": "UUID"
+      }
+    ]
+  },
+  "scheduled_meal": {
+    "id": "UUID",
+    "date": "ISO-8601 Date",
+    "time": "ISO-8601 Time",
+    "meal_type": "Enum(Breakfast, Lunch, Dinner, Snack, Other)",
+    "pre_planned_meal_id": "UUID | null",
+    "restaurant_id": "UUID | null",
+    "people_count": "Integer",
+    "is_consumed": "Boolean"
+  },
+  "shopping_list_item": {
+    "id": "UUID",
+    "ingredient_id": "UUID | null",
+    "custom_name": "String | null",
+    "store_id": "UUID",
+    "needed_quantity": "Number | null",
+    "unit_id": "UUID | null",
+    "package_id": "UUID | null",
+    "is_purchased": "Boolean"
+  },
+  "receipt_history": {
+    "id": "UUID",
+    "date": "ISO-8601 Date",
+    "store_id": "UUID",
+    "projected_total_cents": "Integer",
+    "actual_total_cents": "Integer",
+    "tax_paid_cents": "Integer"
+  },
+  "app_settings": {
+    "id": "UUID",
+    "meal_consumed_notification_delay_minutes": "Integer",
+    "default_tax_rate_percentage": "Number"
+  }
+}
