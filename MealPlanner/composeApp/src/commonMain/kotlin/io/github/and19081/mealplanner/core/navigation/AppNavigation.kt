@@ -21,7 +21,9 @@ import io.github.and19081.mealplanner.feature.main.DashboardRoute
 import io.github.and19081.mealplanner.feature.main.InventoryRoute
 import io.github.and19081.mealplanner.feature.main.KitchenRoute
 import io.github.and19081.mealplanner.feature.main.MainViewModel
+import io.github.and19081.mealplanner.feature.main.RecipeExecutionRoute
 import io.github.and19081.mealplanner.feature.main.SettingsRoute
+import io.github.and19081.mealplanner.feature.recipes.RecipeExecutionScreen
 import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.feature.settings.SettingsView
 
@@ -34,66 +36,70 @@ fun AppNavigation(
     isExpanded: Boolean,
     modifier: Modifier = Modifier,
 ) {
-  val factory = remember { ViewModelFactory(diContainer) }
+    val factory = remember { ViewModelFactory(diContainer) }
 
-  NavHost(
-      navController = navController,
-      startDestination = DashboardRoute,
-      modifier = modifier.fillMaxSize(),
-  ) {
-    composable<DashboardRoute> {
-      val vm = viewModel { factory.createDashboardViewModel() }
-      DashboardView(
-          viewModel = vm,
-          mode = mode,
-          isExpanded = isExpanded,
-          onCanMakeNowClick = {
-            mainViewModel.setActivateCanMakeNowFilter(true)
-            navController.navigate(KitchenRoute)
-          },
-      )
+    NavHost(
+        navController = navController,
+        startDestination = DashboardRoute,
+        modifier = modifier.fillMaxSize(),
+    ) {
+        composable<DashboardRoute> {
+            val vm = viewModel { factory.createDashboardViewModel() }
+            DashboardView(
+                viewModel = vm,
+                mode = mode,
+                isExpanded = isExpanded,
+                onCanMakeNowClick = {
+                    mainViewModel.setActivateCanMakeNowFilter(true)
+                    navController.navigate(KitchenRoute)
+                },
+            )
+        }
+        composable<CalendarRoute> {
+            val vm = viewModel { factory.createCalendarViewModel(mainViewModel.currentMonth) }
+            CalendarView(
+                viewModel = vm,
+                calendarViewMode = mainViewModel.calendarViewMode.value,
+                mode = mode,
+                isExpanded = isExpanded,
+                onPrevClick = { mainViewModel.onDateArrowClick(false) },
+                onNextClick = { mainViewModel.onDateArrowClick(true) },
+                onToggleViewMode = { mainViewModel.toggleCalendarViewMode() },
+                onDateSelected = { mainViewModel.updateReferenceDate(it) },
+            )
+        }
+        composable<KitchenRoute> {
+            KitchenView(
+                diContainer = diContainer,
+                mainViewModel = mainViewModel,
+                mode = mode,
+                isExpanded = isExpanded,
+                pushModal = { mainViewModel.pushModal(it) },
+                popModal = { mainViewModel.popModal() },
+                modalStack = mainViewModel.modalStack.value,
+            )
+        }
+        composable<InventoryRoute> {
+            InventoryView(
+                diContainer = diContainer,
+                mode = mode,
+                isExpanded = isExpanded,
+                pushModal = { mainViewModel.pushModal(it) },
+                popModal = { mainViewModel.popModal() },
+                modalStack = mainViewModel.modalStack.value,
+            )
+        }
+        composable<AnalyticsRoute> {
+            val vm = viewModel { factory.createAnalyticsViewModel() }
+            AnalyticsView(vm, mode = mode, isExpanded = isExpanded)
+        }
+        composable<SettingsRoute> {
+            val vm = viewModel { factory.createSettingsViewModel() }
+            SettingsView(vm, isExpanded = isExpanded)
+        }
+        composable<RecipeExecutionRoute> {
+            val vm = viewModel { factory.createRecipeExecutionViewModel() }
+            RecipeExecutionScreen(vm)
+        }
     }
-    composable<CalendarRoute> {
-      val vm = viewModel { factory.createCalendarViewModel(mainViewModel.currentMonth) }
-      CalendarView(
-          viewModel = vm,
-          calendarViewMode = mainViewModel.calendarViewMode.value,
-          mode = mode,
-          isExpanded = isExpanded,
-          onPrevClick = { mainViewModel.onDateArrowClick(false) },
-          onNextClick = { mainViewModel.onDateArrowClick(true) },
-          onToggleViewMode = { mainViewModel.toggleCalendarViewMode() },
-          onDateSelected = { mainViewModel.updateReferenceDate(it) },
-      )
-    }
-    composable<KitchenRoute> {
-      KitchenView(
-          diContainer = diContainer,
-          mainViewModel = mainViewModel,
-          mode = mode,
-          isExpanded = isExpanded,
-          pushModal = { mainViewModel.pushModal(it) },
-          popModal = { mainViewModel.popModal() },
-          modalStack = mainViewModel.modalStack.value,
-      )
-    }
-    composable<InventoryRoute> {
-      InventoryView(
-          diContainer = diContainer,
-          mode = mode,
-          isExpanded = isExpanded,
-          pushModal = { mainViewModel.pushModal(it) },
-          popModal = { mainViewModel.popModal() },
-          modalStack = mainViewModel.modalStack.value,
-      )
-    }
-    composable<AnalyticsRoute> {
-      val vm = viewModel { factory.createAnalyticsViewModel() }
-      AnalyticsView(vm, mode = mode, isExpanded = isExpanded)
-    }
-    composable<SettingsRoute> {
-      val vm = viewModel { factory.createSettingsViewModel() }
-      SettingsView(vm, isExpanded = isExpanded)
-    }
-  }
 }

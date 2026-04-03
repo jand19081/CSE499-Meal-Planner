@@ -11,25 +11,35 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 
 // Define Routes
-@Serializable object CalendarRoute
+@Serializable
+object CalendarRoute
 
-@Serializable object DashboardRoute
+@Serializable
+object DashboardRoute
 
-@Serializable object RecipesRoute
+@Serializable
+object RecipesRoute
 
-@Serializable object IngredientsRoute
+@Serializable
+object IngredientsRoute
 
-@Serializable object MealsRoute
+@Serializable
+object MealsRoute
 
-@Serializable object SettingsRoute
+@Serializable
+object SettingsRoute
 
-@Serializable object InventoryRoute
+@Serializable
+object InventoryRoute
 
-@Serializable object PantryRoute
+@Serializable
+object PantryRoute
 
-@Serializable object AnalyticsRoute
+@Serializable
+object AnalyticsRoute
 
-@Serializable object KitchenRoute
+@Serializable
+object KitchenRoute
 
 data class TopLevelDestination(val label: String, val icon: ImageVector, val route: Any)
 
@@ -43,7 +53,7 @@ val MainDestinations =
 
 val AllDestinations =
     MainDestinations +
-        listOf(
-            TopLevelDestination("Analytics", Icons.Default.Analytics, AnalyticsRoute),
-            TopLevelDestination("Settings", Icons.Default.Settings, SettingsRoute),
-        )
+            listOf(
+                TopLevelDestination("Analytics", Icons.Default.Analytics, AnalyticsRoute),
+                TopLevelDestination("Settings", Icons.Default.Settings, SettingsRoute),
+            )
