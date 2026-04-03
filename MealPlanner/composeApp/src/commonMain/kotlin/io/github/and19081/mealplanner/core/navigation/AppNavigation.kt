@@ -2,6 +2,8 @@ package io.github.and19081.mealplanner.core.navigation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -10,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.and19081.mealplanner.core.di.DependencyInjectionContainer
 import io.github.and19081.mealplanner.core.di.ViewModelFactory
+import io.github.and19081.mealplanner.domain.model.Recipe
 import io.github.and19081.mealplanner.feature.Inventory.InventoryView
 import io.github.and19081.mealplanner.feature.analytics.AnalyticsView
 import io.github.and19081.mealplanner.feature.calendar.CalendarView
@@ -37,6 +40,7 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
 ) {
     val factory = remember { ViewModelFactory(diContainer) }
+    val recipeExecutionVm = viewModel { factory.createRecipeExecutionViewModel() }
 
     NavHost(
         navController = navController,
@@ -77,6 +81,10 @@ fun AppNavigation(
                 pushModal = { mainViewModel.pushModal(it) },
                 popModal = { mainViewModel.popModal() },
                 modalStack = mainViewModel.modalStack.value,
+                onMakeRecipe = { foodItem ->
+                    (foodItem as? Recipe)?.let { recipeExecutionVm.start(it) }
+                    navController.navigate(RecipeExecutionRoute)
+                },
             )
         }
         composable<InventoryRoute> {
@@ -98,8 +106,14 @@ fun AppNavigation(
             SettingsView(vm, isExpanded = isExpanded)
         }
         composable<RecipeExecutionRoute> {
-            val vm = viewModel { factory.createRecipeExecutionViewModel() }
-            RecipeExecutionScreen(vm)
+            val allItemNames by recipeExecutionVm.allItemNames.collectAsState()
+            val allUnitAbbr by recipeExecutionVm.allUnitAbbr.collectAsState()
+            RecipeExecutionScreen(
+                viewModel = recipeExecutionVm,
+                allItemNames = allItemNames,
+                allUnitAbbr = allUnitAbbr,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

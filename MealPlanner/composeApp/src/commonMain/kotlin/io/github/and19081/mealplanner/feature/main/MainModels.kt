@@ -41,6 +41,9 @@ object AnalyticsRoute
 @Serializable
 object KitchenRoute
 
+@Serializable
+object RecipeExecutionRoute
+
 data class TopLevelDestination(val label: String, val icon: ImageVector, val route: Any)
 
 val MainDestinations =

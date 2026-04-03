@@ -15,7 +15,6 @@ import io.github.and19081.mealplanner.feature.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.feature.main.MainViewModel
 import io.github.and19081.mealplanner.feature.meals.MealsView
 import io.github.and19081.mealplanner.feature.meals.MealsViewModel
-import io.github.and19081.mealplanner.feature.recipes.RecipeExecutionViewModel
 import io.github.and19081.mealplanner.feature.recipes.RecipesView
 import io.github.and19081.mealplanner.feature.recipes.RecipesViewModel
 import io.github.and19081.mealplanner.feature.settings.Mode
@@ -38,6 +37,7 @@ fun KitchenView(
     pushModal: (KitchenModal) -> Unit = {},
     popModal: () -> Unit = {},
     modalStack: List<KitchenModal> = emptyList(),
+    onMakeRecipe: (FoodItem) -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Meals", "Recipes", "Ingredients")
@@ -51,10 +51,6 @@ fun KitchenView(
     val ingredientsViewModel: IngredientsViewModel = viewModel {
         diContainer.viewModelFactory.createIngredientsViewModel()
     }
-    val recipeExecutionViewModel: RecipeExecutionViewModel = viewModel {
-        diContainer.viewModelFactory.createRecipeExecutionViewModel()
-    }
-
     LaunchedEffect(mainViewModel.shouldActivateCanMakeNowFilter.value) {
         if (mainViewModel.shouldActivateCanMakeNowFilter.value) {
             selectedTab = 1
@@ -81,9 +77,6 @@ fun KitchenView(
                         viewModel = mealsViewModel,
                         mode = mode,
                         isExpanded = isExpanded,
-                        factory = diContainer.viewModelFactory,
-                        allItems = mealsViewModel.uiState.collectAsState().value.allItems,
-                        allUnits = mealsViewModel.uiState.collectAsState().value.allUnits,
                         onAddIngredient = { name, onCreated ->
                             pushModal(KitchenModal.FoodItemCreator(name, onCreated))
                         },
@@ -110,13 +103,11 @@ fun KitchenView(
                         viewModel = recipesViewModel,
                         mode = mode,
                         isExpanded = isExpanded,
-                        factory = diContainer.viewModelFactory,
-                        allItems = recipesViewModel.uiState.collectAsState().value.allItems,
-                        allUnits = recipesViewModel.uiState.collectAsState().value.allUnits,
                         onAddIngredient = { name, onCreated ->
                             pushModal(KitchenModal.FoodItemCreator(name, onCreated))
                         },
                         onAddSubRecipe = { name, onCreated -> /* Logic to push recipe creator if needed */ },
+                        onMakeRecipe = { foodItem, _, _, _, _ -> onMakeRecipe(foodItem) },
                     )
 
                 2 -> IngredientsView(viewModel = ingredientsViewModel, mode = mode, isExpanded = isExpanded)

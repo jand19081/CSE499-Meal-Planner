@@ -22,8 +22,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.and19081.mealplanner.core.di.ViewModelFactory
 import io.github.and19081.mealplanner.core.navigation.AppNavigation
 import io.github.and19081.mealplanner.domain.logic.CommitRecipeExecutionUseCase
-import io.github.and19081.mealplanner.domain.model.FoodItem
-import io.github.and19081.mealplanner.domain.model.Recipe
 import io.github.and19081.mealplanner.domain.model.isRecipe
 import io.github.and19081.mealplanner.domain.model.recipeInfo
 import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
@@ -112,7 +110,7 @@ fun RecipesView(
                     viewModel = viewModel,
                     onRecipeClick = onRecipeClick,
                     onAddClick = onAddClick,
-                    onMakeRecipe = onMakeRecipe,
+                    onMakeRecipe = { foodItem -> onMakeRecipe(foodItem, 1.0, null, null, null) },
                 )
             }
 
@@ -167,7 +165,7 @@ fun RecipesView(
                 viewModel = viewModel,
                 onRecipeClick = onRecipeClick,
                 onAddClick = onAddClick,
-                onMakeRecipe = onMakeRecipe,
+                onMakeRecipe = { foodItem -> onMakeRecipe(foodItem, 1.0, null, null, null) },
             )
         }
     }

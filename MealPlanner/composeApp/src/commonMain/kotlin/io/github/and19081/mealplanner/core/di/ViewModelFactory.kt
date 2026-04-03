@@ -113,10 +113,12 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
 
     fun createRecipeExecutionViewModel() =
         RecipeExecutionViewModel(
-            CommitRecipeExecutionUseCase(
+            commitRecipeExecutionUseCase = CommitRecipeExecutionUseCase(
                 foodItemRepository = di.foodItemRepository,
                 pantryRepository = di.pantryRepository,
                 unitRepository = di.unitRepository,
             ),
+            foodItemRepository = di.foodItemRepository,
+            unitRepository = di.unitRepository,
         )
 }
