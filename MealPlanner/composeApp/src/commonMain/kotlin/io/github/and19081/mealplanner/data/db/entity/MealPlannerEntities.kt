@@ -80,6 +80,9 @@ data class FoodItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "preferred_unit_id") val preferredUnitId: Uuid? = null,
+    @ColumnInfo(name = "is_purchasable") val isPurchasable: Boolean = false,
+    @ColumnInfo(name = "is_recipe") val isRecipe: Boolean = false,
+    @ColumnInfo(name = "is_leftover") val isLeftover: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long? = null,
 )

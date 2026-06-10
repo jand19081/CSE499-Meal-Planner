@@ -6,6 +6,7 @@ import io.github.and19081.mealplanner.feature.meals.Restaurant
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import io.github.and19081.mealplanner.feature.shoppinglist.ShoppingListItem
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 interface PantryRepository {
@@ -59,6 +60,8 @@ interface ShoppingListItemRepository {
 
 interface ReceiptHistoryRepository {
   val trips: StateFlow<List<ReceiptHistory>>
+
+  fun observeMonthlyExpenditures(): Flow<List<io.github.and19081.mealplanner.data.db.relation.MonthlyExpenditure>>
 
   suspend fun getTripWithLineItems(id: Uuid): ReceiptHistory?
 

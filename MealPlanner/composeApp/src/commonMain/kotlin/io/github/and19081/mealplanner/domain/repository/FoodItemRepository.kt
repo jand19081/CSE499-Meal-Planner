@@ -16,6 +16,12 @@ interface FoodItemRepository {
 
   suspend fun getFoodItem(id: Uuid): FoodItem?
 
+  suspend fun getCheapestPurchaseOption(foodItemId: Uuid): PurchaseOption?
+
+  suspend fun getRecursiveIngredients(recipeId: Uuid): List<io.github.and19081.mealplanner.domain.model.ItemMeasurement>
+
+  suspend fun getMakeableRecipes(): List<FoodItem>
+
   suspend fun getConversionsForFoodItem(foodItemId: Uuid): List<BridgeConversion>
 
   suspend fun saveFoodItem(

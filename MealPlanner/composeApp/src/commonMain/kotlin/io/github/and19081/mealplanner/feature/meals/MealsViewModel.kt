@@ -9,6 +9,7 @@ import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitModel
 import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.Validators
+import io.github.and19081.mealplanner.domain.logic.PriceCalculator
 import io.github.and19081.mealplanner.domain.model.BridgeConversion
 import io.github.and19081.mealplanner.domain.model.FoodItem
 import io.github.and19081.mealplanner.domain.model.FoodItemRequirement
@@ -41,6 +42,7 @@ data class MealsUiState(
     val allUnits: List<UnitModel>,
     val errorMessage: String? = null,
     val mealWarnings: Map<Uuid, List<DataWarning>> = emptyMap(),
+    val mealCosts: Map<Uuid, Long?> = emptyMap(),
 )
 
 private data class CoreDataState(
@@ -52,6 +54,7 @@ private data class CoreDataState(
 
 private data class FilterState(val query: String, val isAlpha: Boolean, val error: String?)
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class MealsViewModel(
     private val foodItemRepository: FoodItemRepository,
     private val pantryRepository: PantryRepository,
@@ -119,8 +122,23 @@ class MealsViewModel(
             FilterState(query, isAlpha, error)
         }
 
+    private val costsFlow = coreDataFlow.flatMapLatest { data ->
+        flow {
+            val allMeals = data.items.filter { it.isRecipe() || it.isMeal() }
+            val unitsMap = data.units.associateBy { it.id }
+            val costs = allMeals.associate { meal ->
+                meal.id to PriceCalculator.calculateFoodItemCost(
+                    meal,
+                    foodItemRepository,
+                    unitsMap
+                )
+            }
+            emit(costs)
+        }
+    }
+
     val uiState =
-        combine(coreDataFlow, filterFlow) { data, filter ->
+        combine(coreDataFlow, filterFlow, costsFlow) { data, filter, costs ->
             val allMeals = data.items.filter { it.isRecipe() || it.isMeal() }
             val itemsById = data.items.associateBy { it.id }
 
@@ -155,6 +173,7 @@ class MealsViewModel(
                 allUnits = data.units,
                 errorMessage = filter.error,
                 mealWarnings = warningsMap,
+                mealCosts = costs,
             )
         }
             .stateIn(

@@ -12,3 +12,14 @@ data class MealCost(
     @ColumnInfo(name = "meal_id") val mealId: Uuid,
     @ColumnInfo(name = "total_cost_cents") val totalCostCents: Long,
 )
+
+data class MonthlyExpenditure(
+    @ColumnInfo(name = "month") val month: String,
+    @ColumnInfo(name = "totalSpent") val totalSpentCents: Long,
+)
+
+data class RecipeBOMItem(
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "required_qty") val requiredQty: Double,
+    @ColumnInfo(name = "unit_id") val unitId: Uuid?,
+)

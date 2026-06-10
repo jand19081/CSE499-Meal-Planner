@@ -21,7 +21,9 @@ import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 import io.github.and19081.mealplanner.data.db.relation.ComposedFoodItemRelation
+import io.github.and19081.mealplanner.data.db.relation.MonthlyExpenditure
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.data.db.relation.RecipeBOMItem
 import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
 import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
 import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
@@ -157,6 +159,37 @@ interface FoodItemDao {
     @Query("SELECT * FROM food_items WHERE id = :id")
     suspend fun getComposedById(id: Uuid): ComposedFoodItemRelation?
 
+    @Query("""
+        SELECT f.* FROM food_items f
+        INNER JOIN recipe_components r ON f.id = r.food_item_id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM recipe_requirements req
+            INNER JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            LEFT JOIN pantry_inventory p ON req.food_item_id = p.food_item_id
+            WHERE grp.food_item_id = f.id
+            AND (p.food_item_id IS NULL OR p.quantity < req.quantity)
+        )
+    """)
+    suspend fun getMakeableRecipes(): List<FoodItemEntity>
+
+    @Query("""
+        WITH RECURSIVE RecipeBOM(food_item_id, required_qty, unit_id) AS (
+            SELECT req.food_item_id, req.quantity, req.unit_id
+            FROM recipe_requirements req
+            JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            WHERE grp.food_item_id = :recipeId
+
+            UNION ALL
+
+            SELECT req.food_item_id, (req.quantity * bom.required_qty), req.unit_id
+            FROM recipe_requirements req
+            JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            JOIN RecipeBOM bom ON grp.food_item_id = bom.food_item_id
+        )
+        SELECT * FROM RecipeBOM
+    """)
+    suspend fun getRecursiveIngredients(recipeId: Uuid): List<RecipeBOMItem>
+
     @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     suspend fun search(query: String): List<FoodItemEntity>
 
@@ -212,7 +245,12 @@ interface FoodItemDao {
         requirementGroups: List<RecipeRequirementGroupEntity> = emptyList(),
         requirements: List<RecipeRequirementEntity> = emptyList(),
     ) {
-        upsertEntity(item)
+        val updatedItem = item.copy(
+            isPurchasable = purchasable != null,
+            isRecipe = recipe != null,
+            isLeftover = leftover != null
+        )
+        upsertEntity(updatedItem)
 
         // Components
         if (purchasable != null) upsertPurchasable(purchasable) else deletePurchasable(item.id)
@@ -355,6 +393,14 @@ interface PurchaseOptionDao {
 
     @Query("SELECT * FROM purchase_options WHERE food_item_id = :foodItemId ORDER BY price_cents ASC")
     fun observeForFoodItem(foodItemId: Uuid): Flow<List<PurchaseOptionEntity>>
+
+    @Query("""
+        SELECT * FROM purchase_options 
+        WHERE food_item_id = :foodItemId 
+        AND quantity > 0
+        ORDER BY (price_cents / quantity) ASC LIMIT 1
+    """)
+    suspend fun getCheapestOption(foodItemId: Uuid): PurchaseOptionEntity?
 
     @Query("SELECT * FROM purchase_options WHERE id = :id")
     suspend fun getById(id: Uuid): PurchaseOptionEntity?
@@ -502,6 +548,14 @@ interface ReceiptDao {
 
     @Query("SELECT * FROM store_receipts")
     suspend fun getAllReceipts(): List<StoreReceiptEntity>
+
+    @Query("""
+        SELECT strftime('%Y-%m', date) as month, SUM(actual_total_cents) as totalSpent 
+        FROM store_receipts 
+        GROUP BY month
+        ORDER BY month DESC
+    """)
+    fun observeMonthlyExpenditures(): Flow<List<MonthlyExpenditure>>
 
     @Query("SELECT * FROM receipt_line_items")
     suspend fun getAllLineItems(): List<ReceiptLineItemEntity>

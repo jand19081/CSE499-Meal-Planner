@@ -15,6 +15,7 @@ import io.github.and19081.mealplanner.domain.repository.FoodItemRepository
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
 import io.github.and19081.mealplanner.domain.repository.ReceiptHistoryRepository
+import io.github.and19081.mealplanner.domain.repository.PantryUpdate
 import io.github.and19081.mealplanner.feature.kitchen.ConsumptionResult
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import kotlin.math.max
@@ -37,7 +38,8 @@ class CommitConsumptionUseCase(
         val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val foodItemId = meal.prePlannedMealId ?: return
         val foodItem = foodItemRepository.getFoodItem(foodItemId) ?: return
-        deductRecipeIngredients(foodItem, meal.peopleCount.toDouble())
+        val deductions = calculateDeductions(foodItem, meal.peopleCount.toDouble())
+        pantryRepository.updateQuantities(deductions)
         if (result.leftoverServings > 0) addLeftover(foodItem, result.leftoverServings)
         mealPlanRepository.setConsumedStatus(result.scheduledMealId, true)
       }
@@ -46,7 +48,8 @@ class CommitConsumptionUseCase(
         val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val foodItemId = meal.prePlannedMealId ?: return
         val foodItem = foodItemRepository.getFoodItem(foodItemId) ?: return
-        deductRecipeIngredients(foodItem, meal.peopleCount.toDouble())
+        val deductions = calculateDeductions(foodItem, meal.peopleCount.toDouble())
+        pantryRepository.updateQuantities(deductions)
         if (result.leftoverServings > 0) addLeftover(foodItem, result.leftoverServings)
         mealPlanRepository.setConsumedStatus(result.scheduledMealId, true)
       }
@@ -55,19 +58,22 @@ class CommitConsumptionUseCase(
         val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return
         val src = meal.source as? MealSource.StandaloneIngredient ?: return
         val allUnits = unitRepository.units.value
+        val allUnitsMap = allUnits.associateBy { it.id }
         val unit =
             allUnits.find { it.id == src.unitId }
                 ?: allUnits.find { it.type == UnitType.Count && it.factorToBase == 1.0 }
                 ?: return
+        
         val current = pantryRepository.getPantryItemByFoodItemId(src.id)
         val currentQty = current?.measurement?.quantity ?: 0.0
         val currentUnitId = current?.measurement?.unitId ?: unit.id
+        
         val convertedDeduct =
             UnitConverter.convert(
                 src.quantity,
                 unit.id,
                 currentUnitId,
-                allUnits.associateBy { it.id },
+                allUnitsMap,
             ) ?: 0.0
         val newQty = max(0.0, currentQty - convertedDeduct)
         pantryRepository.updateQuantity(src.id, newQty, currentUnitId)
@@ -95,84 +101,76 @@ class CommitConsumptionUseCase(
     }
   }
 
-  private suspend fun deductRecipeIngredients(item: FoodItem, servingsNeeded: Double) {
+  private suspend fun calculateDeductions(item: FoodItem, servingsNeeded: Double): List<PantryUpdate> {
     val recipeInfo =
         when (item) {
           is Recipe -> item.recipeInfo
           is Meal -> item.recipeInfo
-          else -> return
+          else -> return emptyList()
         }
-    val allUnits = unitRepository.units.value
+    val allUnitsMap = unitRepository.units.value.associateBy { it.id }
+    
+    val batchMultiplier =
+        servingsNeeded / (if (recipeInfo.servings > 0) recipeInfo.servings else 1.0)
 
-    suspend fun deductRecursive(fi: FoodItem, multiplier: Double) {
-      val info =
-          when (fi) {
-            is Recipe -> fi.recipeInfo
-            is Meal -> fi.recipeInfo
-            else -> return
-          }
-      info.requirementGroups.forEach { group ->
-        val primary =
-            group.requirements.find { it.isPrimary }
-                ?: group.requirements.firstOrNull()
-                ?: return@forEach
-        val subItem =
-            foodItemRepository.getFoodItem(primary.measurement.foodItemId ?: return@forEach)
-                ?: return@forEach
-        when (subItem) {
-          is Recipe,
-          is Meal -> {
-            val subInfo =
-                when (subItem) {
-                  is Recipe -> subItem.recipeInfo
-                  is Meal -> subItem.recipeInfo
-                  else -> return@forEach
+    // Use CTE to get flat Bill of Materials
+    val bom = foodItemRepository.getRecursiveIngredients(item.id)
+
+    // Group deductions by item and convert to target units
+    val totalDeductions = mutableMapOf<Uuid, Double>()
+    val itemTargetUnits = mutableMapOf<Uuid, Uuid>()
+
+    bom.forEach { measurement ->
+      val subItemId = measurement.foodItemId ?: return@forEach
+      val subItem = foodItemRepository.getFoodItem(subItemId) ?: return@forEach
+      
+      // The CTE returns base ingredients (those that are not recipes)
+      // Wait, the CTE as written returns ALL recursive items. 
+      // I should check if the subItem is an ingredient.
+      
+      if (subItem is Ingredient) {
+        val targetUnitId =
+            subItem.preferredUnitId
+                ?: when (allUnitsMap[measurement.unitId]?.type) {
+                  UnitType.Mass -> SystemUnits.Gram.id
+                  UnitType.Volume -> SystemUnits.Ml.id
+                  else -> SystemUnits.Each.id
                 }
-            val scale =
-                if (subInfo.servings > 0) primary.measurement.quantity / subInfo.servings else 1.0
-            deductRecursive(subItem, multiplier * scale)
-          }
-
-          is Ingredient -> {
-            val targetUnitId =
-                subItem.preferredUnitId
-                    ?: when (allUnits.find { it.id == primary.measurement.unitId }?.type) {
-                      UnitType.Mass -> SystemUnits.Gram.id
-                      UnitType.Volume -> SystemUnits.Ml.id
-                      else -> SystemUnits.Each.id
-                    }
-            val bridges = foodItemRepository.getConversionsForFoodItem(subItem.id)
-            val deductAmt =
-                UnitConverter.convert(
-                    primary.measurement.quantity * multiplier,
-                    primary.measurement.unitId ?: Uuid.NIL,
-                    targetUnitId,
-                    allUnits.associateBy { it.id },
-                    bridges,
-                ) ?: 0.0
-            val current = pantryRepository.getPantryItemByFoodItemId(subItem.id)
-            val currentQty =
-                if (current != null) {
-                  UnitConverter.convert(
-                      current.measurement.quantity,
-                      current.measurement.unitId ?: Uuid.NIL,
-                      targetUnitId,
-                      allUnits.associateBy { it.id },
-                      bridges,
-                  ) ?: 0.0
-                } else 0.0
-            val newQty = max(0.0, currentQty - deductAmt)
-            pantryRepository.updateQuantity(subItem.id, newQty, targetUnitId)
-          }
-
-          else -> Unit
-        }
+        
+        val bridges = foodItemRepository.getConversionsForFoodItem(subItem.id)
+        val deductAmt =
+            UnitConverter.convert(
+                measurement.quantity * batchMultiplier,
+                measurement.unitId ?: Uuid.NIL,
+                targetUnitId,
+                allUnitsMap,
+                bridges,
+            ) ?: 0.0
+        
+        totalDeductions[subItemId] = (totalDeductions[subItemId] ?: 0.0) + deductAmt
+        itemTargetUnits[subItemId] = targetUnitId
       }
     }
 
-    val batchMultiplier =
-        servingsNeeded / (if (recipeInfo.servings > 0) recipeInfo.servings else 1.0)
-    deductRecursive(item, batchMultiplier)
+    // Now convert total deductions into actual PantryUpdate objects by checking current inventory
+    return totalDeductions.map { (itemId, deductAmt) ->
+        val targetUnitId = itemTargetUnits[itemId] ?: SystemUnits.Each.id
+        val current = pantryRepository.getPantryItemByFoodItemId(itemId)
+        val bridges = foodItemRepository.getConversionsForFoodItem(itemId)
+        
+        val currentQtyInTargetUnit = if (current != null) {
+            UnitConverter.convert(
+                current.measurement.quantity,
+                current.measurement.unitId ?: Uuid.NIL,
+                targetUnitId,
+                allUnitsMap,
+                bridges,
+            ) ?: 0.0
+        } else 0.0
+        
+        val newQty = max(0.0, currentQtyInTargetUnit - deductAmt)
+        PantryUpdate(itemId, newQty, targetUnitId)
+    }
   }
 
   private suspend fun addLeftover(source: FoodItem, servings: Double) {

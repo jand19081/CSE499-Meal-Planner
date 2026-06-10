@@ -315,9 +315,7 @@ fun MealListPane(
                         meal = meal,
                         allRecipes = allRecipes,
                         allIngredients = allIngredients,
-                        allPurchaseOptions = uiState.allPurchaseOptions,
-                        allBridges = uiState.allBridges,
-                        allUnits = uiState.allUnits,
+                        mealCost = uiState.mealCosts[meal.id],
                         warnings = uiState.mealWarnings[meal.id] ?: emptyList(),
                         onEditClick = { onMealClick(meal) },
                         onMakeClick = { onMakeMeal(meal) },
@@ -350,9 +348,7 @@ fun MealRow(
     meal: FoodItem,
     allRecipes: List<FoodItem>,
     allIngredients: List<FoodItem>,
-    allPurchaseOptions: List<PurchaseOption>,
-    allBridges: List<BridgeConversion>,
-    allUnits: List<UnitModel>,
+    mealCost: Long?,
     warnings: List<DataWarning>,
     onEditClick: () -> Unit,
     onMakeClick: () -> Unit,
@@ -369,19 +365,10 @@ fun MealRow(
 
     val allNames = recipeNames + ingredientNames
 
-    val costCents =
-        PriceCalculator.calculateFoodItemCost(
-            item = meal,
-            allItemsMap = (allRecipes + allIngredients).associateBy { it.id },
-            purchaseOptionByIngredient = allPurchaseOptions.groupBy { it.foodItemId },
-            bridgesByIngredient = allBridges.groupBy { it.foodItemId },
-            allUnits = allUnits.associateBy { it.id },
-        )
-
     val costStr =
         when {
-            costCents == null -> "Circular Dependency"
-            costCents > 0 -> "$${String.format("%.2f", costCents / 100.0)}"
+            mealCost == null -> "Circular Dependency"
+            mealCost > 0 -> "$${String.format("%.2f", mealCost / 100.0)}"
             else -> "No price data"
         }
 

@@ -24,10 +24,8 @@ import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
 import io.github.and19081.mealplanner.feature.shoppinglist.ReceiptHistory
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -50,6 +48,7 @@ enum class AnalyticsDateRange {
   CUSTOM,
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AnalyticsViewModel(
     private val mealPlanRepository: MealPlanRepository,
     private val foodItemRepository: FoodItemRepository,
@@ -63,6 +62,30 @@ class AnalyticsViewModel(
   private val _dateRange = MutableStateFlow(AnalyticsDateRange.WEEK)
   private val _customStartDate = MutableStateFlow<LocalDate?>(null)
   private val _customEndDate = MutableStateFlow<LocalDate?>(null)
+
+  private val mealCostsFlow = foodItemRepository.foodItems.flatMapLatest { items ->
+    flow {
+      val allUnits = unitRepository.units.value.associateBy { it.id }
+      val costs = items.filter { it.isRecipe() || it.isMeal() }.associate { meal ->
+        meal.id to PriceCalculator.calculateFoodItemCost(meal, foodItemRepository, allUnits)
+      }
+      emit(costs)
+    }
+  }
+
+  private val estimatedCostsFlow = combine(
+    mealPlanRepository.entries,
+    unitRepository.units,
+  ) { entries, units ->
+    entries to units.associateBy { it.id }
+  }.flatMapLatest { (entries, unitsMap) ->
+    flow {
+      val costs = entries.associate { entry ->
+        entry.id to PriceCalculator.calculateEstimatedCost(entry, foodItemRepository, unitsMap)
+      }
+      emit(costs)
+    }
+  }
 
   data class InputData(
       val entries: List<ScheduledMeal>,
@@ -89,6 +112,8 @@ class AnalyticsViewModel(
               storeRepository.stores,
               restaurantRepository.restaurants,
               unitRepository.units,
+              mealCostsFlow,
+              estimatedCostsFlow,
               _filter,
               _dateRange,
               _customStartDate,
@@ -102,10 +127,12 @@ class AnalyticsViewModel(
             val stores = args[5] as List<Store>
             val restaurants = args[6] as List<Restaurant>
             val units = args[7] as List<UnitModel>
-            val filter = args[8] as AnalyticsFilter
-            val range = args[9] as AnalyticsDateRange
-            val customStart = args[10] as LocalDate?
-            val customEnd = args[11] as LocalDate?
+            val mealCosts = args[8] as Map<Uuid, Long?>
+            val estimatedCosts = args[9] as Map<Uuid, Long>
+            val filter = args[10] as AnalyticsFilter
+            val range = args[11] as AnalyticsDateRange
+            val customStart = args[12] as LocalDate?
+            val customEnd = args[13] as LocalDate?
 
             val data =
                 InputData(
@@ -177,19 +204,7 @@ class AnalyticsViewModel(
             val projectedEntries =
                 data.entries.filter { it.date >= futureStartDate && it.date <= futureEndDate }
 
-            fun sumCost(list: List<ScheduledMeal>): Long {
-              return list.sumOf { entry ->
-                PriceCalculator.calculateEstimatedCost(
-                    entry = entry,
-                    allItemsMap = itemsMap,
-                    purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
-                    bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
-                    allUnits = data.allUnits.associateBy { it.id },
-                )
-              }
-            }
-
-            val projectedTotal = sumCost(projectedEntries)
+            val projectedTotal = projectedEntries.sumOf { estimatedCosts[it.id] ?: 0L }
             val actualTotal = filteredReceipts.sumOf { it.actualTotalCents.toLong() }
 
             val restaurantActuals = data.receiptHistory.filter { it.restaurantId != null }
@@ -219,19 +234,11 @@ class AnalyticsViewModel(
                     .sortedByDescending { it.second }
                     .toMap()
 
-            val mealCosts =
+            val mealCostsList =
                 data.allItems
                     .filter { it.isRecipe() || it.isMeal() }
                     .map { meal ->
-                      val cost =
-                          PriceCalculator.calculateFoodItemCost(
-                              item = meal,
-                              allItemsMap = itemsMap,
-                              purchaseOptionByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
-                              bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
-                              allUnits = data.allUnits.associateBy { it.id },
-                          )
-                      meal.name to cost
+                      meal.name to mealCosts[meal.id]
                     }
                     .sortedByDescending { it.second ?: 0L }
 
@@ -251,15 +258,7 @@ class AnalyticsViewModel(
                       val weekStart = today.minus(DatePeriod(days = 7))
                       it.date >= weekStart && it.date <= today && !it.isConsumed
                     }
-                    .sumOf { entry ->
-                      PriceCalculator.calculateEstimatedCost(
-                          entry = entry,
-                          allItemsMap = itemsMap,
-                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
-                          bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
-                          allUnits = data.allUnits.associateBy { it.id },
-                      )
-                    }
+                    .sumOf { estimatedCosts[it.id] ?: 0L }
 
             val weeklyActual =
                 filteredReceipts
@@ -287,15 +286,7 @@ class AnalyticsViewModel(
                       val monthStart = today.minus(DatePeriod(months = 1))
                       it.date >= monthStart && it.date <= today && !it.isConsumed
                     }
-                    .sumOf { entry ->
-                      PriceCalculator.calculateEstimatedCost(
-                          entry = entry,
-                          allItemsMap = itemsMap,
-                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
-                          bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
-                          allUnits = data.allUnits.associateBy { it.id },
-                      )
-                    }
+                    .sumOf { estimatedCosts[it.id] ?: 0L }
 
             val monthlyActual =
                 filteredReceipts
@@ -323,15 +314,7 @@ class AnalyticsViewModel(
                       val yearStart = today.minus(DatePeriod(years = 1))
                       it.date >= yearStart && it.date <= today && !it.isConsumed
                     }
-                    .sumOf { entry ->
-                      PriceCalculator.calculateEstimatedCost(
-                          entry = entry,
-                          allItemsMap = itemsMap,
-                          purchaseOptionsByIngredient = data.purchaseOptions.groupBy { it.foodItemId },
-                          bridgesByIngredient = data.bridges.groupBy { it.foodItemId },
-                          allUnits = data.allUnits.associateBy { it.id },
-                      )
-                    }
+                    .sumOf { estimatedCosts[it.id] ?: 0L }
 
             val annualActual =
                 filteredReceipts
@@ -358,7 +341,7 @@ class AnalyticsViewModel(
                 avgCostPerPersonCents = avgCostPerPersonCents,
                 projectedTotalCents = projectedTotal,
                 actualTotalCents = actualTotal,
-                mostExpensiveMeals = mealCosts.take(5),
+                mostExpensiveMeals = mealCostsList.take(5),
                 spendingByLocation = spendingByLocation,
                 recentShoppingTrips =
                     filteredReceipts.filter { it.storeId != null }.sortedByDescending { it.date },

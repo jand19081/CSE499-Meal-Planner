@@ -77,7 +77,6 @@ class RecipesViewModel(
   private val _sortByAlpha = MutableStateFlow(true)
   private val _filterCanMakeNow = MutableStateFlow(false)
   private val _errorMessage = MutableStateFlow<String?>(null)
-  private val _priceCalculator: io.github.and19081.mealplanner.domain.logic.PriceCalculator? = null
 
   // --- Draft State Management ---
   private val _draftState = MutableStateFlow<RecipeDraftState?>(null)

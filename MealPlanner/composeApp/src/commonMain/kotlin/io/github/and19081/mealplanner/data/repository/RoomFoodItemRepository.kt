@@ -56,6 +56,24 @@ class RoomFoodItemRepository(
     return foodItemDao.getComposedById(id)?.toDomainModel()
   }
 
+  override suspend fun getCheapestPurchaseOption(foodItemId: Uuid): PurchaseOption? {
+    return packageDao.getCheapestOption(foodItemId)?.toModel()
+  }
+
+  override suspend fun getRecursiveIngredients(recipeId: Uuid): List<io.github.and19081.mealplanner.domain.model.ItemMeasurement> {
+    return foodItemDao.getRecursiveIngredients(recipeId).map { 
+        io.github.and19081.mealplanner.domain.model.ItemMeasurement(
+            foodItemId = it.foodItemId,
+            quantity = it.requiredQty,
+            unitId = it.unitId
+        )
+    }
+  }
+
+  override suspend fun getMakeableRecipes(): List<FoodItem> {
+    return foodItemDao.getMakeableRecipes().mapNotNull { getFoodItem(it.id) }
+  }
+
   override suspend fun getConversionsForFoodItem(foodItemId: Uuid): List<BridgeConversion> {
     return foodItemDao.getConversionsByFoodItemId(foodItemId).map { it.toModel() }
   }
