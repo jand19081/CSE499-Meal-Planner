@@ -81,7 +81,7 @@ fun MpNav(
               colors =
                   TopAppBarColors(
                       titleContentColor = MaterialTheme.colorScheme.primary,
-                      containerColor = MaterialTheme.colorScheme.onPrimary,
+                      containerColor = MaterialTheme.colorScheme.surface,
                       scrolledContainerColor = MaterialTheme.colorScheme.primary,
                       navigationIconContentColor = MaterialTheme.colorScheme.inverseSurface,
                       actionIconContentColor = MaterialTheme.colorScheme.inverseSurface,

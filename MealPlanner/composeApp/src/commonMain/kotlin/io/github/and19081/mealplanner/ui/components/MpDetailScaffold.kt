@@ -62,17 +62,20 @@ fun MpDetailScaffold(
       val scrollModifier =
           if (isScrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
       Column(
-          modifier = Modifier.weight(1f).then(scrollModifier).padding(16.dp),
-          verticalArrangement = Arrangement.spacedBy(16.dp),
+          modifier = Modifier.weight(1f).then(scrollModifier),
       ) {
-        content()
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+          content()
+        }
       }
 
       // Footer / Actions
       Surface(tonalElevation = 2.dp, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
           if (onDelete != null) {
@@ -83,9 +86,9 @@ fun MpDetailScaffold(
             ) {
               Text("Delete")
             }
-          } else {
-            Spacer(modifier = Modifier.width(1.dp))
           }
+
+          Spacer(modifier = Modifier.weight(1f))
 
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = onClose) { Text("Cancel") }
