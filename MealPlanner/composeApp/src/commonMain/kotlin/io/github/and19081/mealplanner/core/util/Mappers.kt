@@ -100,7 +100,10 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
                       group.requirements.map { req ->
                         FoodItemRequirement(
                             id = req.id,
-                            measurement = req.measurement.toDomain(),
+                            measurement = DomainMeasurement(
+                                foodItemId = req.foodItemId,
+                                quantity = req.quantity
+                            ),
                             isPrimary = req.isPrimary,
                         )
                       },
@@ -115,6 +118,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
+            unitType = item.unitType,
             purchasableInfo =
                 PurchasableInfo(
                     expectedPriceCents = purchasable.expectedPriceCents,
@@ -129,6 +133,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
+            unitType = item.unitType,
             recipeInfo = processedRecipeInfo,
         )
       } else {
@@ -136,6 +141,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
+            unitType = item.unitType,
             recipeInfo = processedRecipeInfo,
         )
       }
@@ -146,6 +152,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
             id = item.id,
             name = item.name,
             preferredUnitId = item.preferredUnitId,
+            unitType = item.unitType,
             leftoverInfo =
                 LeftoverInfo(
                     remainingServings = leftover.remainingServings,
@@ -160,6 +167,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
           id = item.id,
           name = item.name,
           preferredUnitId = item.preferredUnitId,
+          unitType = item.unitType,
           purchasableInfo = null,
       )
     }
@@ -167,7 +175,7 @@ fun ComposedFoodItemRelation.toDomainModel(): FoodItem {
 }
 
 fun FoodItem.toEntity(): FoodItemEntity =
-    FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId)
+    FoodItemEntity(id = id, name = name, preferredUnitId = preferredUnitId, unitType = unitType)
 
 // Extension function to get recipeInfo from Recipe or Meal variants
 val FoodItem.recipeInfoFromBase: RecipeInfo?
@@ -224,7 +232,8 @@ fun io.github.and19081.mealplanner.domain.model.FoodItemRequirement.toEntity(
     io.github.and19081.mealplanner.data.db.entity.RecipeRequirementEntity(
         id = id,
         groupId = groupId,
-        measurement = measurement.toEntity(),
+        foodItemId = measurement.foodItemId ?: Uuid.NIL,
+        quantity = measurement.quantity,
         isPrimary = isPrimary,
     )
 
@@ -264,7 +273,10 @@ fun UnitConversionBridgeEntity.toModel(): BridgeConversion =
 fun PantryInventoryWithDetails.toModel(): PantryItem =
     PantryItem(
         id = pantryItem.id,
-        measurement = pantryItem.measurement.toDomain(),
+        measurement = DomainMeasurement(
+            foodItemId = pantryItem.foodItemId,
+            quantity = pantryItem.quantity
+        ),
     )
 
 // --- Shopping List Mappers ---

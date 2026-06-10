@@ -22,6 +22,11 @@ interface PantryRepository {
       unitId: Uuid,
   )
 
+  suspend fun updateQuantityById(
+      id: Uuid,
+      quantity: Double,
+  )
+
   suspend fun updateQuantities(updates: List<PantryUpdate>)
 
   suspend fun setPantryItems(items: List<PantryItem>)

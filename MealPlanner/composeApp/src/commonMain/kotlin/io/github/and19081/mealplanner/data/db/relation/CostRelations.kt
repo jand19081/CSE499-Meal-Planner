@@ -21,5 +21,4 @@ data class MonthlyExpenditure(
 data class RecipeBOMItem(
     @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
     @ColumnInfo(name = "required_qty") val requiredQty: Double,
-    @ColumnInfo(name = "unit_id") val unitId: Uuid?,
 )

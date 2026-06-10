@@ -11,6 +11,7 @@ import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
 import io.github.and19081.mealplanner.data.db.entity.ScheduledMealEntity
 import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
+import androidx.room.useWriterConnection
 import io.github.and19081.mealplanner.domain.model.MealSource
 import io.github.and19081.mealplanner.domain.repository.MealPlanRepository
 import io.github.and19081.mealplanner.feature.meals.ScheduledMeal
@@ -104,6 +105,12 @@ class RoomMealPlanRepository(
 
     override suspend fun clearAll() {
         dao.clearAll()
+    }
+
+    override suspend fun <T> withTransaction(block: suspend () -> T): T {
+        return db.useWriterConnection {
+            block()
+        }
     }
 
     private fun ScheduledMealWithSource.toDomain(): ScheduledMeal {

@@ -65,6 +65,7 @@ data class FoodItemDtoV1(
     val id: String,
     val name: String,
     val preferredUnitId: String?,
+    val unitType: UnitType = UnitType.Count,
     val createdAt: Long,
     val updatedAt: Long?,
 )

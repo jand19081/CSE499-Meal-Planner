@@ -173,15 +173,15 @@ interface FoodItemDao {
     suspend fun getMakeableRecipes(): List<FoodItemEntity>
 
     @Query("""
-        WITH RECURSIVE RecipeBOM(food_item_id, required_qty, unit_id) AS (
-            SELECT req.food_item_id, req.quantity, req.unit_id
+        WITH RECURSIVE RecipeBOM(food_item_id, required_qty) AS (
+            SELECT req.food_item_id, req.quantity
             FROM recipe_requirements req
             JOIN recipe_requirement_groups grp ON req.group_id = grp.id
             WHERE grp.food_item_id = :recipeId
 
             UNION ALL
 
-            SELECT req.food_item_id, (req.quantity * bom.required_qty), req.unit_id
+            SELECT req.food_item_id, (req.quantity * bom.required_qty)
             FROM recipe_requirements req
             JOIN recipe_requirement_groups grp ON req.group_id = grp.id
             JOIN RecipeBOM bom ON grp.food_item_id = bom.food_item_id
@@ -398,19 +398,19 @@ interface PurchaseOptionDao {
         SELECT * FROM purchase_options 
         WHERE food_item_id = :foodItemId 
         AND quantity > 0
-        ORDER BY (price_cents / quantity) ASC LIMIT 1
+        ORDER BY ((price_cents * 1.0) / quantity) ASC LIMIT 1
     """)
     suspend fun getCheapestOption(foodItemId: Uuid): PurchaseOptionEntity?
 
     @Query("""
         SELECT po1.* FROM purchase_options po1
         JOIN (
-            SELECT food_item_id, MIN(price_cents / quantity) as min_price_per_unit
+            SELECT food_item_id, MIN((price_cents * 1.0) / quantity) as min_price_per_unit
             FROM purchase_options
             WHERE quantity > 0 AND food_item_id IN (:foodItemIds)
             GROUP BY food_item_id
         ) po2 ON po1.food_item_id = po2.food_item_id 
-        AND (po1.price_cents / po1.quantity) = po2.min_price_per_unit
+        AND ((po1.price_cents * 1.0) / po1.quantity) = po2.min_price_per_unit
         WHERE po1.food_item_id IN (:foodItemIds)
     """)
     suspend fun getCheapestOptionsBatch(foodItemIds: List<Uuid>): List<PurchaseOptionEntity>
@@ -457,11 +457,14 @@ interface PantryDao {
     @Query("SELECT * FROM pantry_inventory WHERE food_item_id = :foodItemId LIMIT 1")
     suspend fun getByFoodItemId(foodItemId: Uuid): PantryInventoryEntity?
 
-    @Query("DELETE FROM pantry_inventory WHERE food_item_id = :foodItemId AND unit_id = :unitId")
-    suspend fun deleteByFoodItemAndUnit(foodItemId: Uuid, unitId: Uuid)
+    @Query("DELETE FROM pantry_inventory WHERE food_item_id = :foodItemId")
+    suspend fun deleteByFoodItem(foodItemId: Uuid)
 
     @Query("DELETE FROM pantry_inventory WHERE id = :id")
     suspend fun deleteById(id: Uuid)
+
+    @Query("UPDATE pantry_inventory SET quantity = :quantity WHERE id = :id")
+    suspend fun updateQuantityById(id: Uuid, quantity: Double)
 
     @Upsert
     suspend fun upsert(item: PantryInventoryEntity)
@@ -487,23 +490,15 @@ interface PantryDao {
                 } else {
                     upsert(
                         existing.copy(
-                            measurement =
-                                existing.measurement.copy(
-                                    quantity = update.newQuantity,
-                                    unitId = update.unitId,
-                                )
+                            quantity = update.newQuantity
                         )
                     )
                 }
             } else if (update.newQuantity > 0) {
                 upsert(
                     PantryInventoryEntity(
-                        measurement =
-                            io.github.and19081.mealplanner.data.db.entity.ItemMeasurement(
-                                foodItemId = update.foodItemId,
-                                quantity = update.newQuantity,
-                                unitId = update.unitId,
-                            )
+                        foodItemId = update.foodItemId,
+                        quantity = update.newQuantity
                     )
                 )
             }

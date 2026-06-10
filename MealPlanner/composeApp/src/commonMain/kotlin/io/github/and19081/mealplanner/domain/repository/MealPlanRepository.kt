@@ -23,4 +23,6 @@ interface MealPlanRepository {
   )
 
   suspend fun clearAll()
+
+  suspend fun <T> withTransaction(block: suspend () -> T): T
 }

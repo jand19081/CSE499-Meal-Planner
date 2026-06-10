@@ -80,6 +80,7 @@ data class FoodItemEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "name") val name: String,
     @ColumnInfo(name = "preferred_unit_id") val preferredUnitId: Uuid? = null,
+    @ColumnInfo(name = "unit_type") val unitType: UnitType = UnitType.Count,
     @ColumnInfo(name = "is_purchasable") val isPurchasable: Boolean = false,
     @ColumnInfo(name = "is_recipe") val isRecipe: Boolean = false,
     @ColumnInfo(name = "is_leftover") val isLeftover: Boolean = false,
@@ -396,20 +397,15 @@ data class RecipeRequirementGroupEntity(
                 ["food_item_id"],
                 onDelete = ForeignKey.CASCADE,
             ),
-            ForeignKey(
-                entity = UnitEntity::class,
-                ["id"],
-                ["unit_id"],
-                onDelete = ForeignKey.RESTRICT,
-            ),
         ],
     indices =
-        [Index(value = ["group_id"]), Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
+        [Index(value = ["group_id"]), Index(value = ["food_item_id"])],
 )
 data class RecipeRequirementEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
     @ColumnInfo(name = "group_id") val groupId: Uuid,
-    @Embedded val measurement: ItemMeasurement,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "quantity") val quantity: Double,
     @ColumnInfo(name = "is_primary") val isPrimary: Boolean = true,
 )
 
@@ -423,18 +419,13 @@ data class RecipeRequirementEntity(
                 ["food_item_id"],
                 onDelete = ForeignKey.CASCADE,
             ),
-            ForeignKey(
-                entity = UnitEntity::class,
-                ["id"],
-                ["unit_id"],
-                onDelete = ForeignKey.RESTRICT,
-            ),
         ],
-    indices = [Index(value = ["food_item_id"]), Index(value = ["unit_id"])],
+    indices = [Index(value = ["food_item_id"])],
 )
 data class PantryInventoryEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
-    @Embedded val measurement: ItemMeasurement,
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid,
+    @ColumnInfo(name = "quantity") val quantity: Double,
 )
 
 @Entity(

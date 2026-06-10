@@ -33,6 +33,12 @@ class CommitConsumptionUseCase(
     private val unitRepository: UnitRepository,
 ) {
   suspend operator fun invoke(result: ConsumptionResult) {
+    mealPlanRepository.withTransaction {
+      executeConsumption(result)
+    }
+  }
+
+  private suspend fun executeConsumption(result: ConsumptionResult) {
     when (result) {
       is ConsumptionResult.HomeMealConsumed -> {
         val meal = mealPlanRepository.getMealById(result.scheduledMealId) ?: return

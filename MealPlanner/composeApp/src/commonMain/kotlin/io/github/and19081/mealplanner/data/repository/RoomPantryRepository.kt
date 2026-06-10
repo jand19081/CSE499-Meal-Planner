@@ -2,7 +2,7 @@ package io.github.and19081.mealplanner.data.repository
 
 import io.github.and19081.mealplanner.core.util.UnitConverter
 import io.github.and19081.mealplanner.core.util.UnitRepository
-import io.github.and19081.mealplanner.core.util.toDomain
+import io.github.and19081.mealplanner.domain.model.ItemMeasurement as DomainMeasurement
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
 import io.github.and19081.mealplanner.domain.repository.PantryRepository
@@ -25,17 +25,21 @@ class RoomPantryRepository(
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
   override suspend fun getPantryItemById(id: Uuid): PantryItem? {
-    return dao.getById(id)?.let { PantryItem(id = it.id, measurement = it.measurement.toDomain()) }
+    return dao.getById(id)?.let { PantryItem(id = it.id, measurement = DomainMeasurement(foodItemId = it.foodItemId, quantity = it.quantity)) }
   }
 
   override suspend fun getPantryItemByFoodItemId(foodItemId: Uuid): PantryItem? {
     return dao.getByFoodItemId(foodItemId)?.let {
-      PantryItem(id = it.id, measurement = it.measurement.toDomain())
+      PantryItem(id = it.id, measurement = DomainMeasurement(foodItemId = it.foodItemId, quantity = it.quantity))
     }
   }
 
   override suspend fun updateQuantity(foodItemId: Uuid, quantity: Double, unitId: Uuid) {
     updateQuantities(listOf(PantryUpdate(foodItemId, quantity, unitId)))
+  }
+
+  override suspend fun updateQuantityById(id: Uuid, quantity: Double) {
+    dao.updateQuantityById(id, quantity)
   }
 
   override suspend fun updateQuantities(updates: List<PantryUpdate>) {
@@ -53,7 +57,7 @@ class RoomPantryRepository(
   }
 
   override suspend fun remove(foodItemId: Uuid, unitId: Uuid) {
-    dao.deleteByFoodItemAndUnit(foodItemId, unitId)
+    dao.deleteByFoodItem(foodItemId)
   }
 
   override suspend fun removeBatch(batchId: Uuid) {
@@ -75,6 +79,9 @@ class RoomPantryRepository(
   private fun PantryInventoryWithDetails.toModel(): PantryItem =
       PantryItem(
           id = pantryItem.id,
-          measurement = pantryItem.measurement.toDomain(),
+          measurement = DomainMeasurement(
+              foodItemId = pantryItem.foodItemId,
+              quantity = pantryItem.quantity
+          ),
       )
 }

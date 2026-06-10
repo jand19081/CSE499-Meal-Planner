@@ -71,8 +71,7 @@ class RoomFoodItemRepository(
     return foodItemDao.getRecursiveIngredients(recipeId).map { 
         io.github.and19081.mealplanner.domain.model.ItemMeasurement(
             foodItemId = it.foodItemId,
-            quantity = it.requiredQty,
-            unitId = it.unitId
+            quantity = it.requiredQty
         )
     }
   }

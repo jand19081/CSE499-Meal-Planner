@@ -16,6 +16,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
 class CommitRecipeExecutionUseCase(
+    private val mealPlanRepository: io.github.and19081.mealplanner.domain.repository.MealPlanRepository,
     private val foodItemRepository: FoodItemRepository,
     private val pantryRepository: PantryRepository,
     private val unitRepository: UnitRepository,
@@ -25,8 +26,10 @@ class CommitRecipeExecutionUseCase(
       scaleFactor: Double,
       yieldServings: Double,
   ) {
-    deductIngredients(recipe, scaleFactor)
-    addToLeftovers(recipe, yieldServings)
+    mealPlanRepository.withTransaction {
+      deductIngredients(recipe, scaleFactor)
+      addToLeftovers(recipe, yieldServings)
+    }
   }
 
   private suspend fun deductIngredients(recipe: Recipe, scaleFactor: Double) {

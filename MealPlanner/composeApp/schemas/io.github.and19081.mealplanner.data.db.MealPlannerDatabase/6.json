@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "e1f0b6197e475cb6ceead7c4ed7e25c8",
+    "identityHash": "46b8bf36fe12230ed537876b65c33e2f",
     "entities": [
       {
         "tableName": "units",
@@ -173,7 +173,7 @@
       },
       {
         "tableName": "food_items",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `preferred_unit_id` TEXT, `is_purchasable` INTEGER NOT NULL, `is_recipe` INTEGER NOT NULL, `is_leftover` INTEGER NOT NULL, `created_at` INTEGER, `updated_at` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`preferred_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `preferred_unit_id` TEXT, `unit_type` TEXT NOT NULL, `is_purchasable` INTEGER NOT NULL, `is_recipe` INTEGER NOT NULL, `is_leftover` INTEGER NOT NULL, `created_at` INTEGER, `updated_at` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`preferred_unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -191,6 +191,12 @@
             "fieldPath": "preferredUnitId",
             "columnName": "preferred_unit_id",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "unitType",
+            "columnName": "unit_type",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "isPurchasable",
@@ -1162,7 +1168,7 @@
       },
       {
         "tableName": "recipe_requirements",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `group_id` TEXT NOT NULL, `is_primary` INTEGER NOT NULL, `food_item_id` TEXT, `unit_id` TEXT, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`group_id`) REFERENCES `recipe_requirement_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `group_id` TEXT NOT NULL, `food_item_id` TEXT NOT NULL, `quantity` REAL NOT NULL, `is_primary` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`group_id`) REFERENCES `recipe_requirement_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1177,25 +1183,21 @@
             "notNull": true
           },
           {
-            "fieldPath": "isPrimary",
-            "columnName": "is_primary",
-            "affinity": "INTEGER",
+            "fieldPath": "foodItemId",
+            "columnName": "food_item_id",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "measurement.foodItemId",
-            "columnName": "food_item_id",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "measurement.unitId",
-            "columnName": "unit_id",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "measurement.quantity",
+            "fieldPath": "quantity",
             "columnName": "quantity",
             "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPrimary",
+            "columnName": "is_primary",
+            "affinity": "INTEGER",
             "notNull": true
           }
         ],
@@ -1223,15 +1225,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_requirements_food_item_id` ON `${TABLE_NAME}` (`food_item_id`)"
-          },
-          {
-            "name": "index_recipe_requirements_unit_id",
-            "unique": false,
-            "columnNames": [
-              "unit_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_requirements_unit_id` ON `${TABLE_NAME}` (`unit_id`)"
           }
         ],
         "foreignKeys": [
@@ -1256,23 +1249,12 @@
             "referencedColumns": [
               "id"
             ]
-          },
-          {
-            "table": "units",
-            "onDelete": "RESTRICT",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "unit_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
           }
         ]
       },
       {
         "tableName": "pantry_inventory",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `food_item_id` TEXT, `unit_id` TEXT, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`unit_id`) REFERENCES `units`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `food_item_id` TEXT NOT NULL, `quantity` REAL NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1281,17 +1263,13 @@
             "notNull": true
           },
           {
-            "fieldPath": "measurement.foodItemId",
+            "fieldPath": "foodItemId",
             "columnName": "food_item_id",
-            "affinity": "TEXT"
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
-            "fieldPath": "measurement.unitId",
-            "columnName": "unit_id",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "measurement.quantity",
+            "fieldPath": "quantity",
             "columnName": "quantity",
             "affinity": "REAL",
             "notNull": true
@@ -1312,15 +1290,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_pantry_inventory_food_item_id` ON `${TABLE_NAME}` (`food_item_id`)"
-          },
-          {
-            "name": "index_pantry_inventory_unit_id",
-            "unique": false,
-            "columnNames": [
-              "unit_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_pantry_inventory_unit_id` ON `${TABLE_NAME}` (`unit_id`)"
           }
         ],
         "foreignKeys": [
@@ -1330,17 +1299,6 @@
             "onUpdate": "NO ACTION",
             "columns": [
               "food_item_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
-          {
-            "table": "units",
-            "onDelete": "RESTRICT",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "unit_id"
             ],
             "referencedColumns": [
               "id"
@@ -1611,7 +1569,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e1f0b6197e475cb6ceead7c4ed7e25c8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '46b8bf36fe12230ed537876b65c33e2f')"
     ]
   }
 }

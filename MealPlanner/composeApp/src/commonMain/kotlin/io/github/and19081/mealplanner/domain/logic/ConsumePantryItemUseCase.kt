@@ -30,7 +30,7 @@ class ConsumePantryItemUseCase(
     if (newQty <= 0.0) {
       pantryRepository.removeBatch(pantryItemId)
     } else {
-      pantryRepository.updateQuantity(foodItemId, newQty, storedUnitId)
+      pantryRepository.updateQuantityById(pantryItemId, newQty)
     }
   }
 }

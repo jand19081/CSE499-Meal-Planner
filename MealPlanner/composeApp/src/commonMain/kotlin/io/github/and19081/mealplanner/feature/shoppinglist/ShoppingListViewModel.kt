@@ -149,11 +149,18 @@ class ShoppingListViewModel(
                   group.requirements.find { it.isPrimary } ?: group.requirements.firstOrNull()
               primaryReq?.let { req ->
                 val reqFoodId = req.measurement.foodItemId ?: return@let
-                addRecursive(reqFoodId, req.measurement.quantity, req.measurement.unitId, scale)
+                addRecursive(reqFoodId, req.measurement.quantity, null, scale)
               }
             }
           } else {
-            val unit = unitsMap[unitId ?: item.preferredUnitId] ?: return
+            val unit = unitsMap[unitId ?: item.preferredUnitId] ?: unitsMap[item.unitType.let {
+                when(it) {
+                    UnitType.Mass -> SystemUnits.Gram.id
+                    UnitType.Volume -> SystemUnits.Ml.id
+                    UnitType.Count -> SystemUnits.Each.id
+                    else -> SystemUnits.Each.id
+                }
+            }] ?: return
             val (baseQty, _) = UnitConverter.toStandard(qty * multiplier, unit, unitsMap)
             val types = grossRequirementsByType.getOrPut(itemId) { mutableMapOf() }
             types[unit.type] = (types[unit.type] ?: 0.0) + baseQty
@@ -571,19 +578,22 @@ class ShoppingListViewModel(
           it.measurement.foodItemId == change.measurement.foodItemId
         }
         val currentQty = currentPantryItem?.measurement?.quantity ?: 0.0
-        val currentUnitId = currentPantryItem?.measurement?.unitId ?: change.measurement.unitId
+        val foodItemId = change.measurement.foodItemId ?: return@forEach
 
-        if (currentUnitId != null && change.measurement.foodItemId != null) {
-          val convertedChangeQty =
-              UnitConverter.convert(
-                  amount = change.measurement.quantity,
-                  fromUnitId = change.measurement.unitId ?: Uuid.NIL,
-                  toUnitId = currentUnitId,
-                  allUnits = allUnits.associateBy { it.id },
-              ) ?: 0.0
+        val convertedChangeQty =
+            UnitConverter.convert(
+                amount = change.measurement.quantity,
+                fromUnitId = change.measurement.unitId ?: Uuid.NIL,
+                toUnitId = currentPantryItem?.measurement?.unitId ?: change.measurement.unitId,
+                allUnits = allUnits.associateBy { it.id },
+            )
 
-          val newQty = currentQty + convertedChangeQty
-          pantryRepository.updateQuantity(change.measurement.foodItemId, newQty, currentUnitId)
+        if (convertedChangeQty != null) {
+            val newQty = currentQty + convertedChangeQty
+            pantryRepository.updateQuantity(foodItemId, newQty, currentPantryItem?.measurement?.unitId ?: change.measurement.unitId ?: Uuid.NIL)
+        } else {
+            // Fallback: Add as a new independent batch if conversion fails
+            pantryRepository.updateQuantity(foodItemId, change.measurement.quantity, change.measurement.unitId ?: Uuid.NIL)
         }
       }
 
@@ -764,23 +774,11 @@ class ShoppingListViewModel(
               pantryRepository.pantryItems.value.find { it.measurement.foodItemId == item.id }
           val currentBaseQty =
               if (currentPantryItem != null) {
-                val pUnit = allUnits.find { it.id == currentPantryItem.measurement.unitId }
-                if (pUnit != null)
-                    UnitConverter.toStandard(
-                            currentPantryItem.measurement.quantity,
-                            pUnit,
-                            allUnits.associateBy { it.id },
-                        )
-                        .first
-                else 0.0
+                currentPantryItem.measurement.quantity
               } else 0.0
 
           val newQty = currentBaseQty + baseQtyToAdd
-
-          val (_, stdUnit) = UnitConverter.toStandard(0.0, unit, allUnits.associateBy { it.id })
-          if (stdUnit != null) {
-            pantryRepository.updateQuantity(item.id, newQty, stdUnit.id)
-          }
+          pantryRepository.updateQuantity(item.id, newQty, unit.id)
         }
       }
     }
