@@ -127,6 +127,8 @@ fun RecipeInstructionDtoV1.toEntity() =
 fun ScheduledMealEntity.toDtoV1() =
     ScheduledMealDtoV1(
         id = id.toString(),
+        foodItemId = foodItemId?.toString(),
+        restaurantId = restaurantId?.toString(),
         date = date,
         time = time,
         mealType = mealType,
@@ -139,6 +141,8 @@ fun ScheduledMealEntity.toDtoV1() =
 fun ScheduledMealDtoV1.toEntity() =
     ScheduledMealEntity(
         id = Uuid.parse(id),
+        foodItemId = foodItemId?.let { Uuid.parse(it) },
+        restaurantId = restaurantId?.let { Uuid.parse(it) },
         date = date,
         time = time,
         mealType = mealType,

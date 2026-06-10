@@ -106,6 +106,8 @@ data class RecipeInstructionDtoV1(
 @Serializable
 data class ScheduledMealDtoV1(
     val id: String,
+    val foodItemId: String? = null,
+    val restaurantId: String? = null,
     val date: String,
     val time: String,
     val mealType: RecipeMealType,

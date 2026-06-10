@@ -127,8 +127,19 @@ class RoomMealPlanRepository(
 
     private fun ScheduledMeal.toEntity(): ScheduledMealEntity {
         val src = source ?: MealSource.PrePlannedMeal(Uuid.random())
+        val foodItemId =
+            when (src) {
+                is MealSource.PrePlannedMeal -> src.id
+                is MealSource.StandaloneRecipe -> src.id
+                is MealSource.StandaloneIngredient -> src.id
+                else -> null
+            }
+        val restaurantId = (src as? MealSource.Restaurant)?.restaurantId
+
         return ScheduledMealEntity(
             id = id,
+            foodItemId = foodItemId,
+            restaurantId = restaurantId,
             date = date.toString(),
             time = time.toString(),
             mealType = mealType,

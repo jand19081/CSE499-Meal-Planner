@@ -181,13 +181,32 @@ data class RecipeInstructionEntity(
 
 @Entity(
     tableName = "scheduled_meals",
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = FoodItemEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["food_item_id"],
+                onDelete = ForeignKey.CASCADE,
+            ),
+            ForeignKey(
+                entity = RestaurantEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["restaurant_id"],
+                onDelete = ForeignKey.RESTRICT,
+            ),
+        ],
     indices =
         [
             Index(value = ["date"]),
+            Index(value = ["food_item_id"]),
+            Index(value = ["restaurant_id"]),
         ],
 )
 data class ScheduledMealEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: Uuid = Uuid.random(),
+    @ColumnInfo(name = "food_item_id") val foodItemId: Uuid? = null,
+    @ColumnInfo(name = "restaurant_id") val restaurantId: Uuid? = null,
     @ColumnInfo(name = "date") val date: String,
     @ColumnInfo(name = "time") val time: String,
     @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
