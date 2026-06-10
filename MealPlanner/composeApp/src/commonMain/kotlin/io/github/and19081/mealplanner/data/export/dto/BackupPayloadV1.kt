@@ -114,7 +114,11 @@ data class ScheduledMealDtoV1(
     val peopleCount: Int,
     val isConsumed: Boolean,
     val anticipatedCostCents: Int?,
-    val mealSource: String = "",
+    val prePlannedMealId: String? = null,
+    val standaloneRecipeId: String? = null,
+    val standaloneIngredientId: String? = null,
+    val standaloneIngredientQuantity: Double? = null,
+    val standaloneIngredientUnitId: String? = null,
 )
 
 @Serializable

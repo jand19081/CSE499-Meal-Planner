@@ -1,5 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
+import io.github.and19081.mealplanner.core.util.UnitConverter
+import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.toDomain
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.*
 
 class RoomPantryRepository(
     private val db: MealPlannerDatabase,
+    private val unitRepository: UnitRepository,
     private val scope: CoroutineScope,
 ) : PantryRepository {
   private val dao = db.pantryDao()
@@ -36,7 +39,17 @@ class RoomPantryRepository(
   }
 
   override suspend fun updateQuantities(updates: List<PantryUpdate>) {
-    dao.updateQuantities(updates)
+    val allUnits = unitRepository.units.value.associateBy { it.id }
+    val normalizedUpdates = updates.map { update ->
+        val fromUnit = allUnits[update.unitId]
+        if (fromUnit != null) {
+            val (baseQty, baseUnit) = UnitConverter.toStandard(update.newQuantity, fromUnit, allUnits)
+            PantryUpdate(update.foodItemId, baseQty, baseUnit?.id ?: update.unitId)
+        } else {
+            update
+        }
+    }
+    dao.updateQuantities(normalizedUpdates)
   }
 
   override suspend fun remove(foodItemId: Uuid, unitId: Uuid) {

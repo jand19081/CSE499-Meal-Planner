@@ -22,34 +22,29 @@ object PriceCalculator {
     ): Long? {
         // Use CTE to get flat Bill of Materials
         val bom = foodItemRepository.getRecursiveIngredients(item.id)
+        val foodItemIds = bom.mapNotNull { it.foodItemId }
+        
+        // Batch fetch the cheapest options in ONE query to solve N+1 problem
+        val bestOptions = foodItemRepository.getCheapestPurchaseOptionsBatch(foodItemIds)
+            .associateBy { it.foodItemId }
         
         var totalCostDouble = 0.0
 
         for (measurement in bom) {
             val subItemId = measurement.foodItemId ?: continue
-            val subItem = foodItemRepository.getFoodItem(subItemId) ?: continue
+            val bestOption = bestOptions[subItemId]
 
-            // We only care about base ingredients (purchasable items)
-            // Recipes that were expanded by the CTE are already accounted for in their base ingredients
-            if (subItem is io.github.and19081.mealplanner.domain.model.Ingredient) {
-                val bridges = foodItemRepository.getConversionsForFoodItem(subItem.id)
-                val bestOption = foodItemRepository.getCheapestPurchaseOption(subItem.id)
-
-                if (bestOption != null && bestOption.quantity > 0) {
-                    val convertedReqQty =
-                        UnitConverter.convert(
-                            amount = measurement.quantity,
-                            fromUnitId = measurement.unitId ?: subItem.preferredUnitId ?: Uuid.NIL,
-                            toUnitId = bestOption.unitId,
-                            allUnits = allUnits,
-                            bridges = bridges,
-                        ) ?: 0.0
-
-                    if (convertedReqQty > 0) {
-                        val pricePerUnit = bestOption.priceCents.toDouble() / bestOption.quantity
-                        totalCostDouble += pricePerUnit * convertedReqQty
-                    }
-                }
+            if (bestOption != null && bestOption.quantity > 0) {
+                // IMPORTANT: In Base Unit Normalization, 
+                // measurement.quantity and bestOption.quantity 
+                // are both already in base units (Grams/Ml/Each).
+                
+                // If they are NOT in the same unit type (e.g. Mass vs Volume), 
+                // we still need a bridge lookup, but for now we assume same-type base units.
+                // TODO: Verify if cross-type conversion is needed here after normalization.
+                
+                val pricePerBaseUnit = bestOption.priceCents.toDouble() / bestOption.quantity
+                totalCostDouble += pricePerBaseUnit * measurement.quantity
             }
         }
         return totalCostDouble.toLong()

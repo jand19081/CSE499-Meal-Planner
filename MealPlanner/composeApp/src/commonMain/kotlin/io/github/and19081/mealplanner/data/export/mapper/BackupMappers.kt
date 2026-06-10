@@ -135,7 +135,11 @@ fun ScheduledMealEntity.toDtoV1() =
         peopleCount = peopleCount,
         isConsumed = isConsumed,
         anticipatedCostCents = anticipatedCostCents,
-        mealSource = mealSource,
+        prePlannedMealId = prePlannedMealId?.toString(),
+        standaloneRecipeId = standaloneRecipeId?.toString(),
+        standaloneIngredientId = standaloneIngredientId?.toString(),
+        standaloneIngredientQuantity = standaloneIngredientQuantity,
+        standaloneIngredientUnitId = standaloneIngredientUnitId?.toString(),
     )
 
 fun ScheduledMealDtoV1.toEntity() =
@@ -149,7 +153,11 @@ fun ScheduledMealDtoV1.toEntity() =
         peopleCount = peopleCount,
         isConsumed = isConsumed,
         anticipatedCostCents = anticipatedCostCents,
-        mealSource = mealSource,
+        prePlannedMealId = prePlannedMealId?.let { Uuid.parse(it) },
+        standaloneRecipeId = standaloneRecipeId?.let { Uuid.parse(it) },
+        standaloneIngredientId = standaloneIngredientId?.let { Uuid.parse(it) },
+        standaloneIngredientQuantity = standaloneIngredientQuantity,
+        standaloneIngredientUnitId = standaloneIngredientUnitId?.let { Uuid.parse(it) },
     )
 
 fun DashboardConfig.toDtoV1() =

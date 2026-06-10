@@ -267,38 +267,6 @@ fun PantryInventoryWithDetails.toModel(): PantryItem =
         measurement = pantryItem.measurement.toDomain(),
     )
 
-// --- Scheduled Meal Mappers ---
-private val mealSourceJson = Json { ignoreUnknownKeys = true }
-
-fun ScheduledMealWithSource.toModel(): ScheduledMeal {
-  val source =
-      try {
-        mealSourceJson.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
-      } catch (e: Exception) {
-        null
-      }
-  return ScheduledMeal(
-      id = scheduledMeal.id,
-      date =
-          try {
-            LocalDate.parse(scheduledMeal.date)
-          } catch (e: Exception) {
-            Clock.System.todayIn(TimeZone.currentSystemDefault())
-          },
-      time =
-          try {
-            LocalTime.parse(scheduledMeal.time)
-          } catch (e: Exception) {
-            LocalTime(12, 0)
-          },
-      mealType = scheduledMeal.mealType,
-      source = source,
-      peopleCount = scheduledMeal.peopleCount,
-      isConsumed = scheduledMeal.isConsumed,
-      anticipatedCostCents = scheduledMeal.anticipatedCostCents,
-  )
-}
-
 // --- Shopping List Mappers ---
 fun ShoppingCartItemWithDetails.toModel(): ShoppingListItem =
     ShoppingListItem(

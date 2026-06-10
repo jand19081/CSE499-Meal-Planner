@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "ba7f8ddbde1c0e049deb853183145b61",
+    "identityHash": "e1f0b6197e475cb6ceead7c4ed7e25c8",
     "entities": [
       {
         "tableName": "units",
@@ -529,7 +529,7 @@
       },
       {
         "tableName": "scheduled_meals",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `food_item_id` TEXT, `restaurant_id` TEXT, `date` TEXT NOT NULL, `time` TEXT NOT NULL, `meal_type` TEXT NOT NULL, `people_count` INTEGER NOT NULL, `is_consumed` INTEGER NOT NULL, `meal_source` TEXT NOT NULL, `anticipated_cost_cents` INTEGER, `scheduled_quantity` REAL, `scheduled_quantity_unit_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`restaurant_id`) REFERENCES `restaurants`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `food_item_id` TEXT, `restaurant_id` TEXT, `date` TEXT NOT NULL, `time` TEXT NOT NULL, `meal_type` TEXT NOT NULL, `people_count` INTEGER NOT NULL, `is_consumed` INTEGER NOT NULL, `anticipated_cost_cents` INTEGER, `scheduled_quantity` REAL, `scheduled_quantity_unit_id` TEXT, `pre_planned_meal_id` TEXT, `standalone_recipe_id` TEXT, `standalone_ingredient_id` TEXT, `standalone_ingredient_quantity` REAL, `standalone_ingredient_unit_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`food_item_id`) REFERENCES `food_items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`restaurant_id`) REFERENCES `restaurants`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -578,12 +578,6 @@
             "notNull": true
           },
           {
-            "fieldPath": "mealSource",
-            "columnName": "meal_source",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
             "fieldPath": "anticipatedCostCents",
             "columnName": "anticipated_cost_cents",
             "affinity": "INTEGER"
@@ -596,6 +590,31 @@
           {
             "fieldPath": "scheduledQuantityUnitId",
             "columnName": "scheduled_quantity_unit_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "prePlannedMealId",
+            "columnName": "pre_planned_meal_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "standaloneRecipeId",
+            "columnName": "standalone_recipe_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "standaloneIngredientId",
+            "columnName": "standalone_ingredient_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "standaloneIngredientQuantity",
+            "columnName": "standalone_ingredient_quantity",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "standaloneIngredientUnitId",
+            "columnName": "standalone_ingredient_unit_id",
             "affinity": "TEXT"
           }
         ],
@@ -1592,7 +1611,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ba7f8ddbde1c0e049deb853183145b61')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e1f0b6197e475cb6ceead7c4ed7e25c8')"
     ]
   }
 }

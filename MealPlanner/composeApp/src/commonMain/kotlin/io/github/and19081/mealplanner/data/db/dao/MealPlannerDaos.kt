@@ -402,6 +402,19 @@ interface PurchaseOptionDao {
     """)
     suspend fun getCheapestOption(foodItemId: Uuid): PurchaseOptionEntity?
 
+    @Query("""
+        SELECT po1.* FROM purchase_options po1
+        JOIN (
+            SELECT food_item_id, MIN(price_cents / quantity) as min_price_per_unit
+            FROM purchase_options
+            WHERE quantity > 0 AND food_item_id IN (:foodItemIds)
+            GROUP BY food_item_id
+        ) po2 ON po1.food_item_id = po2.food_item_id 
+        AND (po1.price_cents / po1.quantity) = po2.min_price_per_unit
+        WHERE po1.food_item_id IN (:foodItemIds)
+    """)
+    suspend fun getCheapestOptionsBatch(foodItemIds: List<Uuid>): List<PurchaseOptionEntity>
+
     @Query("SELECT * FROM purchase_options WHERE id = :id")
     suspend fun getById(id: Uuid): PurchaseOptionEntity?
 

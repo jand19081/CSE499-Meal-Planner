@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dining
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
@@ -39,6 +40,9 @@ object PantryRoute
 object AnalyticsRoute
 
 @Serializable
+object ReceiptsRoute
+
+@Serializable
 object KitchenRoute
 
 @Serializable
@@ -57,6 +61,7 @@ val MainDestinations =
 val AllDestinations =
     MainDestinations +
             listOf(
+                TopLevelDestination("Receipts", Icons.Default.Receipt, ReceiptsRoute),
                 TopLevelDestination("Analytics", Icons.Default.Analytics, AnalyticsRoute),
                 TopLevelDestination("Settings", Icons.Default.Settings, SettingsRoute),
             )

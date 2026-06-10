@@ -215,10 +215,14 @@ data class ScheduledMealEntity(
     @ColumnInfo(name = "meal_type") val mealType: RecipeMealType = RecipeMealType.Other,
     @ColumnInfo(name = "people_count") val peopleCount: Int = 1,
     @ColumnInfo(name = "is_consumed") val isConsumed: Boolean = false,
-    @ColumnInfo(name = "meal_source") val mealSource: String,
     @ColumnInfo(name = "anticipated_cost_cents") val anticipatedCostCents: Int? = null,
     @ColumnInfo(name = "scheduled_quantity") val scheduledQuantity: Double? = null,
     @ColumnInfo(name = "scheduled_quantity_unit_id") val scheduledQuantityUnitId: Uuid? = null,
+    @ColumnInfo(name = "pre_planned_meal_id") val prePlannedMealId: Uuid? = null,
+    @ColumnInfo(name = "standalone_recipe_id") val standaloneRecipeId: Uuid? = null,
+    @ColumnInfo(name = "standalone_ingredient_id") val standaloneIngredientId: Uuid? = null,
+    @ColumnInfo(name = "standalone_ingredient_quantity") val standaloneIngredientQuantity: Double? = null,
+    @ColumnInfo(name = "standalone_ingredient_unit_id") val standaloneIngredientUnitId: Uuid? = null,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

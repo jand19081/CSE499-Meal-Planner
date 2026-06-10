@@ -25,8 +25,10 @@ import io.github.and19081.mealplanner.feature.main.InventoryRoute
 import io.github.and19081.mealplanner.feature.main.KitchenRoute
 import io.github.and19081.mealplanner.feature.main.MainViewModel
 import io.github.and19081.mealplanner.feature.main.RecipeExecutionRoute
+import io.github.and19081.mealplanner.feature.main.ReceiptsRoute
 import io.github.and19081.mealplanner.feature.main.SettingsRoute
 import io.github.and19081.mealplanner.feature.recipes.RecipeExecutionScreen
+import io.github.and19081.mealplanner.feature.receipts.ReceiptsView
 import io.github.and19081.mealplanner.feature.settings.Mode
 import io.github.and19081.mealplanner.feature.settings.SettingsView
 
@@ -100,6 +102,10 @@ fun AppNavigation(
         composable<AnalyticsRoute> {
             val vm = viewModel { factory.createAnalyticsViewModel() }
             AnalyticsView(vm, mode = mode, isExpanded = isExpanded)
+        }
+        composable<ReceiptsRoute> {
+            val vm = viewModel { factory.createReceiptsViewModel() }
+            ReceiptsView(vm, mode = mode, isExpanded = isExpanded)
         }
         composable<SettingsRoute> {
             val vm = viewModel { factory.createSettingsViewModel() }

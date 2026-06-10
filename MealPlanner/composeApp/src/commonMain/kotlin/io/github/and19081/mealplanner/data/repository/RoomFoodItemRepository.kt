@@ -1,5 +1,7 @@
 package io.github.and19081.mealplanner.data.repository
 
+import io.github.and19081.mealplanner.core.util.UnitConverter
+import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.core.util.toDomainModel
 import io.github.and19081.mealplanner.core.util.toEntity
 import io.github.and19081.mealplanner.core.util.toModel
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.*
 
 class RoomFoodItemRepository(
     private val db: MealPlannerDatabase,
+    private val unitRepository: UnitRepository,
     private val scope: CoroutineScope,
 ) : FoodItemRepository {
 
@@ -60,6 +63,10 @@ class RoomFoodItemRepository(
     return packageDao.getCheapestOption(foodItemId)?.toModel()
   }
 
+  override suspend fun getCheapestPurchaseOptionsBatch(foodItemIds: List<Uuid>): List<PurchaseOption> {
+    return packageDao.getCheapestOptionsBatch(foodItemIds).map { it.toModel() }
+  }
+
   override suspend fun getRecursiveIngredients(recipeId: Uuid): List<io.github.and19081.mealplanner.domain.model.ItemMeasurement> {
     return foodItemDao.getRecursiveIngredients(recipeId).map { 
         io.github.and19081.mealplanner.domain.model.ItemMeasurement(
@@ -83,8 +90,26 @@ class RoomFoodItemRepository(
       instructions: List<String>,
       requirementGroups: List<FoodItemRequirementGroup>,
   ) {
+    val allUnits = unitRepository.units.value.associateBy { it.id }
     val instructionEntities = instructions.mapIndexed { index, text ->
       RecipeInstructionEntity(foodItemId = item.id, stepOrder = index, instruction = text)
+    }
+
+    val normalizedGroups = requirementGroups.map { group ->
+        group.copy(
+            requirements = group.requirements.map { req ->
+                val fromUnit = allUnits[req.measurement.unitId]
+                if (fromUnit != null) {
+                    val (baseQty, baseUnit) = UnitConverter.toStandard(req.measurement.quantity, fromUnit, allUnits)
+                    req.copy(
+                        measurement = req.measurement.copy(
+                            quantity = baseQty,
+                            unitId = baseUnit?.id ?: req.measurement.unitId
+                        )
+                    )
+                } else req
+            }
+        )
     }
 
     foodItemDao.upsertFoodItem(
@@ -93,9 +118,9 @@ class RoomFoodItemRepository(
         recipe = item.recipeInfo?.toEntity(item.id),
         leftover = item.leftoverInfo?.toEntity(item.id),
         instructions = instructionEntities,
-        requirementGroups = requirementGroups.map { it.toEntity(item.id) },
+        requirementGroups = normalizedGroups.map { it.toEntity(item.id) },
         requirements =
-            requirementGroups.flatMap { group -> group.requirements.map { it.toEntity(group.id) } },
+            normalizedGroups.flatMap { group -> group.requirements.map { it.toEntity(group.id) } },
     )
   }
 
@@ -130,7 +155,17 @@ class RoomFoodItemRepository(
   }
 
   override suspend fun savePurchaseOption(purchaseOption: PurchaseOption) {
-    packageDao.upsert(purchaseOption.toEntity())
+    val allUnits = unitRepository.units.value.associateBy { it.id }
+    val fromUnit = allUnits[purchaseOption.unitId]
+    val normalizedPO = if (fromUnit != null) {
+        val (baseQty, baseUnit) = UnitConverter.toStandard(purchaseOption.quantity, fromUnit, allUnits)
+        purchaseOption.copy(
+            quantity = baseQty,
+            unitId = baseUnit?.id ?: purchaseOption.unitId
+        )
+    } else purchaseOption
+    
+    packageDao.upsert(normalizedPO.toEntity())
   }
 
   override suspend fun deletePurchaseOption(id: Uuid) {

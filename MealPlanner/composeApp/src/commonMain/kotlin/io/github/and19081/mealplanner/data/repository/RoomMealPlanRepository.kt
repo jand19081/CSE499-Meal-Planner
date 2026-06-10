@@ -3,6 +3,8 @@ package io.github.and19081.mealplanner.data.repository
 import io.github.and19081.mealplanner.core.util.DateConstants
 import io.github.and19081.mealplanner.core.util.DateConstants.LATEST_DATE
 import io.github.and19081.mealplanner.core.util.DateConstants.EARLIEST_DATE
+import io.github.and19081.mealplanner.core.util.UnitConverter
+import io.github.and19081.mealplanner.core.util.UnitRepository
 import io.github.and19081.mealplanner.data.db.MealPlannerDatabase
 import io.github.and19081.mealplanner.data.db.entity.ItemMeasurement
 import io.github.and19081.mealplanner.data.db.entity.ReceiptLineItemEntity
@@ -23,6 +25,7 @@ import kotlinx.serialization.json.Json
 
 class RoomMealPlanRepository(
     private val db: MealPlannerDatabase,
+    private val unitRepository: UnitRepository,
     private val scope: CoroutineScope,
 ) : MealPlanRepository {
     private val dao = db.scheduledMealDao()
@@ -37,7 +40,22 @@ class RoomMealPlanRepository(
     }
 
     override suspend fun addPlan(entry: ScheduledMeal) {
-        dao.upsert(entry.toEntity())
+        val allUnits = unitRepository.units.value.associateBy { it.id }
+        val normalizedEntry = if (entry.source is MealSource.StandaloneIngredient) {
+            val src = entry.source
+            val fromUnit = allUnits[src.unitId]
+            if (fromUnit != null) {
+                val (baseQty, baseUnit) = UnitConverter.toStandard(src.quantity, fromUnit, allUnits)
+                entry.copy(
+                    source = src.copy(
+                        quantity = baseQty,
+                        unitId = baseUnit?.id ?: src.unitId
+                    )
+                )
+            } else entry
+        } else entry
+        
+        dao.upsert(normalizedEntry.toEntity())
     }
 
     override suspend fun removePlan(id: Uuid) {
@@ -88,15 +106,25 @@ class RoomMealPlanRepository(
         dao.clearAll()
     }
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     private fun ScheduledMealWithSource.toDomain(): ScheduledMeal {
-        val source =
-            try {
-                json.decodeFromString(MealSource.serializer(), scheduledMeal.mealSource)
-            } catch (e: Exception) {
-                null
-            }
+        val source = when {
+            scheduledMeal.prePlannedMealId != null -> 
+                MealSource.PrePlannedMeal(scheduledMeal.prePlannedMealId)
+            scheduledMeal.standaloneRecipeId != null -> 
+                MealSource.StandaloneRecipe(scheduledMeal.standaloneRecipeId)
+            scheduledMeal.standaloneIngredientId != null -> 
+                MealSource.StandaloneIngredient(
+                    scheduledMeal.standaloneIngredientId,
+                    scheduledMeal.standaloneIngredientQuantity ?: 0.0,
+                    scheduledMeal.standaloneIngredientUnitId ?: Uuid.NIL
+                )
+            scheduledMeal.restaurantId != null -> 
+                MealSource.Restaurant(
+                    scheduledMeal.restaurantId,
+                    scheduledMeal.anticipatedCostCents ?: 0
+                )
+            else -> null
+        }
 
         val parsedDate =
             try {
@@ -126,27 +154,42 @@ class RoomMealPlanRepository(
     }
 
     private fun ScheduledMeal.toEntity(): ScheduledMealEntity {
-        val src = source ?: MealSource.PrePlannedMeal(Uuid.random())
-        val foodItemId =
-            when (src) {
-                is MealSource.PrePlannedMeal -> src.id
-                is MealSource.StandaloneRecipe -> src.id
-                is MealSource.StandaloneIngredient -> src.id
-                else -> null
+        val src = source ?: MealSource.PrePlannedMeal(Uuid.NIL)
+        
+        var prePlannedMealId: Uuid? = null
+        var standaloneRecipeId: Uuid? = null
+        var standaloneIngredientId: Uuid? = null
+        var standaloneIngredientQuantity: Double? = null
+        var standaloneIngredientUnitId: Uuid? = null
+        var restaurantId: Uuid? = null
+
+        when (src) {
+            is MealSource.PrePlannedMeal -> prePlannedMealId = src.id
+            is MealSource.StandaloneRecipe -> standaloneRecipeId = src.id
+            is MealSource.StandaloneIngredient -> {
+                standaloneIngredientId = src.id
+                standaloneIngredientQuantity = src.quantity
+                standaloneIngredientUnitId = src.unitId
             }
-        val restaurantId = (src as? MealSource.Restaurant)?.restaurantId
+            is MealSource.Restaurant -> {
+                restaurantId = src.restaurantId
+            }
+        }
 
         return ScheduledMealEntity(
             id = id,
-            foodItemId = foodItemId,
-            restaurantId = restaurantId,
             date = date.toString(),
             time = time.toString(),
             mealType = mealType,
-            mealSource = json.encodeToString(MealSource.serializer(), src),
             peopleCount = peopleCount,
             isConsumed = isConsumed,
             anticipatedCostCents = anticipatedCostCents,
+            prePlannedMealId = prePlannedMealId,
+            standaloneRecipeId = standaloneRecipeId,
+            standaloneIngredientId = standaloneIngredientId,
+            standaloneIngredientQuantity = standaloneIngredientQuantity,
+            standaloneIngredientUnitId = standaloneIngredientUnitId,
+            restaurantId = restaurantId
         )
     }
 }

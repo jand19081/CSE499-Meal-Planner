@@ -8,6 +8,7 @@ import io.github.and19081.mealplanner.feature.dashboard.DashboardViewModel
 import io.github.and19081.mealplanner.feature.ingredients.IngredientsViewModel
 import io.github.and19081.mealplanner.feature.meals.MealsViewModel
 import io.github.and19081.mealplanner.feature.pantry.PantryViewModel
+import io.github.and19081.mealplanner.feature.receipts.ReceiptsViewModel
 import io.github.and19081.mealplanner.feature.recipes.RecipeExecutionViewModel
 import io.github.and19081.mealplanner.feature.recipes.RecipesViewModel
 import io.github.and19081.mealplanner.feature.settings.SettingsViewModel
@@ -56,6 +57,15 @@ class ViewModelFactory(private val di: DependencyInjectionContainer) {
             di.storeRepository,
             di.unitRepository,
             di.restaurantRepository,
+        )
+
+    fun createReceiptsViewModel() =
+        ReceiptsViewModel(
+            di.receiptHistoryRepository,
+            di.foodItemRepository,
+            di.storeRepository,
+            di.restaurantRepository,
+            di.unitRepository,
         )
 
     fun createSettingsViewModel() =
