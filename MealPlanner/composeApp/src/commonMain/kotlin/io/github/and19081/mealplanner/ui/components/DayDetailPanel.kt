@@ -44,6 +44,7 @@ import kotlinx.datetime.LocalTime
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DayDetailPanel(
+    modifier: Modifier = Modifier,
     date: LocalDate,
     dayEvents: List<DayEventUi>,
     onEventClick: (Uuid) -> Unit,
@@ -53,7 +54,6 @@ fun DayDetailPanel(
     allMeals: List<FoodItem> = emptyList(),
     allRestaurants: List<PurchaseOption> = emptyList(),
     mode: Mode = Mode.AUTO,
-    modifier: Modifier = Modifier,
 ) {
   val isDesktopExpanded =
       when (mode) {
@@ -149,26 +149,26 @@ fun DayDetailPanel(
           }
         },
         text = {
-          if (dayEvents.isEmpty()) {
-            EmptyListMessage(
-                message = "No meals planned for ${date.month.name} $date.dayOfMonth",
-                modifier = Modifier.fillMaxWidth(),
-            )
-          } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-              items(dayEvents) { event ->
-                DayEventRow(
-                    event = event,
-                    onEventClick = { onEventClick(event.entryId) },
-                    onConsume = { onConsumeEvent(event.entryId) },
-                    allMeals = allMeals,
-                    allRestaurants = allRestaurants,
+            if (dayEvents.isEmpty()) {
+                EmptyListMessage(
+                    message = "No meals planned for ${date.month.name} ${date.day}",
+                    modifier = Modifier.fillMaxWidth(),
                 )
-              }
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    dayEvents.forEach { event ->
+                        DayEventRow(
+                            event = event,
+                            onEventClick = { onEventClick(event.entryId) },
+                            onConsume = { onConsumeEvent(event.entryId) },
+                            allMeals = allMeals,
+                            allRestaurants = allRestaurants,
+                        )
+                    }
+                }
             }
-          }
         },
         confirmButton = {
           Button(onClick = onAddEvent) {

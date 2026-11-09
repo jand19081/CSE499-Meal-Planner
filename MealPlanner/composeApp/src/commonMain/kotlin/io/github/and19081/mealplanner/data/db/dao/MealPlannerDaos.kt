@@ -21,7 +21,9 @@ import io.github.and19081.mealplanner.data.db.entity.StoreReceiptEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitConversionBridgeEntity
 import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 import io.github.and19081.mealplanner.data.db.relation.ComposedFoodItemRelation
+import io.github.and19081.mealplanner.data.db.relation.MonthlyExpenditure
 import io.github.and19081.mealplanner.data.db.relation.PantryInventoryWithDetails
+import io.github.and19081.mealplanner.data.db.relation.RecipeBOMItem
 import io.github.and19081.mealplanner.data.db.relation.ScheduledMealWithSource
 import io.github.and19081.mealplanner.data.db.relation.ShoppingCartItemWithDetails
 import io.github.and19081.mealplanner.data.db.relation.StoreReceiptWithLineItems
@@ -34,22 +36,29 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UnitDao {
-  @Query("SELECT * FROM units ORDER BY name ASC") fun observeAll(): Flow<List<UnitEntity>>
+    @Query("SELECT * FROM units ORDER BY name ASC")
+    fun observeAll(): Flow<List<UnitEntity>>
 
-  @Query("SELECT * FROM units ORDER BY name ASC") suspend fun getAll(): List<UnitEntity>
+    @Query("SELECT * FROM units ORDER BY name ASC")
+    suspend fun getAll(): List<UnitEntity>
 
-  @Query("SELECT * FROM units WHERE id = :id") suspend fun getById(id: Uuid): UnitEntity?
+    @Query("SELECT * FROM units WHERE id = :id")
+    suspend fun getById(id: Uuid): UnitEntity?
 
-  @Query("SELECT * FROM units WHERE unit_type = :type ORDER BY name ASC")
-  suspend fun getByType(type: String): List<UnitEntity>
+    @Query("SELECT * FROM units WHERE unit_type = :type ORDER BY name ASC")
+    suspend fun getByType(type: String): List<UnitEntity>
 
-  @Upsert suspend fun upsert(unit: UnitEntity)
+    @Upsert
+    suspend fun upsert(unit: UnitEntity)
 
-  @Upsert suspend fun upsertAll(units: List<UnitEntity>)
+    @Upsert
+    suspend fun upsertAll(units: List<UnitEntity>)
 
-  @Delete suspend fun delete(unit: UnitEntity)
+    @Delete
+    suspend fun delete(unit: UnitEntity)
 
-  @Query("DELETE FROM units") suspend fun clearAll()
+    @Query("DELETE FROM units")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,17 +67,23 @@ interface UnitDao {
 
 @Dao
 interface CategoryDao {
-  @Query("SELECT * FROM categories ORDER BY name ASC") fun observeAll(): Flow<List<CategoryEntity>>
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    fun observeAll(): Flow<List<CategoryEntity>>
 
-  @Query("SELECT * FROM categories ORDER BY name ASC") suspend fun getAll(): List<CategoryEntity>
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    suspend fun getAll(): List<CategoryEntity>
 
-  @Upsert suspend fun upsert(category: CategoryEntity)
+    @Upsert
+    suspend fun upsert(category: CategoryEntity)
 
-  @Upsert suspend fun upsertAll(categories: List<CategoryEntity>)
+    @Upsert
+    suspend fun upsertAll(categories: List<CategoryEntity>)
 
-  @Delete suspend fun delete(category: CategoryEntity)
+    @Delete
+    suspend fun delete(category: CategoryEntity)
 
-  @Query("DELETE FROM categories") suspend fun clearAll()
+    @Query("DELETE FROM categories")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,19 +92,26 @@ interface CategoryDao {
 
 @Dao
 interface StoreDao {
-  @Query("SELECT * FROM stores ORDER BY name ASC") fun observeAll(): Flow<List<StoreEntity>>
+    @Query("SELECT * FROM stores ORDER BY name ASC")
+    fun observeAll(): Flow<List<StoreEntity>>
 
-  @Query("SELECT * FROM stores ORDER BY name ASC") suspend fun getAll(): List<StoreEntity>
+    @Query("SELECT * FROM stores ORDER BY name ASC")
+    suspend fun getAll(): List<StoreEntity>
 
-  @Query("SELECT * FROM stores WHERE id = :id") suspend fun getById(id: Uuid): StoreEntity?
+    @Query("SELECT * FROM stores WHERE id = :id")
+    suspend fun getById(id: Uuid): StoreEntity?
 
-  @Upsert suspend fun upsert(store: StoreEntity)
+    @Upsert
+    suspend fun upsert(store: StoreEntity)
 
-  @Upsert suspend fun upsertAll(stores: List<StoreEntity>)
+    @Upsert
+    suspend fun upsertAll(stores: List<StoreEntity>)
 
-  @Delete suspend fun delete(store: StoreEntity)
+    @Delete
+    suspend fun delete(store: StoreEntity)
 
-  @Query("DELETE FROM stores") suspend fun clearAll()
+    @Query("DELETE FROM stores")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,18 +120,23 @@ interface StoreDao {
 
 @Dao
 interface RestaurantDao {
-  @Query("SELECT * FROM restaurants ORDER BY name ASC")
-  fun observeAll(): Flow<List<RestaurantEntity>>
+    @Query("SELECT * FROM restaurants ORDER BY name ASC")
+    fun observeAll(): Flow<List<RestaurantEntity>>
 
-  @Query("SELECT * FROM restaurants ORDER BY name ASC") suspend fun getAll(): List<RestaurantEntity>
+    @Query("SELECT * FROM restaurants ORDER BY name ASC")
+    suspend fun getAll(): List<RestaurantEntity>
 
-  @Upsert suspend fun upsert(restaurant: RestaurantEntity)
+    @Upsert
+    suspend fun upsert(restaurant: RestaurantEntity)
 
-  @Upsert suspend fun upsertAll(restaurants: List<RestaurantEntity>)
+    @Upsert
+    suspend fun upsertAll(restaurants: List<RestaurantEntity>)
 
-  @Delete suspend fun delete(restaurant: RestaurantEntity)
+    @Delete
+    suspend fun delete(restaurant: RestaurantEntity)
 
-  @Query("DELETE FROM restaurants") suspend fun clearAll()
+    @Query("DELETE FROM restaurants")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,137 +145,197 @@ interface RestaurantDao {
 
 @Dao
 interface FoodItemDao {
-  @Query("SELECT * FROM food_items ORDER BY name ASC") fun observeAll(): Flow<List<FoodItemEntity>>
+    @Query("SELECT * FROM food_items ORDER BY name ASC")
+    fun observeAll(): Flow<List<FoodItemEntity>>
 
-  @Query("SELECT * FROM food_items ORDER BY name ASC") suspend fun getAll(): List<FoodItemEntity>
+    @Query("SELECT * FROM food_items ORDER BY name ASC")
+    suspend fun getAll(): List<FoodItemEntity>
 
-  @Transaction
-  @Query("SELECT * FROM food_items ORDER BY name ASC")
-  fun observeAllComposed(): Flow<List<ComposedFoodItemRelation>>
+    @Transaction
+    @Query("SELECT * FROM food_items ORDER BY name ASC")
+    fun observeAllComposed(): Flow<List<ComposedFoodItemRelation>>
 
-  @Transaction
-  @Query("SELECT * FROM food_items WHERE id = :id")
-  suspend fun getComposedById(id: Uuid): ComposedFoodItemRelation?
+    @Transaction
+    @Query("SELECT * FROM food_items WHERE id = :id")
+    suspend fun getComposedById(id: Uuid): ComposedFoodItemRelation?
 
-  @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
-  suspend fun search(query: String): List<FoodItemEntity>
+    @Query("""
+        SELECT f.* FROM food_items f
+        INNER JOIN recipe_components r ON f.id = r.food_item_id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM recipe_requirements req
+            INNER JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            LEFT JOIN pantry_inventory p ON req.food_item_id = p.food_item_id
+            WHERE grp.food_item_id = f.id
+            AND (p.food_item_id IS NULL OR p.quantity < req.quantity)
+        )
+    """)
+    suspend fun getMakeableRecipes(): List<FoodItemEntity>
 
-  @Upsert suspend fun upsertEntity(item: FoodItemEntity)
+    @Query("""
+        WITH RECURSIVE RecipeBOM(food_item_id, required_qty) AS (
+            SELECT req.food_item_id, req.quantity
+            FROM recipe_requirements req
+            JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            WHERE grp.food_item_id = :recipeId
 
-  @Upsert suspend fun upsertAll(items: List<FoodItemEntity>)
+            UNION ALL
 
-  @Upsert suspend fun upsertPurchasable(comp: PurchasableComponentEntity)
+            SELECT req.food_item_id, (req.quantity * bom.required_qty)
+            FROM recipe_requirements req
+            JOIN recipe_requirement_groups grp ON req.group_id = grp.id
+            JOIN RecipeBOM bom ON grp.food_item_id = bom.food_item_id
+        )
+        SELECT * FROM RecipeBOM
+    """)
+    suspend fun getRecursiveIngredients(recipeId: Uuid): List<RecipeBOMItem>
 
-  @Upsert suspend fun upsertAllPurchasable(items: List<PurchasableComponentEntity>)
+    @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
+    suspend fun search(query: String): List<FoodItemEntity>
 
-  @Query("SELECT * FROM purchasable_components")
-  suspend fun getAllPurchasable(): List<PurchasableComponentEntity>
+    @Upsert
+    suspend fun upsertEntity(item: FoodItemEntity)
 
-  @Query("DELETE FROM purchasable_components") suspend fun clearAllPurchasable()
+    @Upsert
+    suspend fun upsertAll(items: List<FoodItemEntity>)
 
-  @Upsert suspend fun upsertRecipe(comp: RecipeComponentEntity)
+    @Upsert
+    suspend fun upsertPurchasable(comp: PurchasableComponentEntity)
 
-  @Upsert suspend fun upsertAllRecipeComponents(items: List<RecipeComponentEntity>)
+    @Upsert
+    suspend fun upsertAllPurchasable(items: List<PurchasableComponentEntity>)
 
-  @Query("SELECT * FROM recipe_components")
-  suspend fun getAllRecipeComponents(): List<RecipeComponentEntity>
+    @Query("SELECT * FROM purchasable_components")
+    suspend fun getAllPurchasable(): List<PurchasableComponentEntity>
 
-  @Query("DELETE FROM recipe_components") suspend fun clearAllRecipeComponents()
+    @Query("DELETE FROM purchasable_components")
+    suspend fun clearAllPurchasable()
 
-  @Upsert suspend fun upsertLeftover(comp: LeftoverComponentEntity)
+    @Upsert
+    suspend fun upsertRecipe(comp: RecipeComponentEntity)
 
-  @Upsert suspend fun upsertAllLeftoverComponents(items: List<LeftoverComponentEntity>)
+    @Upsert
+    suspend fun upsertAllRecipeComponents(items: List<RecipeComponentEntity>)
 
-  @Query("SELECT * FROM leftover_components")
-  suspend fun getAllLeftoverComponents(): List<LeftoverComponentEntity>
+    @Query("SELECT * FROM recipe_components")
+    suspend fun getAllRecipeComponents(): List<RecipeComponentEntity>
 
-  @Query("DELETE FROM leftover_components") suspend fun clearAllLeftoverComponents()
+    @Query("DELETE FROM recipe_components")
+    suspend fun clearAllRecipeComponents()
 
-  @Transaction
-  suspend fun upsertFoodItem(
-      item: FoodItemEntity,
-      purchasable: PurchasableComponentEntity? = null,
-      recipe: RecipeComponentEntity? = null,
-      leftover: LeftoverComponentEntity? = null,
-      instructions: List<RecipeInstructionEntity> = emptyList(),
-      requirementGroups: List<RecipeRequirementGroupEntity> = emptyList(),
-      requirements: List<RecipeRequirementEntity> = emptyList(),
-  ) {
-    upsertEntity(item)
+    @Upsert
+    suspend fun upsertLeftover(comp: LeftoverComponentEntity)
 
-    // Components
-    if (purchasable != null) upsertPurchasable(purchasable) else deletePurchasable(item.id)
-    if (recipe != null) upsertRecipe(recipe) else deleteRecipeComponent(item.id)
-    if (leftover != null) upsertLeftover(leftover) else deleteLeftoverComponent(item.id)
+    @Upsert
+    suspend fun upsertAllLeftoverComponents(items: List<LeftoverComponentEntity>)
 
-    // Nested Data
-    deleteInstructions(item.id)
-    if (instructions.isNotEmpty()) upsertAllInstructions(instructions)
+    @Query("SELECT * FROM leftover_components")
+    suspend fun getAllLeftoverComponents(): List<LeftoverComponentEntity>
 
-    deleteRequirementGroups(item.id)
-    if (requirementGroups.isNotEmpty()) {
-      upsertAllRequirementGroups(requirementGroups)
-      upsertAllRequirements(requirements)
+    @Query("DELETE FROM leftover_components")
+    suspend fun clearAllLeftoverComponents()
+
+    @Transaction
+    suspend fun upsertFoodItem(
+        item: FoodItemEntity,
+        purchasable: PurchasableComponentEntity? = null,
+        recipe: RecipeComponentEntity? = null,
+        leftover: LeftoverComponentEntity? = null,
+        instructions: List<RecipeInstructionEntity> = emptyList(),
+        requirementGroups: List<RecipeRequirementGroupEntity> = emptyList(),
+        requirements: List<RecipeRequirementEntity> = emptyList(),
+    ) {
+        val updatedItem = item.copy(
+            isPurchasable = purchasable != null,
+            isRecipe = recipe != null,
+            isLeftover = leftover != null
+        )
+        upsertEntity(updatedItem)
+
+        // Components
+        if (purchasable != null) upsertPurchasable(purchasable) else deletePurchasable(item.id)
+        if (recipe != null) upsertRecipe(recipe) else deleteRecipeComponent(item.id)
+        if (leftover != null) upsertLeftover(leftover) else deleteLeftoverComponent(item.id)
+
+        // Nested Data
+        deleteInstructions(item.id)
+        if (instructions.isNotEmpty()) upsertAllInstructions(instructions)
+
+        deleteRequirementGroups(item.id)
+        if (requirementGroups.isNotEmpty()) {
+            upsertAllRequirementGroups(requirementGroups)
+            upsertAllRequirements(requirements)
+        }
     }
-  }
 
-  @Query("DELETE FROM food_items WHERE id = :id") suspend fun deleteFoodItem(id: Uuid)
+    @Query("DELETE FROM food_items WHERE id = :id")
+    suspend fun deleteFoodItem(id: Uuid)
 
-  @Query("DELETE FROM food_items") suspend fun clearAll()
+    @Query("DELETE FROM food_items")
+    suspend fun clearAll()
 
-  @Query("DELETE FROM purchasable_components WHERE food_item_id = :id")
-  suspend fun deletePurchasable(id: Uuid)
+    @Query("DELETE FROM purchasable_components WHERE food_item_id = :id")
+    suspend fun deletePurchasable(id: Uuid)
 
-  @Query("DELETE FROM recipe_components WHERE food_item_id = :id")
-  suspend fun deleteRecipeComponent(id: Uuid)
+    @Query("DELETE FROM recipe_components WHERE food_item_id = :id")
+    suspend fun deleteRecipeComponent(id: Uuid)
 
-  @Query("DELETE FROM leftover_components WHERE food_item_id = :id")
-  suspend fun deleteLeftoverComponent(id: Uuid)
+    @Query("DELETE FROM leftover_components WHERE food_item_id = :id")
+    suspend fun deleteLeftoverComponent(id: Uuid)
 
-  @Upsert suspend fun upsertAllInstructions(instructions: List<RecipeInstructionEntity>)
+    @Upsert
+    suspend fun upsertAllInstructions(instructions: List<RecipeInstructionEntity>)
 
-  @Query("SELECT * FROM recipe_instructions")
-  suspend fun getAllInstructions(): List<RecipeInstructionEntity>
+    @Query("SELECT * FROM recipe_instructions")
+    suspend fun getAllInstructions(): List<RecipeInstructionEntity>
 
-  @Query("DELETE FROM recipe_instructions") suspend fun clearAllInstructions()
+    @Query("DELETE FROM recipe_instructions")
+    suspend fun clearAllInstructions()
 
-  @Query("DELETE FROM recipe_instructions WHERE food_item_id = :foodItemId")
-  suspend fun deleteInstructions(foodItemId: Uuid)
+    @Query("DELETE FROM recipe_instructions WHERE food_item_id = :foodItemId")
+    suspend fun deleteInstructions(foodItemId: Uuid)
 
-  @Upsert suspend fun upsertAllRequirementGroups(groups: List<RecipeRequirementGroupEntity>)
+    @Upsert
+    suspend fun upsertAllRequirementGroups(groups: List<RecipeRequirementGroupEntity>)
 
-  @Query("SELECT * FROM recipe_requirement_groups")
-  suspend fun getAllRequirementGroups(): List<RecipeRequirementGroupEntity>
+    @Query("SELECT * FROM recipe_requirement_groups")
+    suspend fun getAllRequirementGroups(): List<RecipeRequirementGroupEntity>
 
-  @Query("DELETE FROM recipe_requirement_groups") suspend fun clearAllRequirementGroups()
+    @Query("DELETE FROM recipe_requirement_groups")
+    suspend fun clearAllRequirementGroups()
 
-  @Query("DELETE FROM recipe_requirement_groups WHERE food_item_id = :foodItemId")
-  suspend fun deleteRequirementGroups(foodItemId: Uuid)
+    @Query("DELETE FROM recipe_requirement_groups WHERE food_item_id = :foodItemId")
+    suspend fun deleteRequirementGroups(foodItemId: Uuid)
 
-  @Upsert suspend fun upsertAllRequirements(requirements: List<RecipeRequirementEntity>)
+    @Upsert
+    suspend fun upsertAllRequirements(requirements: List<RecipeRequirementEntity>)
 
-  @Query("SELECT * FROM recipe_requirements")
-  suspend fun getAllRequirements(): List<RecipeRequirementEntity>
+    @Query("SELECT * FROM recipe_requirements")
+    suspend fun getAllRequirements(): List<RecipeRequirementEntity>
 
-  @Query("DELETE FROM recipe_requirements") suspend fun clearAllRequirements()
+    @Query("DELETE FROM recipe_requirements")
+    suspend fun clearAllRequirements()
 
-  @Query("SELECT * FROM unit_conversion_bridges")
-  fun observeAllConversions(): Flow<List<UnitConversionBridgeEntity>>
+    @Query("SELECT * FROM unit_conversion_bridges")
+    fun observeAllConversions(): Flow<List<UnitConversionBridgeEntity>>
 
-  @Query("SELECT * FROM unit_conversion_bridges")
-  suspend fun getAllConversions(): List<UnitConversionBridgeEntity>
+    @Query("SELECT * FROM unit_conversion_bridges")
+    suspend fun getAllConversions(): List<UnitConversionBridgeEntity>
 
-  @Query("SELECT * FROM unit_conversion_bridges WHERE food_item_id = :foodItemId")
-  suspend fun getConversionsByFoodItemId(foodItemId: Uuid): List<UnitConversionBridgeEntity>
+    @Query("SELECT * FROM unit_conversion_bridges WHERE food_item_id = :foodItemId")
+    suspend fun getConversionsByFoodItemId(foodItemId: Uuid): List<UnitConversionBridgeEntity>
 
-  @Upsert suspend fun upsertConversion(bridge: UnitConversionBridgeEntity)
+    @Upsert
+    suspend fun upsertConversion(bridge: UnitConversionBridgeEntity)
 
-  @Upsert suspend fun upsertAllConversions(items: List<UnitConversionBridgeEntity>)
+    @Upsert
+    suspend fun upsertAllConversions(items: List<UnitConversionBridgeEntity>)
 
-  @Query("DELETE FROM unit_conversion_bridges WHERE id = :id")
-  suspend fun deleteConversion(id: Uuid)
+    @Query("DELETE FROM unit_conversion_bridges WHERE id = :id")
+    suspend fun deleteConversion(id: Uuid)
 
-  @Query("DELETE FROM unit_conversion_bridges") suspend fun clearAllConversions()
+    @Query("DELETE FROM unit_conversion_bridges")
+    suspend fun clearAllConversions()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -257,34 +344,39 @@ interface FoodItemDao {
 
 @Dao
 interface ScheduledMealDao {
-  @Query(
-      "SELECT * FROM scheduled_meals WHERE date BETWEEN :from AND :to ORDER BY date ASC, time ASC"
-  )
-  fun observeInRange(from: String, to: String): Flow<List<ScheduledMealEntity>>
+    @Query(
+        "SELECT * FROM scheduled_meals WHERE date BETWEEN :from AND :to ORDER BY date ASC, time ASC"
+    )
+    fun observeInRange(from: String, to: String): Flow<List<ScheduledMealEntity>>
 
-  @Query("SELECT * FROM scheduled_meals ORDER BY date ASC, time ASC")
-  suspend fun getAll(): List<ScheduledMealEntity>
+    @Query("SELECT * FROM scheduled_meals ORDER BY date ASC, time ASC")
+    suspend fun getAll(): List<ScheduledMealEntity>
 
-  @Transaction
-  @Query(
-      "SELECT * FROM scheduled_meals WHERE date BETWEEN :from AND :to ORDER BY date ASC, time ASC"
-  )
-  fun observeInRangeWithSource(from: String, to: String): Flow<List<ScheduledMealWithSource>>
+    @Query("SELECT * FROM scheduled_meals ORDER BY date ASC, time ASC")
+    fun observeAll(): Flow<List<ScheduledMealEntity>>
 
-  @Upsert suspend fun upsert(meal: ScheduledMealEntity)
+    @Transaction
+    @Query("SELECT * FROM scheduled_meals WHERE date BETWEEN :from AND :to ORDER BY date ASC, time ASC")
+    fun observeInRangeWithSource(from: String, to: String): Flow<List<ScheduledMealWithSource>>
 
-  @Upsert suspend fun upsertAll(meals: List<ScheduledMealEntity>)
+    @Upsert
+    suspend fun upsert(meal: ScheduledMealEntity)
 
-  @Delete suspend fun delete(meal: ScheduledMealEntity)
+    @Upsert
+    suspend fun upsertAll(meals: List<ScheduledMealEntity>)
 
-  @Query("UPDATE scheduled_meals SET is_consumed = :consumed WHERE id = :id")
-  suspend fun setConsumed(id: Uuid, consumed: Boolean)
+    @Delete
+    suspend fun delete(meal: ScheduledMealEntity)
 
-  @Transaction
-  @Query("SELECT * FROM scheduled_meals WHERE id = :id")
-  suspend fun getWithSource(id: Uuid): ScheduledMealWithSource?
+    @Query("UPDATE scheduled_meals SET is_consumed = :consumed WHERE id = :id")
+    suspend fun setConsumed(id: Uuid, consumed: Boolean)
 
-  @Query("DELETE FROM scheduled_meals") suspend fun clearAll()
+    @Transaction
+    @Query("SELECT * FROM scheduled_meals WHERE id = :id")
+    suspend fun getWithSource(id: Uuid): ScheduledMealWithSource?
+
+    @Query("DELETE FROM scheduled_meals")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -293,26 +385,53 @@ interface ScheduledMealDao {
 
 @Dao
 interface PurchaseOptionDao {
-  @Query("SELECT * FROM purchase_options ORDER BY food_item_id ASC")
-  fun observeAll(): Flow<List<PurchaseOptionEntity>>
+    @Query("SELECT * FROM purchase_options ORDER BY food_item_id ASC")
+    fun observeAll(): Flow<List<PurchaseOptionEntity>>
 
-  @Query("SELECT * FROM purchase_options") suspend fun getAll(): List<PurchaseOptionEntity>
+    @Query("SELECT * FROM purchase_options")
+    suspend fun getAll(): List<PurchaseOptionEntity>
 
-  @Query("SELECT * FROM purchase_options WHERE food_item_id = :foodItemId ORDER BY price_cents ASC")
-  fun observeForFoodItem(foodItemId: Uuid): Flow<List<PurchaseOptionEntity>>
+    @Query("SELECT * FROM purchase_options WHERE food_item_id = :foodItemId ORDER BY price_cents ASC")
+    fun observeForFoodItem(foodItemId: Uuid): Flow<List<PurchaseOptionEntity>>
 
-  @Query("SELECT * FROM purchase_options WHERE id = :id")
-  suspend fun getById(id: Uuid): PurchaseOptionEntity?
+    @Query("""
+        SELECT * FROM purchase_options 
+        WHERE food_item_id = :foodItemId 
+        AND quantity > 0
+        ORDER BY ((price_cents * 1.0) / quantity) ASC LIMIT 1
+    """)
+    suspend fun getCheapestOption(foodItemId: Uuid): PurchaseOptionEntity?
 
-  @Upsert suspend fun upsert(option: PurchaseOptionEntity)
+    @Query("""
+        SELECT po1.* FROM purchase_options po1
+        JOIN (
+            SELECT food_item_id, MIN((price_cents * 1.0) / quantity) as min_price_per_unit
+            FROM purchase_options
+            WHERE quantity > 0 AND food_item_id IN (:foodItemIds)
+            GROUP BY food_item_id
+        ) po2 ON po1.food_item_id = po2.food_item_id 
+        AND ((po1.price_cents * 1.0) / po1.quantity) = po2.min_price_per_unit
+        WHERE po1.food_item_id IN (:foodItemIds)
+    """)
+    suspend fun getCheapestOptionsBatch(foodItemIds: List<Uuid>): List<PurchaseOptionEntity>
 
-  @Upsert suspend fun upsertAll(options: List<PurchaseOptionEntity>)
+    @Query("SELECT * FROM purchase_options WHERE id = :id")
+    suspend fun getById(id: Uuid): PurchaseOptionEntity?
 
-  @Delete suspend fun delete(option: PurchaseOptionEntity)
+    @Upsert
+    suspend fun upsert(option: PurchaseOptionEntity)
 
-  @Query("DELETE FROM purchase_options WHERE id = :id") suspend fun deleteById(id: Uuid)
+    @Upsert
+    suspend fun upsertAll(options: List<PurchaseOptionEntity>)
 
-  @Query("DELETE FROM purchase_options") suspend fun clearAll()
+    @Delete
+    suspend fun delete(option: PurchaseOptionEntity)
+
+    @Query("DELETE FROM purchase_options WHERE id = :id")
+    suspend fun deleteById(id: Uuid)
+
+    @Query("DELETE FROM purchase_options")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -321,69 +440,70 @@ interface PurchaseOptionDao {
 
 @Dao
 interface PantryDao {
-  @Transaction
-  @Query("SELECT * FROM pantry_inventory")
-  fun observeAllWithDetails(): Flow<List<PantryInventoryWithDetails>>
+    @Transaction
+    @Query("SELECT * FROM pantry_inventory")
+    fun observeAllWithDetails(): Flow<List<PantryInventoryWithDetails>>
 
-  @Transaction
-  @Query("SELECT * FROM pantry_inventory")
-  suspend fun getAllWithDetails(): List<PantryInventoryWithDetails>
+    @Transaction
+    @Query("SELECT * FROM pantry_inventory")
+    suspend fun getAllWithDetails(): List<PantryInventoryWithDetails>
 
-  @Query("SELECT * FROM pantry_inventory") suspend fun getAll(): List<PantryInventoryEntity>
+    @Query("SELECT * FROM pantry_inventory")
+    suspend fun getAll(): List<PantryInventoryEntity>
 
-  @Query("SELECT * FROM pantry_inventory WHERE id = :id")
-  suspend fun getById(id: Uuid): PantryInventoryEntity?
+    @Query("SELECT * FROM pantry_inventory WHERE id = :id")
+    suspend fun getById(id: Uuid): PantryInventoryEntity?
 
-  @Query("SELECT * FROM pantry_inventory WHERE food_item_id = :foodItemId LIMIT 1")
-  suspend fun getByFoodItemId(foodItemId: Uuid): PantryInventoryEntity?
+    @Query("SELECT * FROM pantry_inventory WHERE food_item_id = :foodItemId LIMIT 1")
+    suspend fun getByFoodItemId(foodItemId: Uuid): PantryInventoryEntity?
 
-  @Query("DELETE FROM pantry_inventory WHERE food_item_id = :foodItemId AND unit_id = :unitId")
-  suspend fun deleteByFoodItemAndUnit(foodItemId: Uuid, unitId: Uuid)
+    @Query("DELETE FROM pantry_inventory WHERE food_item_id = :foodItemId")
+    suspend fun deleteByFoodItem(foodItemId: Uuid)
 
-  @Query("DELETE FROM pantry_inventory WHERE id = :id") suspend fun deleteById(id: Uuid)
+    @Query("DELETE FROM pantry_inventory WHERE id = :id")
+    suspend fun deleteById(id: Uuid)
 
-  @Upsert suspend fun upsert(item: PantryInventoryEntity)
+    @Query("UPDATE pantry_inventory SET quantity = :quantity WHERE id = :id")
+    suspend fun updateQuantityById(id: Uuid, quantity: Double)
 
-  @Upsert suspend fun upsertAll(items: List<PantryInventoryEntity>)
+    @Upsert
+    suspend fun upsert(item: PantryInventoryEntity)
 
-  @Delete suspend fun delete(item: PantryInventoryEntity)
+    @Upsert
+    suspend fun upsertAll(items: List<PantryInventoryEntity>)
 
-  @Query("DELETE FROM pantry_inventory") suspend fun clearAll()
+    @Delete
+    suspend fun delete(item: PantryInventoryEntity)
 
-  @Transaction
-  suspend fun updateQuantities(
-      updates: List<io.github.and19081.mealplanner.domain.repository.PantryUpdate>
-  ) {
-    updates.forEach { update ->
-      val existing = getByFoodItemId(update.foodItemId)
-      if (existing != null) {
-        if (update.newQuantity <= 0) {
-          delete(existing)
-        } else {
-          upsert(
-              existing.copy(
-                  measurement =
-                      existing.measurement.copy(
-                          quantity = update.newQuantity,
-                          unitId = update.unitId,
-                      )
-              )
-          )
-        }
-      } else if (update.newQuantity > 0) {
-        upsert(
-            PantryInventoryEntity(
-                measurement =
-                    io.github.and19081.mealplanner.data.db.entity.ItemMeasurement(
-                        foodItemId = update.foodItemId,
-                        quantity = update.newQuantity,
-                        unitId = update.unitId,
+    @Query("DELETE FROM pantry_inventory")
+    suspend fun clearAll()
+
+    @Transaction
+    suspend fun updateQuantities(
+        updates: List<io.github.and19081.mealplanner.domain.repository.PantryUpdate>
+    ) {
+        updates.forEach { update ->
+            val existing = getByFoodItemId(update.foodItemId)
+            if (existing != null) {
+                if (update.newQuantity <= 0) {
+                    delete(existing)
+                } else {
+                    upsert(
+                        existing.copy(
+                            quantity = update.newQuantity
+                        )
                     )
-            )
-        )
-      }
+                }
+            } else if (update.newQuantity > 0) {
+                upsert(
+                    PantryInventoryEntity(
+                        foodItemId = update.foodItemId,
+                        quantity = update.newQuantity
+                    )
+                )
+            }
+        }
     }
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -392,29 +512,36 @@ interface PantryDao {
 
 @Dao
 interface ShoppingListDao {
-  @Transaction
-  @Query("SELECT * FROM shopping_cart_items ORDER BY is_purchased ASC, store_id ASC")
-  fun observeAllWithDetails(): Flow<List<ShoppingCartItemWithDetails>>
+    @Transaction
+    @Query("SELECT * FROM shopping_cart_items ORDER BY is_purchased ASC, store_id ASC")
+    fun observeAllWithDetails(): Flow<List<ShoppingCartItemWithDetails>>
 
-  @Query("SELECT * FROM shopping_cart_items") suspend fun getAll(): List<ShoppingCartItemEntity>
+    @Query("SELECT * FROM shopping_cart_items")
+    suspend fun getAll(): List<ShoppingCartItemEntity>
 
-  @Query("SELECT * FROM shopping_cart_items WHERE id = :id")
-  suspend fun getById(id: Uuid): ShoppingCartItemEntity?
+    @Query("SELECT * FROM shopping_cart_items WHERE id = :id")
+    suspend fun getById(id: Uuid): ShoppingCartItemEntity?
 
-  @Query("DELETE FROM shopping_cart_items WHERE id = :id") suspend fun deleteById(id: Uuid)
+    @Query("DELETE FROM shopping_cart_items WHERE id = :id")
+    suspend fun deleteById(id: Uuid)
 
-  @Upsert suspend fun upsert(item: ShoppingCartItemEntity)
+    @Upsert
+    suspend fun upsert(item: ShoppingCartItemEntity)
 
-  @Upsert suspend fun upsertAll(items: List<ShoppingCartItemEntity>)
+    @Upsert
+    suspend fun upsertAll(items: List<ShoppingCartItemEntity>)
 
-  @Delete suspend fun delete(item: ShoppingCartItemEntity)
+    @Delete
+    suspend fun delete(item: ShoppingCartItemEntity)
 
-  @Query("UPDATE shopping_cart_items SET is_purchased = :purchased WHERE id = :id")
-  suspend fun setPurchased(id: Uuid, purchased: Boolean)
+    @Query("UPDATE shopping_cart_items SET is_purchased = :purchased WHERE id = :id")
+    suspend fun setPurchased(id: Uuid, purchased: Boolean)
 
-  @Query("DELETE FROM shopping_cart_items WHERE is_purchased = 1") suspend fun clearPurchased()
+    @Query("DELETE FROM shopping_cart_items WHERE is_purchased = 1")
+    suspend fun clearPurchased()
 
-  @Query("DELETE FROM shopping_cart_items") suspend fun clearAll()
+    @Query("DELETE FROM shopping_cart_items")
+    suspend fun clearAll()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -423,39 +550,54 @@ interface ShoppingListDao {
 
 @Dao
 interface ReceiptDao {
-  @Transaction
-  @Query("SELECT * FROM store_receipts ORDER BY date DESC")
-  fun observeAllWithLineItems(): Flow<List<StoreReceiptWithLineItems>>
+    @Transaction
+    @Query("SELECT * FROM store_receipts ORDER BY date DESC")
+    fun observeAllWithLineItems(): Flow<List<StoreReceiptWithLineItems>>
 
-  @Query("SELECT * FROM store_receipts") suspend fun getAllReceipts(): List<StoreReceiptEntity>
+    @Query("SELECT * FROM store_receipts")
+    suspend fun getAllReceipts(): List<StoreReceiptEntity>
 
-  @Query("SELECT * FROM receipt_line_items")
-  suspend fun getAllLineItems(): List<ReceiptLineItemEntity>
+    @Query("""
+        SELECT strftime('%Y-%m', date) as month, SUM(actual_total_cents) as totalSpent 
+        FROM store_receipts 
+        GROUP BY month
+        ORDER BY month DESC
+    """)
+    fun observeMonthlyExpenditures(): Flow<List<MonthlyExpenditure>>
 
-  @Upsert suspend fun upsertReceipt(receipt: StoreReceiptEntity)
+    @Query("SELECT * FROM receipt_line_items")
+    suspend fun getAllLineItems(): List<ReceiptLineItemEntity>
 
-  @Upsert suspend fun upsertAllReceipts(receipts: List<StoreReceiptEntity>)
+    @Upsert
+    suspend fun upsertReceipt(receipt: StoreReceiptEntity)
 
-  @Upsert suspend fun upsertAllLineItems(items: List<ReceiptLineItemEntity>)
+    @Upsert
+    suspend fun upsertAllReceipts(receipts: List<StoreReceiptEntity>)
 
-  @Transaction
-  suspend fun upsertReceiptWithDetails(
-      receipt: StoreReceiptEntity,
-      lineItems: List<ReceiptLineItemEntity>,
-  ) {
-    upsertReceipt(receipt)
-    clearLineItemsForReceipt(receipt.id)
-    upsertAllLineItems(lineItems)
-  }
+    @Upsert
+    suspend fun upsertAllLineItems(items: List<ReceiptLineItemEntity>)
 
-  @Query("DELETE FROM receipt_line_items WHERE receipt_id = :receiptId")
-  suspend fun clearLineItemsForReceipt(receiptId: Uuid)
+    @Transaction
+    suspend fun upsertReceiptWithDetails(
+        receipt: StoreReceiptEntity,
+        lineItems: List<ReceiptLineItemEntity>,
+    ) {
+        upsertReceipt(receipt)
+        clearLineItemsForReceipt(receipt.id)
+        upsertAllLineItems(lineItems)
+    }
 
-  @Delete suspend fun deleteReceipt(receipt: StoreReceiptEntity)
+    @Query("DELETE FROM receipt_line_items WHERE receipt_id = :receiptId")
+    suspend fun clearLineItemsForReceipt(receiptId: Uuid)
 
-  @Query("DELETE FROM store_receipts") suspend fun clearAllReceipts()
+    @Delete
+    suspend fun deleteReceipt(receipt: StoreReceiptEntity)
 
-  @Query("DELETE FROM receipt_line_items") suspend fun clearAllLineItems()
+    @Query("DELETE FROM store_receipts")
+    suspend fun clearAllReceipts()
+
+    @Query("DELETE FROM receipt_line_items")
+    suspend fun clearAllLineItems()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -464,17 +606,19 @@ interface ReceiptDao {
 
 @Dao
 interface AppSettingsDao {
-  @Query(
-      "SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1"
-  )
-  fun observe(): Flow<AppSettingsEntity?>
+    @Query(
+        "SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1"
+    )
+    fun observe(): Flow<AppSettingsEntity?>
 
-  @Query(
-      "SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1"
-  )
-  suspend fun get(): AppSettingsEntity?
+    @Query(
+        "SELECT * FROM app_settings WHERE id = '${AppSettingsEntity.Companion.SINGLETON_ID}' LIMIT 1"
+    )
+    suspend fun get(): AppSettingsEntity?
 
-  @Upsert suspend fun upsert(settings: AppSettingsEntity)
+    @Upsert
+    suspend fun upsert(settings: AppSettingsEntity)
 
-  @Query("DELETE FROM app_settings") suspend fun clearAll()
+    @Query("DELETE FROM app_settings")
+    suspend fun clearAll()
 }

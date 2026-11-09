@@ -37,7 +37,7 @@ import io.github.and19081.mealplanner.data.db.entity.UnitEntity
 
 /** Room database for the Meal Planner application with ECS architecture. */
 @Database(
-    version = 5,
+    version = 6,
     exportSchema = true,
     entities =
         [

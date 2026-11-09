@@ -29,6 +29,10 @@ class RoomReceiptHistoryRepository(
           .map { list -> list.map { it.toDomain() } }
           .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  override fun observeMonthlyExpenditures(): Flow<List<io.github.and19081.mealplanner.data.db.relation.MonthlyExpenditure>> {
+    return dao.observeMonthlyExpenditures()
+  }
+
   override suspend fun getTripWithLineItems(id: Uuid): ReceiptHistory? {
     return dao.observeAllWithLineItems().first().find { it.receipt.id == id }?.toDomain()
   }

@@ -75,7 +75,6 @@ data class ShoppingCartItemWithDetails(
 data class PantryInventoryWithDetails(
     @Embedded val pantryItem: PantryInventoryEntity,
     @Relation(parentColumn = "food_item_id", entityColumn = "id") val foodItem: FoodItemEntity?,
-    @Relation(parentColumn = "unit_id", entityColumn = "id") val unit: UnitEntity?,
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

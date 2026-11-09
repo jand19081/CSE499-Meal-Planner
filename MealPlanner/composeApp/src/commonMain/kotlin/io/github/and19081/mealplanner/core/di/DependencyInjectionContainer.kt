@@ -38,10 +38,10 @@ class DependencyInjectionContainer(
   val dataTransferService = DataTransferService(db)
 
   // ECS Unified Repository
-  val foodItemRepository: FoodItemRepository = RoomFoodItemRepository(db, scope)
+  val foodItemRepository: FoodItemRepository = RoomFoodItemRepository(db, unitRepository, scope)
 
-  val mealPlanRepository: MealPlanRepository = RoomMealPlanRepository(db, scope)
-  val pantryRepository: PantryRepository = RoomPantryRepository(db, scope)
+  val mealPlanRepository: MealPlanRepository = RoomMealPlanRepository(db, unitRepository, scope)
+  val pantryRepository: PantryRepository = RoomPantryRepository(db, unitRepository, scope)
   val shoppingListRepository = ShoppingListRepository()
   val shoppingListItemRepository: ShoppingListItemRepository =
       RoomShoppingListItemRepository(db, scope)

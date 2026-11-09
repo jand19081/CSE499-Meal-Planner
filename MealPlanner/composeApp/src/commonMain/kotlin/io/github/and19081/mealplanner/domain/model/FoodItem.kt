@@ -1,6 +1,7 @@
 package io.github.and19081.mealplanner.domain.model
 
 import io.github.and19081.mealplanner.core.util.RecipeMealType
+import io.github.and19081.mealplanner.core.util.UnitType
 import kotlin.uuid.Uuid
 import kotlinx.serialization.Serializable
 
@@ -48,6 +49,7 @@ sealed interface FoodItem {
   val id: Uuid
   val name: String
   val preferredUnitId: Uuid?
+  val unitType: UnitType
 }
 
 /** Variant for purchasable ingredients. */
@@ -56,6 +58,7 @@ data class Ingredient(
     override val id: Uuid = Uuid.random(),
     override val name: String,
     override val preferredUnitId: Uuid? = null,
+    override val unitType: UnitType = UnitType.Count,
     val purchasableInfo: PurchasableInfo? = null,
 ) : FoodItem
 
@@ -65,6 +68,7 @@ data class Recipe(
     override val id: Uuid = Uuid.random(),
     override val name: String,
     override val preferredUnitId: Uuid? = null,
+    override val unitType: UnitType = UnitType.Count,
     val recipeInfo: RecipeInfo,
 ) : FoodItem
 
@@ -74,6 +78,7 @@ data class Meal(
     override val id: Uuid = Uuid.random(),
     override val name: String,
     override val preferredUnitId: Uuid? = null,
+    override val unitType: UnitType = UnitType.Count,
     val recipeInfo: RecipeInfo,
 ) : FoodItem
 
@@ -83,6 +88,7 @@ data class Leftover(
     override val id: Uuid = Uuid.random(),
     override val name: String,
     override val preferredUnitId: Uuid? = null,
+    override val unitType: UnitType = UnitType.Count,
     val leftoverInfo: LeftoverInfo,
 ) : FoodItem
 

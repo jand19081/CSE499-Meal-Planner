@@ -65,6 +65,7 @@ data class FoodItemDtoV1(
     val id: String,
     val name: String,
     val preferredUnitId: String?,
+    val unitType: UnitType = UnitType.Count,
     val createdAt: Long,
     val updatedAt: Long?,
 )
@@ -106,13 +107,19 @@ data class RecipeInstructionDtoV1(
 @Serializable
 data class ScheduledMealDtoV1(
     val id: String,
+    val foodItemId: String? = null,
+    val restaurantId: String? = null,
     val date: String,
     val time: String,
     val mealType: RecipeMealType,
     val peopleCount: Int,
     val isConsumed: Boolean,
     val anticipatedCostCents: Int?,
-    val mealSource: String = "",
+    val prePlannedMealId: String? = null,
+    val standaloneRecipeId: String? = null,
+    val standaloneIngredientId: String? = null,
+    val standaloneIngredientQuantity: Double? = null,
+    val standaloneIngredientUnitId: String? = null,
 )
 
 @Serializable

@@ -2,7 +2,6 @@ package io.github.and19081.mealplanner.feature.main
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
@@ -17,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -145,56 +145,58 @@ fun MainView(
     modalStack.lastOrNull()?.let { modal ->
       when (modal) {
         is KitchenModal.FoodItemCreator -> {
-          AlertDialog(
+          Dialog(
               onDismissRequest = { viewModel.popModal() },
-              modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f),
               properties = DialogProperties(usePlatformDefaultWidth = false),
-              content = {
-                IngredientForm(
-                    ingredient = null,
-                    initialName = modal.name,
-                    allPurchaseOptions = emptyList<PurchaseOption>(),
-                    allBridges = emptyList<BridgeConversion>(),
-                    allStores = ingredientsUiState.allStores,
-                    allCategories = ingredientsUiState.allCategories,
-                    allUnits = ingredientsUiState.allUnits,
-                    onDismiss = { viewModel.popModal() },
-                    onSave = { ingredient, purchaseOptions, bridges ->
-                      ingredientsVm.saveIngredient(ingredient, purchaseOptions, bridges)
-                      modal.onCreated(ingredient)
-                      viewModel.popModal()
-                    },
-                    onAddStore = { ingredientsVm.addStore(it) },
-                    onDeleteStore = { /* ... */ },
-                    onAddCategory = { ingredientsVm.addCategory(it) },
-                    onDeleteCategory = { /* ... */ },
-                )
-              },
-          )
+          ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.8f),
+                shape = MaterialTheme.shapes.extraLarge,
+                tonalElevation = 6.dp,
+            ) {
+              IngredientForm(
+                  ingredient = null,
+                  initialName = modal.name,
+                  allPurchaseOptions = emptyList<PurchaseOption>(),
+                  allBridges = emptyList<BridgeConversion>(),
+                  allStores = ingredientsUiState.allStores,
+                  allCategories = ingredientsUiState.allCategories,
+                  allUnits = ingredientsUiState.allUnits,
+                  onDismiss = { viewModel.popModal() },
+                  onSave = { ingredient, purchaseOptions, bridges ->
+                    ingredientsVm.saveIngredient(ingredient, purchaseOptions, bridges)
+                    modal.onCreated(ingredient)
+                    viewModel.popModal()
+                  },
+                  onAddStore = { ingredientsVm.addStore(it) },
+                  onDeleteStore = { /* ... */ },
+                  onAddCategory = { ingredientsVm.addCategory(it) },
+                  onDeleteCategory = { /* ... */ },
+              )
+            }
+          }
         }
         is KitchenModal.KitchenTransactionReview -> {
-          AlertDialog(
+          Dialog(
               onDismissRequest = { viewModel.popModal() },
-              modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.9f),
               properties = DialogProperties(usePlatformDefaultWidth = false),
-              content = {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    tonalElevation = 6.dp,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                  TransactionReviewSheet(
-                      transaction = modal.transaction,
-                      allUnits = recipesUiState.allUnits,
-                      onDismiss = { viewModel.popModal() },
-                      onCommit = {
-                        modal.onCommit(it)
-                        viewModel.popModal()
-                      },
-                  )
-                }
-              },
-          )
+          ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.9f).fillMaxHeight(0.9f),
+                shape = MaterialTheme.shapes.extraLarge,
+                tonalElevation = 6.dp,
+            ) {
+              TransactionReviewSheet(
+                  transaction = modal.transaction,
+                  allUnits = recipesUiState.allUnits,
+                  onDismiss = { viewModel.popModal() },
+                  onCommit = {
+                    modal.onCommit(it)
+                    viewModel.popModal()
+                  },
+              )
+            }
+          }
         }
       }
     }

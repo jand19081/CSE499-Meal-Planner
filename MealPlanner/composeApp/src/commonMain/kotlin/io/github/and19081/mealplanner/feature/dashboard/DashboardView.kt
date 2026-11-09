@@ -3,19 +3,14 @@
 package io.github.and19081.mealplanner.feature.dashboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Inventory
-import androidx.compose.material.icons.filled.RestaurantMenu
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -149,12 +144,13 @@ fun DashboardStats(
 
     // Shortcut Card
     DashboardStatCard(
-        modifier = Modifier.fillMaxWidth().clickable { onCanMakeNowClick() },
+        modifier = Modifier.fillMaxWidth(),
         title = "Shortcut",
         value = "Can Make Now",
         icon = Icons.Default.RestaurantMenu,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        onClick = onCanMakeNowClick,
     )
   }
 }
@@ -253,13 +249,13 @@ fun DashboardMealPlan(uiState: DashboardViewModel.DashboardUiState, viewModel: D
                 ) {
                   if (meal.isConsumed) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        Icons.Filled.CheckCircle,
                         "Undo Consumption",
                         tint = MaterialTheme.colorScheme.primary,
                     )
                   } else {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        Icons.Outlined.CheckCircleOutline,
                         "Mark as Consumed",
                         tint = MaterialTheme.colorScheme.outline,
                     )
@@ -297,12 +293,9 @@ fun DashboardStatCard(
     icon: ImageVector,
     containerColor: Color,
     contentColor: Color,
+    onClick: (() -> Unit)? = null,
 ) {
-  Card(
-      modifier = modifier,
-      colors =
-          CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
-  ) {
+  val cardContent = @Composable {
     Column(modifier = Modifier.padding(16.dp)) {
       Icon(icon, null)
       Spacer(modifier = Modifier.height(8.dp))
@@ -312,6 +305,25 @@ fun DashboardStatCard(
           style = MaterialTheme.typography.labelMedium,
           color = contentColor.copy(alpha = 0.8f),
       )
+    }
+  }
+
+  if (onClick != null) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors =
+            CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+    ) {
+      cardContent()
+    }
+  } else {
+    Card(
+        modifier = modifier,
+        colors =
+            CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+    ) {
+      cardContent()
     }
   }
 }

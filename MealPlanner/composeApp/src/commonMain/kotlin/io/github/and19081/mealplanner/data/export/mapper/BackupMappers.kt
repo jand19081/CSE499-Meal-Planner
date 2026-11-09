@@ -43,6 +43,7 @@ fun FoodItemEntity.toDtoV1() =
         id = id.toString(),
         name = name,
         preferredUnitId = preferredUnitId?.toString(),
+        unitType = unitType,
         createdAt = createdAt ?: 0L,
         updatedAt = updatedAt,
     )
@@ -52,6 +53,7 @@ fun FoodItemDtoV1.toEntity() =
         id = Uuid.parse(id),
         name = name,
         preferredUnitId = preferredUnitId?.let { Uuid.parse(it) },
+        unitType = unitType,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -127,25 +129,37 @@ fun RecipeInstructionDtoV1.toEntity() =
 fun ScheduledMealEntity.toDtoV1() =
     ScheduledMealDtoV1(
         id = id.toString(),
+        foodItemId = foodItemId?.toString(),
+        restaurantId = restaurantId?.toString(),
         date = date,
         time = time,
         mealType = mealType,
         peopleCount = peopleCount,
         isConsumed = isConsumed,
         anticipatedCostCents = anticipatedCostCents,
-        mealSource = mealSource,
+        prePlannedMealId = prePlannedMealId?.toString(),
+        standaloneRecipeId = standaloneRecipeId?.toString(),
+        standaloneIngredientId = standaloneIngredientId?.toString(),
+        standaloneIngredientQuantity = standaloneIngredientQuantity,
+        standaloneIngredientUnitId = standaloneIngredientUnitId?.toString(),
     )
 
 fun ScheduledMealDtoV1.toEntity() =
     ScheduledMealEntity(
         id = Uuid.parse(id),
+        foodItemId = foodItemId?.let { Uuid.parse(it) },
+        restaurantId = restaurantId?.let { Uuid.parse(it) },
         date = date,
         time = time,
         mealType = mealType,
         peopleCount = peopleCount,
         isConsumed = isConsumed,
         anticipatedCostCents = anticipatedCostCents,
-        mealSource = mealSource,
+        prePlannedMealId = prePlannedMealId?.let { Uuid.parse(it) },
+        standaloneRecipeId = standaloneRecipeId?.let { Uuid.parse(it) },
+        standaloneIngredientId = standaloneIngredientId?.let { Uuid.parse(it) },
+        standaloneIngredientQuantity = standaloneIngredientQuantity,
+        standaloneIngredientUnitId = standaloneIngredientUnitId?.let { Uuid.parse(it) },
     )
 
 fun DashboardConfig.toDtoV1() =
@@ -288,7 +302,11 @@ fun RecipeRequirementEntity.toDtoV1() =
     RecipeRequirementDtoV1(
         id = id.toString(),
         groupId = groupId.toString(),
-        measurement = measurement.toDtoV1(),
+        measurement = ItemMeasurementDtoV1(
+            foodItemId = foodItemId.toString(),
+            unitId = null,
+            quantity = quantity
+        ),
         isPrimary = isPrimary,
     )
 
@@ -296,15 +314,27 @@ fun RecipeRequirementDtoV1.toEntity() =
     RecipeRequirementEntity(
         id = Uuid.parse(id),
         groupId = Uuid.parse(groupId),
-        measurement = measurement.toEntity(),
+        foodItemId = Uuid.parse(measurement.foodItemId ?: Uuid.NIL.toString()),
+        quantity = measurement.quantity,
         isPrimary = isPrimary,
     )
 
 fun PantryInventoryEntity.toDtoV1() =
-    PantryInventoryDtoV1(id = id.toString(), measurement = measurement.toDtoV1())
+    PantryInventoryDtoV1(
+        id = id.toString(),
+        measurement = ItemMeasurementDtoV1(
+            foodItemId = foodItemId.toString(),
+            unitId = null,
+            quantity = quantity
+        )
+    )
 
 fun PantryInventoryDtoV1.toEntity() =
-    PantryInventoryEntity(id = Uuid.parse(id), measurement = measurement.toEntity())
+    PantryInventoryEntity(
+        id = Uuid.parse(id),
+        foodItemId = Uuid.parse(measurement.foodItemId ?: Uuid.NIL.toString()),
+        quantity = measurement.quantity
+    )
 
 fun ShoppingCartItemEntity.toDtoV1() =
     ShoppingCartItemDtoV1(
